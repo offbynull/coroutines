@@ -11,6 +11,7 @@ import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
+// ASM utilities class
 public final class AsmUtils {
 
     private AsmUtils() {
