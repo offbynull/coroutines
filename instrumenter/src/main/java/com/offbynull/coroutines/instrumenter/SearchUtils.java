@@ -3,29 +3,35 @@ package com.offbynull.coroutines.instrumenter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
 // ASM utilities class
-public final class AsmUtils {
+public final class SearchUtils {
 
-    private AsmUtils() {
+    private SearchUtils() {
         // do nothing
     }
 
-    public static Collection<AbstractInsnNode> findInvocationsOf(Collection<AbstractInsnNode> instructionNodes,
+    public static List<AbstractInsnNode> findInvocationsOf(InsnList instructionNodes,
             Type expectedMethodType) {
         Validate.notNull(instructionNodes);
         Validate.notNull(expectedMethodType);
         Validate.isTrue(expectedMethodType.getSort() == Type.METHOD);
 
         List<AbstractInsnNode> ret = new ArrayList<>();
-        for (AbstractInsnNode instructionNode : instructionNodes) {
+        
+        Iterator<AbstractInsnNode> it = instructionNodes.iterator();
+        while (it.hasNext()) {
+            AbstractInsnNode instructionNode = it.next();
+            
             Type methodType;
             if (instructionNode instanceof MethodInsnNode) {
                 MethodInsnNode methodInsnNode = (MethodInsnNode) instructionNode;
@@ -45,14 +51,17 @@ public final class AsmUtils {
         return ret;
     }
 
-    public static Collection<AbstractInsnNode> findInvocationsThatStartWithParameters(Collection<AbstractInsnNode> instructionNodes,
+    public static List<AbstractInsnNode> findInvocationsThatStartWithParameters(InsnList instructionNodes,
             Type... expectedStartingParamTypes) {
         Validate.notNull(instructionNodes);
         Validate.notNull(expectedStartingParamTypes);
         Validate.noNullElements(expectedStartingParamTypes);
 
         List<AbstractInsnNode> ret = new ArrayList<>();
-        for (AbstractInsnNode instructionNode : instructionNodes) {
+        
+        Iterator<AbstractInsnNode> it = instructionNodes.iterator();
+        while (it.hasNext()) {
+            AbstractInsnNode instructionNode = it.next();
             Type[] methodParamTypes;
             if (instructionNode instanceof MethodInsnNode) {
                 MethodInsnNode methodInsnNode = (MethodInsnNode) instructionNode;
@@ -74,7 +83,7 @@ public final class AsmUtils {
         return ret;
     }
 
-    public static Collection<MethodNode> findMethodsThatStartWithParameters(Collection<MethodNode> methodNodes,
+    public static List<MethodNode> findMethodsThatStartWithParameters(Collection<MethodNode> methodNodes,
             Type... expectedStartingParamTypes) {
         Validate.notNull(methodNodes);
         Validate.notNull(expectedStartingParamTypes);

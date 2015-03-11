@@ -8,17 +8,20 @@ import java.util.LinkedList;
 import java.util.List;
 import org.apache.commons.lang3.Validate;
 
-public final class CoroutineState {
+public final class Continuation {
+    private static final int MODE_NORMAL = 0;
+    private static final int MODE_SAVING = 1;
+    private static final int MODE_LOADING = 2;
     private Deque<MethodState> methodStates = new LinkedList<>();
-    private State state = State.NORMAL;
+    private int mode = MODE_NORMAL;
 
-    public State getState() {
-        return state;
+    public int getMode() {
+        return mode;
     }
 
-    public void setState(State state) {
-        Validate.notNull(state);
-        this.state = state;
+    public void setMode(int mode) {
+        Validate.isTrue(mode == MODE_NORMAL || mode == MODE_SAVING || mode == MODE_LOADING);
+        this.mode = mode;
     }
     
     public void push(MethodState methodState) {
@@ -31,14 +34,8 @@ public final class CoroutineState {
         return methodStates.pop();
     }
     
-    public void yield() {
+    public void suspend() {
         throw new UnsupportedOperationException("Caller not instrumented");
-    }
-    
-    public enum State {
-        NORMAL,
-        SAVING,
-        LOADING,
     }
     
     public static final class MethodState {
