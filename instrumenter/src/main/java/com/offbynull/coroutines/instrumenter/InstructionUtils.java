@@ -1,53 +1,152 @@
 package com.offbynull.coroutines.instrumenter;
 
+import com.offbynull.coroutines.user.InternalContinuationException;
+import java.util.List;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
+import org.objectweb.asm.tree.JumpInsnNode;
+import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
-import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 
 public final class InstructionUtils {
 
-    /**
-     * Emits instructions to replace an invocation to CoroutineState.yield().
-     * <pre>
-     * if (s.getMode() == CoroutineState.MODE_NORMAL) {
-     *     throw new IllegalStateException("Must be in normal state before yielding");
-     * }
-     *
-     * int point = <GENERATED>;
-     * Object[] stack = <GENERATED>;
-     * Object[] locals = <GENERATED>;
-     *
-     * MethodState methodState = new MethodState(point, stack, locals);
-     * s.setMode(CoroutineState.MODE_SAVING);
-     * s.push(methodState);
-     *
-     * return <DUMMY>;
-     * </pre>
-     *
-     * @param staticMethod
-     * @return
-     */
-    public static InsnList yieldReplaceLogic(boolean staticMethod) {
+    public static InsnList instrumentMethodStart(boolean staticMethod, InsnList originalMethodInsnList,
+            List<AbstractInsnNode> invokePoints, List<AbstractInsnNode> yieldPoints) {
         int coroutineStateVarIdx = staticMethod ? 0 : 1;
 
+        Type exceptionType = Type.getType(InternalContinuationException.class);
+
         InsnList ret = new InsnList();
+
+        LabelNode startOfMethodLabelNode = new LabelNode();
+
+        ret.add(
+                tableSwitch(
+                        throwException(exceptionType, "Bad state"),
+                        0,
+                        merge(
+                                saveLocalsArray(0, 1, null),
+                                saveOperandStack(0, 1, null)),
+                        throwException(exceptionType, "Unexpected saving state"),
+                        jumpTo(startOfMethodLabelNode)));
+        ret.add(startOfMethodLabelNode);
+        ret.add(originalMethodInsnList);
 
         return ret;
     }
 
-    
+    /**
+     * Merges multiple instruction lists in to a single instruction list
+     * @param insnLists instruction lists to merge
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @return merged instructions
+     */
+    private static InsnList merge(InsnList... insnLists) {
+        Validate.notNull(insnLists);
+        Validate.noNullElements(insnLists);
+
+        InsnList ret = new InsnList();
+        for (int i = 0; i < insnLists.length; i++) {
+            ret.add(insnLists[i]);
+        }
+
+        return ret;
+    }
+
+    /**
+     * Generates instructions for an unconditional jump to a label.
+     * @param labelNode label to jump to
+     * @throws NullPointerException if any argument is {@code null}
+     * @return instructions for an unconditional jump to {@code labelNode}
+     */
+    private static InsnList jumpTo(LabelNode labelNode) {
+        Validate.notNull(labelNode);
+
+        InsnList ret = new InsnList();
+        ret.add(new JumpInsnNode(Opcodes.GOTO, labelNode));
+
+        return ret;
+    }
+
+    /**
+     * Generates instructions to throw an exception.
+     *
+     * @param exceptionType type of exception (must have a constructor that takes in a single string as the message)
+     * @param message message of exception
+     * @return instructions to throw an exception
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if type isn't an {@code OBJECT}
+     */
+    private static InsnList throwException(Type exceptionType, String message) {
+        Validate.notNull(exceptionType);
+        Validate.notNull(message);
+        Validate.isTrue(exceptionType.getSort() == Type.OBJECT);
+
+        InsnList ret = new InsnList();
+
+        ret.add(new TypeInsnNode(Opcodes.NEW, exceptionType.getInternalName()));
+        ret.add(new InsnNode(Opcodes.DUP));
+        ret.add(new LdcInsnNode("test"));
+        ret.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, exceptionType.getInternalName(), "<init>", "(Ljava/lang/String;)V", false));
+        ret.add(new InsnNode(Opcodes.ATHROW));
+
+        return ret;
+    }
+
+    /**
+     * Generates instructions for a switch table.
+     *
+     * @param defaultInsnList instructions to execute on default statement ({@code null} means no default statement)
+     * @param caseStartIdx the number which the case statements start at
+     * @param caseInsnLists instructions to execute on each case statement (elements that contain {@code null} mean missing case statement)
+     * @return instructions to dump the operand stack in to an array and save it to the local variables table
+     * @throws NullPointerException if {@code caseInsnLists} argument is {@code null}
+     * @throws IllegalArgumentException if any numeric argument is {@code < 0}
+     */
+    private static InsnList tableSwitch(InsnList defaultInsnList, int caseStartIdx, InsnList... caseInsnLists) {
+        Validate.isTrue(caseStartIdx >= 0);
+        Validate.notNull(caseInsnLists);
+        InsnList ret = new InsnList();
+
+        LabelNode endLabelNode = new LabelNode();
+        LabelNode defaultLabelNode = defaultInsnList == null ? endLabelNode : new LabelNode();
+        LabelNode[] caseLabelNodes = new LabelNode[caseInsnLists.length];
+
+        for (int i = 0; i < caseInsnLists.length; i++) {
+            caseLabelNodes[i] = caseInsnLists[i] == null ? endLabelNode : new LabelNode();
+        }
+
+        ret.add(new TableSwitchInsnNode(caseStartIdx, caseStartIdx + caseInsnLists.length, defaultLabelNode, caseLabelNodes));
+
+        for (int i = 0; i < caseInsnLists.length; i++) {
+            if (caseInsnLists[i] != null) {
+                ret.add(caseInsnLists[i]);
+                ret.add(new JumpInsnNode(Opcodes.GOTO, endLabelNode));
+            }
+        }
+
+        if (defaultInsnList != null) {
+            ret.add(defaultInsnList);
+            ret.add(new JumpInsnNode(Opcodes.GOTO, endLabelNode));
+        }
+
+        return ret;
+    }
+
     /**
      * Generates instructions to save the operand stack to an object array.
+     *
      * @param arrayLocalsIdx index within the local variables table that the generated object array should be saved
      * @param tempObjectLocalsIdx index within the local variables table that a temporary object should be stored
      * @param frame execution stack frame at the instruction where the operand stack is to be saved
@@ -61,18 +160,17 @@ public final class InstructionUtils {
         Validate.isTrue(tempObjectLocalsIdx >= 0);
         Validate.notNull(frame);
         InsnList ret = new InsnList();
-        
+
         // Create stack storage array and save it in local vars table
         ret.add(new LdcInsnNode(frame.getStackSize()));
         ret.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"));
         ret.add(new VarInsnNode(Opcodes.ASTORE, arrayLocalsIdx));
-                        
+
         // Save the stack
         for (int i = frame.getStackSize() - 1; i >= 0; i--) {
             BasicValue basicValue = frame.getStack(i);
             Type type = basicValue.getType();
-            
-            
+
             // Convert the item to an object (if not already an object) and stores it in local vars table. Item removed from stack.
             switch (type.getSort()) {
                 case Type.BOOLEAN:
@@ -124,21 +222,16 @@ public final class InstructionUtils {
             ret.add(new InsnNode(Opcodes.AASTORE));
         }
 
-        
-        
-        
         // Restore the stack
         for (int i = 0; i < frame.getStackSize(); i++) {
             BasicValue basicValue = frame.getStack(i);
             Type type = basicValue.getType();
-            
-            
+
             // Load item from stack storage array
             ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx));
             ret.add(new LdcInsnNode(i));
             ret.add(new InsnNode(Opcodes.AALOAD));
-            
-            
+
             // Convert the item to an object (if not already an object) and stores it in local vars table. Item removed from stack.
             switch (type.getSort()) {
                 case Type.BOOLEAN:
@@ -182,14 +275,13 @@ public final class InstructionUtils {
                     throw new IllegalArgumentException();
             }
         }
-        
+
         return ret;
     }
-    
-    
-    
+
     /**
      * Generates instructions to save the local variables table to an object array.
+     *
      * @param arrayLocalsIdx index within the local variables table that the generated object array should be frame
      * @param tempObjectLocalsIdx index within the local variables table that a temporary object should be stored
      * @param frameAtInstruction execution stack frame at the instruction where the local variables table is to be saved
@@ -203,21 +295,21 @@ public final class InstructionUtils {
         Validate.isTrue(tempObjectLocalsIdx >= 0);
         Validate.notNull(frame);
         InsnList ret = new InsnList();
-        
+
         // Create local storage array and save it in local vars table
         ret.add(new LdcInsnNode(frame.getLocals()));
         ret.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"));
         ret.add(new VarInsnNode(Opcodes.ASTORE, arrayLocalsIdx));
-                        
+
         // Save the locals
         for (int i = 0; i < frame.getLocals(); i++) {
             BasicValue basicValue = frame.getLocal(i);
             Type type = basicValue.getType();
-            
+
             if (type == null) {
                 continue;
             }
-            
+
             // Convert the item to an object (if not already an object) and stores it in local vars table.
             switch (type.getSort()) {
                 case Type.BOOLEAN:
@@ -278,11 +370,11 @@ public final class InstructionUtils {
             ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
             ret.add(new InsnNode(Opcodes.AASTORE));
         }
-        
+
         // Shove in to method nodes
         return ret;
     }
-    
+
     /**
      * Generates instructions that returns a dummy value. Return values are as follows:
      * <ul>
@@ -294,6 +386,7 @@ public final class InstructionUtils {
      * <li>double -> 0.0</li>
      * <li>Object -> null</li>
      * </ul>
+     *
      * @param returnType return type of the method this generated bytecode is for
      * @return instructions to return a dummy value
      * @throws NullPointerException if any argument is {@code null}
