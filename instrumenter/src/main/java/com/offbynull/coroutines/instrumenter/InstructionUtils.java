@@ -60,8 +60,8 @@ public final class InstructionUtils {
     }
 
     /**
-     * Generates instructions for an unconditional jump to a addLabel.
-     * @param labelNode addLabel to jump to
+     * Generates instructions for an unconditional jump to a label.
+     * @param labelNode label to jump to
      * @throws NullPointerException if any argument is {@code null}
      * @return instructions for an unconditional jump to {@code labelNode}
      */
@@ -75,10 +75,10 @@ public final class InstructionUtils {
     }
     
     /**
-     * Generates instructions for a addLabel.
-     * @param labelNode addLabel to insert
+     * Generates instructions for a label.
+     * @param labelNode label to insert
      * @throws NullPointerException if any argument is {@code null}
-     * @return instructions for a addLabel
+     * @return instructions for a label
      */
     public static InsnList addLabel(LabelNode labelNode) {
         Validate.notNull(labelNode);
