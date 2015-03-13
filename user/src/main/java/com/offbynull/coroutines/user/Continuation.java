@@ -40,28 +40,28 @@ public final class Continuation {
     
     public static final class MethodState {
         private final int continuationPoint;
-        private final List<Object> stack;
-        private final List<Object> localTable;
+        private final Object[] stack;
+        private final Object[] localTable;
 
         public MethodState(int continuationPoint, Object[] stack, Object[] localTable) {
             Validate.isTrue(continuationPoint >= 0);
             Validate.notNull(stack);
             Validate.notNull(localTable);
             this.continuationPoint = continuationPoint;
-            this.stack = Collections.unmodifiableList(new ArrayList<>(Arrays.asList(stack)));
-            this.localTable = Collections.unmodifiableList(new ArrayList<>(Arrays.asList(localTable)));
+            this.stack = stack.clone();
+            this.localTable = localTable.clone();
         }
 
         public int getContinuationPoint() {
             return continuationPoint;
         }
 
-        public List<Object> getStack() {
-            return stack;
+        public Object[] getStack() {
+            return stack.clone();
         }
 
-        public List<Object> getLocalTable() {
-            return localTable;
+        public Object[] getLocalTable() {
+            return localTable.clone();
         }
         
     }
