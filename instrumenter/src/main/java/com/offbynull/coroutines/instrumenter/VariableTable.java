@@ -10,9 +10,12 @@ public final class VariableTable {
     private int extraOffset;
     private List<Variable> extraVars;
     
-    public VariableTable(boolean isStatic, Type methodType, int maxLocals) {
+    public VariableTable(boolean isStatic, Type objectType, Type methodType, int maxLocals) {
+        Validate.notNull(objectType);
         Validate.notNull(methodType);
         Validate.isTrue(maxLocals >= 0);
+        Validate.isTrue(objectType.getSort() == Type.OBJECT);
+        Validate.isTrue(methodType.getSort() == Type.METHOD);
         
         extraOffset = maxLocals;
         
@@ -20,7 +23,7 @@ public final class VariableTable {
         extraVars = new ArrayList<>();
         
         if (!isStatic) {
-            argVars.add(0, new Variable(Type.getType(Object.class), 0, true));
+            argVars.add(0, new Variable(objectType, 0, true));
         }
         
         Type[] argTypes = methodType.getArgumentTypes();

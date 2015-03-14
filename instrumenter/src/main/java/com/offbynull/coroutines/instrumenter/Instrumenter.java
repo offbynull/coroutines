@@ -2,8 +2,9 @@ package com.offbynull.coroutines.instrumenter;
 
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.addLabel;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.call;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.cloneInvokeNode;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.construct;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.empty;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.ifIntegersEqual;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.jumpTo;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadIntConst;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadLocalVariableTable;
@@ -61,6 +62,8 @@ public final class Instrumenter {
             MethodUtils.getAccessibleMethod(Continuation.class, "suspend"));
     private static final Method CONTINUATION_GETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
+    private static final Method CONTINUATION_SETMODE_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "setMode", Integer.TYPE);
     private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
             = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, Object[].class);
     private static final Method CONTINUATION_PUSH_METHOD
@@ -127,7 +130,11 @@ public final class Instrumenter {
 
             // Generate local variable indices
             boolean isStatic = (methodNode.access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC;
-            VariableTable varTable = new VariableTable(isStatic, Type.getMethodType(methodNode.desc), methodNode.maxLocals);
+            VariableTable varTable = new VariableTable(
+                    isStatic,
+                    Type.getObjectType(classNode.name),
+                    Type.getMethodType(methodNode.desc),
+                    methodNode.maxLocals);
 
             // Generate instructions for continuation points
             int nextId = 0;
@@ -229,15 +236,19 @@ public final class Instrumenter {
             //      Object[] locals = saveLocalsStackHere();
             //      continuation.push(new MethodState(<number>, stack, locals);
             //      #IFDEF suspend
-            //          return <value>;       
+            //          continuation.setMode(MODE_SAVING);
+            //          return <dummy>;
             //      #ENDIF
             //
             //      restorePoint_<number>:
             //      #IFDEF !suspend
             //          <method invocation>
+            //          if (continuation.getMode() == MODE_SAVING) {
+            //              return <dummy>;
+            //          }
             //      #ENDIF
             continuationPoints.forEach((cp) -> {
-                InsnList savePointInsnList
+                InsnList saveBeforeInvokeInsnList
                         = merge(
                                 saveOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
                                 saveLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
@@ -245,15 +256,38 @@ public final class Instrumenter {
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(cp.getId()),
                                                 loadObjectVar(savedStackVar),
-                                                loadObjectVar(savedLocalsVar))),
-                                cp.isSuspend() ? returnDummy(returnType) : empty(),
-                                addLabel(cp.getRestoreLabelNode())
+                                                loadObjectVar(savedLocalsVar)))
                         );
                 
-                methodNode.instructions.insertBefore(cp.getInvokeInsnNode(), savePointInsnList);                
+                InsnList insnList;
                 if (cp.isSuspend()) {
+                    insnList =
+                            merge(
+                                    saveBeforeInvokeInsnList,           // save
+                                                                        // set saving mode
+                                    call(CONTINUATION_SETMODE_METHOD, loadObjectVar(contArg),
+                                            loadIntConst(Continuation.MODE_SAVING)),
+                                    returnDummy(returnType),            // return dummy value
+                                    addLabel(cp.getRestoreLabelNode())  // add restore point for when we're enter the method in loading mode
+                            );
+                    methodNode.instructions.insertBefore(cp.getInvokeInsnNode(), insnList);
                     methodNode.instructions.remove(cp.getInvokeInsnNode());
+                } else {
+                    insnList =
+                            merge(
+                                    saveBeforeInvokeInsnList,                   // save
+                                    cloneInvokeNode(cp.getInvokeInsnNode()),    // invoke method
+                                    ifIntegersEqual(                            // if we're saving after invoke, return dummy value
+                                            call(CONTINUATION_GETMODE_METHOD, loadObjectVar(contArg)),
+                                            loadIntConst(Continuation.MODE_SAVING),
+                                            returnDummy(returnType)
+                                    ),
+                                    addLabel(cp.getRestoreLabelNode())  // add restore point for when we're enter the method in loading mode
+                            );
                 }
+                
+                methodNode.instructions.insertBefore(cp.getInvokeInsnNode(), insnList);
+                methodNode.instructions.remove(cp.getInvokeInsnNode());
             });
         }
 

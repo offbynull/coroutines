@@ -6,12 +6,15 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
@@ -35,18 +38,24 @@ public final class InstructionUtils {
     public static InsnList empty() {
         return new InsnList();
     }
-    
+
     /**
-     * Merges multiple instruction lists in to a single instruction list
-     * @param insnLists instruction lists to merge
-     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
-     * @return merged instructions
+     * Clones an invoke/invokedynamic node and returns it as an InsnList
+     * @param insnNode instruction to clone
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if node isn't of invoke type
+     * @return instruction list with cloned instruction
      */
-    public static InsnList merge(List<InsnList> insnLists) {
-        Validate.notNull(insnLists);
-        return merge(insnLists.toArray(new InsnList[insnLists.size()]));
+    public static InsnList cloneInvokeNode(AbstractInsnNode insnNode) {
+        Validate.notNull(insnNode);
+        Validate.isTrue(insnNode instanceof MethodInsnNode || insnNode instanceof InvokeDynamicInsnNode);
+
+        InsnList ret = new InsnList();
+        ret.add(insnNode.clone(new HashMap<>()));
+
+        return ret;
     }
-    
+
     /**
      * Merges multiple instruction lists in to a single instruction list
      * @param insnLists instruction lists to merge
@@ -112,6 +121,7 @@ public final class InstructionUtils {
 
         InsnList ret = new InsnList();
         ret.add(new VarInsnNode(Opcodes.ALOAD, variable.getIndex()));
+        ret.add(new TypeInsnNode(Opcodes.CHECKCAST, variable.getType().getInternalName()));
 
         return ret;
     }
@@ -160,6 +170,34 @@ public final class InstructionUtils {
         return ret;
     }
 
+    /**
+     * Calls a method with a set of arguments. The return result (if present) will be on top of the stack after execution. If method is not
+     * static, first argument must be this pointer to the object on which method is being called.
+     * @param lhs left hand side instruction list (must leave an int on top of the stack)
+     * @param rhs right hand side instruction list (must leave an int on top of the stack)
+     * @param action action to perform if results of {@code lhs} and {@code rhs} are equal
+     * @return instructions instruction list to perform some action if two ints are equal
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList ifIntegersEqual(InsnList lhs, InsnList rhs, InsnList action) {
+        Validate.notNull(lhs);
+        Validate.notNull(rhs);
+        Validate.notNull(action);
+        
+        
+        InsnList ret = new InsnList();
+        
+        LabelNode notEqualLabelNode = new LabelNode();
+        
+        ret.add(lhs);
+        ret.add(rhs);
+        ret.add(new JumpInsnNode(Opcodes.IF_ICMPNE, notEqualLabelNode));
+        ret.add(action);
+        ret.add(notEqualLabelNode);
+        
+        return ret;
+    }
+    
     /**
      * Calls a method with a set of arguments. The return result (if present) will be on top of the stack after execution. If method is not
      * static, first argument must be this pointer to the object on which method is being called.
