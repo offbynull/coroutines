@@ -13,15 +13,21 @@ import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveLocalVa
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveOperandStack;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.tableSwitch;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.throwException;
+import static com.offbynull.coroutines.instrumenter.SearchUtils.findInvocationsOf;
+import static com.offbynull.coroutines.instrumenter.SearchUtils.findInvocationsThatStartWithParameters;
+import static com.offbynull.coroutines.instrumenter.SearchUtils.findMethodsThatStartWithParameters;
+import static com.offbynull.coroutines.instrumenter.SearchUtils.searchForOpcodes;
 import com.offbynull.coroutines.user.Continuation;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.LinkedList;
 import java.util.List;
+import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -47,9 +53,13 @@ public final class Instrumenter {
 
         // Find methods that need to be instrumented
         List<MethodNode> methodNodesToInstrument
-                = SearchUtils.findMethodsThatStartWithParameters(classNode.methods, CONTINUATION_CLASS_TYPE);
+                = findMethodsThatStartWithParameters(classNode.methods, CONTINUATION_CLASS_TYPE);
 
         for (MethodNode methodNode : methodNodesToInstrument) {
+            // Check method does not contain invalid bytecode
+            Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR, Opcodes.MONITORENTER, Opcodes.MONITOREXIT).isEmpty(),
+                    "JSR/MONITORENTER/MONITOREXIT are not allowed");
+            
             // Get return type
             Type returnType = Type.getMethodType(methodNode.desc).getReturnType();
 
@@ -63,9 +73,9 @@ public final class Instrumenter {
 
             // Find invocations of continuation points
             List<AbstractInsnNode> yieldInvocationInsnNodes
-                    = SearchUtils.findInvocationsOf(methodNode.instructions, CONTINUATION_YIELD_METHOD_TYPE);
+                    = findInvocationsOf(methodNode.instructions, CONTINUATION_YIELD_METHOD_TYPE);
             List<AbstractInsnNode> saveInvocationInsnNodes
-                    = SearchUtils.findInvocationsThatStartWithParameters(methodNode.instructions, CONTINUATION_CLASS_TYPE);
+                    = findInvocationsThatStartWithParameters(methodNode.instructions, CONTINUATION_CLASS_TYPE);
 
             // Generate local variable indices
             VariableTable variableTable = new VariableTable(methodNode.access, methodNode.maxLocals);

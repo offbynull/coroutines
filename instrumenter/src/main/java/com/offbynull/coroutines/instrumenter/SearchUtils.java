@@ -3,8 +3,11 @@ package com.offbynull.coroutines.instrumenter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -134,6 +137,35 @@ public final class SearchUtils {
             }
         }
 
+        return ret;
+    }
+    
+    /**
+     * Find instructions in a certain class that are of a certain set of opcodes.
+     * @param insnList instruction list to search through
+     * @param opcodes opcodes to search for
+     * @return list of instructions that contain the opcodes being searched for
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@coed opcodes} is empty
+     */
+    public static List<AbstractInsnNode> searchForOpcodes(InsnList insnList, int ... opcodes) {
+        Validate.notNull(insnList);
+        Validate.notNull(opcodes);
+        Validate.isTrue(opcodes.length > 0);
+        
+        List<AbstractInsnNode> ret = new LinkedList<>();
+        
+        Set<Integer> opcodeSet = new HashSet<>();
+        Arrays.stream(opcodes).forEach((x) -> opcodeSet.add(x));
+        
+        Iterator<AbstractInsnNode> it = insnList.iterator();
+        while (it.hasNext()) {
+            AbstractInsnNode insnNode = it.next();
+            if (opcodeSet.contains(insnNode.getOpcode())) {
+                ret.add(insnNode);
+            }
+        }
+        
         return ret;
     }
 
