@@ -19,6 +19,10 @@ import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 
+/**
+ * Utility class to generate common bytecode instructions.
+ * @author Kasra Faghihi
+ */
 public final class InstructionUtils {
 
     /**

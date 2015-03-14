@@ -13,22 +13,32 @@ import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
-// ASM utilities class
+/**
+ * Utility class to search bytecode in classes/methods/patterns for specific patterns. 
+ * @author Kasra Faghihi
+ */
 public final class SearchUtils {
 
     private SearchUtils() {
         // do nothing
     }
 
-    public static List<AbstractInsnNode> findInvocationsOf(InsnList instructionNodes,
-            Type expectedMethodType) {
-        Validate.notNull(instructionNodes);
+    /**
+     * Find invocations of a certain method.
+     * @param insnList instruction list to search through
+     * @param expectedMethodType type of method being invoked
+     * @return list of invocations (may be nodes of type {@link MethodInsnNode} or {@link InvokeDynamicInsnNode})
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws NullPointerException if {@code expectedMethodType} isn't of sort {@link Type#METHOD}
+     */
+    public static List<AbstractInsnNode> findInvocationsOf(InsnList insnList, Type expectedMethodType) {
+        Validate.notNull(insnList);
         Validate.notNull(expectedMethodType);
         Validate.isTrue(expectedMethodType.getSort() == Type.METHOD);
 
         List<AbstractInsnNode> ret = new ArrayList<>();
         
-        Iterator<AbstractInsnNode> it = instructionNodes.iterator();
+        Iterator<AbstractInsnNode> it = insnList.iterator();
         while (it.hasNext()) {
             AbstractInsnNode instructionNode = it.next();
             
@@ -51,15 +61,27 @@ public final class SearchUtils {
         return ret;
     }
 
-    public static List<AbstractInsnNode> findInvocationsThatStartWithParameters(InsnList instructionNodes,
+    /**
+     * Find invocations of any method where the parameter list starts with a certain list of types (order matters).
+     * @param insnList instruction list to search through
+     * @param expectedStartingParamTypes starting parameter types
+     * @return list of invocations (may be nodes of type {@link MethodInsnNode} or {@link InvokeDynamicInsnNode})
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @throws IllegalArgumentException if any element in {@code expectedStartingParamTypes} is either of sort {@link Type#METHOD}
+     * or {@link Type#VOID}
+     */
+    public static List<AbstractInsnNode> findInvocationsThatStartWithParameters(InsnList insnList,
             Type... expectedStartingParamTypes) {
-        Validate.notNull(instructionNodes);
+        Validate.notNull(insnList);
         Validate.notNull(expectedStartingParamTypes);
         Validate.noNullElements(expectedStartingParamTypes);
+        for (Type type : expectedStartingParamTypes) {
+            Validate.isTrue(type.getSort() != Type.METHOD && type.getSort() != Type.VOID);
+        }
 
         List<AbstractInsnNode> ret = new ArrayList<>();
         
-        Iterator<AbstractInsnNode> it = instructionNodes.iterator();
+        Iterator<AbstractInsnNode> it = insnList.iterator();
         while (it.hasNext()) {
             AbstractInsnNode instructionNode = it.next();
             Type[] methodParamTypes;
@@ -83,11 +105,24 @@ public final class SearchUtils {
         return ret;
     }
 
+    /**
+     * Find methods within a class where the parameter list starts with a certain list of types (order matters).
+     * @param methodNodes method nodes to search through
+     * @param expectedStartingParamTypes starting parameter types
+     * @return list of methods
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @throws IllegalArgumentException if any element in {@code expectedStartingParamTypes} is either of sort {@link Type#METHOD}
+     * or {@link Type#VOID}
+     */
     public static List<MethodNode> findMethodsThatStartWithParameters(Collection<MethodNode> methodNodes,
             Type... expectedStartingParamTypes) {
         Validate.notNull(methodNodes);
         Validate.notNull(expectedStartingParamTypes);
+        Validate.noNullElements(methodNodes);
         Validate.noNullElements(expectedStartingParamTypes);
+        for (Type type : expectedStartingParamTypes) {
+            Validate.isTrue(type.getSort() != Type.METHOD && type.getSort() != Type.VOID);
+        }
 
         List<MethodNode> ret = new ArrayList<>();
         for (MethodNode methodNode : methodNodes) {
