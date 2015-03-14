@@ -1,8 +1,14 @@
 package com.offbynull.coroutines.instrumenter;
 
+import com.offbynull.coroutines.instrumenter.TestUtils.JarEntry;
+import static com.offbynull.coroutines.instrumenter.TestUtils.createJar;
+import static com.offbynull.coroutines.instrumenter.TestUtils.getClasspath;
 import com.offbynull.coroutines.user.Coroutine;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.junit.After;
@@ -32,7 +38,7 @@ import static org.objectweb.asm.Opcodes.RETURN;
 
 public final class InstrumenterTest {
 
-    private SingleClassLoader classLoader;
+    private URLClassLoader classLoader;
 
     @Before
     public void setUp() throws Exception {
@@ -64,7 +70,7 @@ public final class InstrumenterTest {
         MethodVisitor mv;
         AnnotationVisitor av0;
 
-        cw.visit(52, ACC_PUBLIC + ACC_SUPER, "test/Test", null, "java/lang/Object", null);
+        cw.visit(52, ACC_PUBLIC + ACC_SUPER, "Test", null, "java/lang/Object", null);
 
         cw.visitSource("Test.java", null);
 
@@ -79,7 +85,7 @@ public final class InstrumenterTest {
             mv.visitInsn(RETURN);
             Label l1 = new Label();
             mv.visitLabel(l1);
-            mv.visitLocalVariable("this", "Ltest/Test;", null, l0, l1, 0);
+            mv.visitLocalVariable("this", "LTest;", null, l0, l1, 0);
             mv.visitMaxs(1, 1);
             mv.visitEnd();
         }
@@ -117,17 +123,17 @@ public final class InstrumenterTest {
             Label l4 = new Label();
             mv.visitLabel(l4);
             mv.visitLineNumber(20, l4);
-            mv.visitFrame(Opcodes.F_NEW, 3, new Object[]{"test/Test", "com/offbynull/coroutines/user/Continuation", Opcodes.INTEGER}, 0, new Object[]{});
+            mv.visitFrame(Opcodes.F_NEW, 3, new Object[]{"Test", "com/offbynull/coroutines/user/Continuation", Opcodes.INTEGER}, 0, new Object[]{});
             mv.visitVarInsn(ALOAD, 0);
             mv.visitVarInsn(ALOAD, 1);
             mv.visitVarInsn(ILOAD, 2);
-            mv.visitMethodInsn(INVOKESPECIAL, "test/Test", "echo", "(Lcom/offbynull/coroutines/user/Continuation;I)V", false);
+            mv.visitMethodInsn(INVOKESPECIAL, "Test", "echo", "(Lcom/offbynull/coroutines/user/Continuation;I)V", false);
             Label l5 = new Label();
             mv.visitLabel(l5);
             mv.visitLineNumber(19, l5);
             mv.visitIincInsn(2, 1);
             mv.visitLabel(l3);
-            mv.visitFrame(Opcodes.F_NEW, 3, new Object[]{"test/Test", "com/offbynull/coroutines/user/Continuation", Opcodes.INTEGER}, 0, new Object[]{});
+            mv.visitFrame(Opcodes.F_NEW, 3, new Object[]{"Test", "com/offbynull/coroutines/user/Continuation", Opcodes.INTEGER}, 0, new Object[]{});
             mv.visitVarInsn(ILOAD, 2);
             mv.visitIntInsn(BIPUSH, 10);
             mv.visitJumpInsn(IF_ICMPLT, l4);
@@ -137,7 +143,7 @@ public final class InstrumenterTest {
             mv.visitInsn(RETURN);
             Label l7 = new Label();
             mv.visitLabel(l7);
-            mv.visitLocalVariable("this", "Ltest/Test;", null, l0, l7, 0);
+            mv.visitLocalVariable("this", "LTest;", null, l0, l7, 0);
             mv.visitLocalVariable("continuation", "Lcom/offbynull/coroutines/user/Continuation;", null, l0, l7, 1);
             mv.visitLocalVariable("i", "I", null, l2, l6, 2);
             mv.visitMaxs(3, 3);
@@ -163,7 +169,7 @@ public final class InstrumenterTest {
             mv.visitInsn(RETURN);
             Label l3 = new Label();
             mv.visitLabel(l3);
-            mv.visitLocalVariable("this", "Ltest/Test;", null, l0, l3, 0);
+            mv.visitLocalVariable("this", "LTest;", null, l0, l3, 0);
             mv.visitLocalVariable("continuation", "Lcom/offbynull/coroutines/user/Continuation;", null, l0, l3, 1);
             mv.visitLocalVariable("x", "I", null, l0, l3, 2);
             mv.visitMaxs(2, 3);
@@ -171,12 +177,21 @@ public final class InstrumenterTest {
         }
         cw.visitEnd();
 
-        byte[] normalClass = cw.toByteArray();
-        byte[] instrumentedClass = new Instrumenter().instrument(normalClass);
+        // Create jar of original class
+        byte[] originalClass = cw.toByteArray();
+        File originalJarFile = createJar(new JarEntry("Test.class", originalClass));
         
-        FileUtils.writeByteArrayToFile(new File("out.class"), instrumentedClass);
+        // Construct classpath required for instrumentation
+        List<File> instrumentationClasspath = getClasspath();
+        instrumentationClasspath.add(originalJarFile);
         
-        classLoader = SingleClassLoader.create(getClass().getClassLoader(), "test.Test", instrumentedClass);
+        // Instrument class
+        byte[] instrumentedClass = new Instrumenter(instrumentationClasspath).instrument(originalClass);
+        FileUtils.writeByteArrayToFile(new File("out.class"), instrumentedClass); // temp
+        
+        // Create jar of instrumented class and set for use in classloader
+        File instrumentedJarFile = createJar(new JarEntry("Test.class", instrumentedClass));
+        classLoader = URLClassLoader.newInstance(new URL[] { instrumentedJarFile.toURI().toURL() }, getClass().getClassLoader());
     }
 
     @After
@@ -188,7 +203,7 @@ public final class InstrumenterTest {
 
     @Test
     public void testSomeMethod() throws Exception {
-        Class<?> cls = classLoader.loadClass("test.Test");
+        Class<?> cls = classLoader.loadClass("Test");
         Object instance = cls.newInstance();
         
         Coroutine coroutine = new Coroutine();

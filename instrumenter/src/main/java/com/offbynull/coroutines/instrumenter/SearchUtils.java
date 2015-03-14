@@ -1,14 +1,25 @@
 package com.offbynull.coroutines.instrumenter;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.Validate;
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
@@ -179,4 +190,71 @@ public final class SearchUtils {
         return expectedParams.equals(truncatedMethodParams);
     }
 
+    public static Map<String, String> getSuperClassMappings(List<File> classPaths) throws IOException {
+        Validate.notNull(classPaths);
+        Validate.noNullElements(classPaths);
+        
+        Map<String, String> ret = new HashMap<>();
+        for (File classPath : classPaths) {
+            Validate.isTrue(classPath.exists());
+            
+            Map<String, String> superNameMappingsForPath;
+            if (classPath.isFile()) {
+                superNameMappingsForPath = openJarAndGetSuperClassMappings(classPath);
+            } else {
+                superNameMappingsForPath = openFolderAndGetSuperClassMappings(classPath);
+            }
+            
+            // remove those we already have entries for before adding, because we don't want to override name mappings for names we already
+            // have
+            superNameMappingsForPath.keySet().removeAll(ret.keySet());
+            ret.putAll(superNameMappingsForPath);
+        }
+        
+        return ret;
+    }
+    
+    private static Map<String, String> openFolderAndGetSuperClassMappings(File folder) throws IOException {
+        Validate.isTrue(folder.isDirectory());
+        
+        Map<String, String> ret = new HashMap<>();
+        for (File file : FileUtils.listFiles(folder, new String[] { "class" }, true)) {
+            try (InputStream is = new FileInputStream(file)) {
+                populateSuperClassMapping(is, ret);
+            }
+        }
+        
+        return ret;
+    }
+
+    private static Map<String, String> openJarAndGetSuperClassMappings(File file) throws IOException {
+        Validate.isTrue(file.isFile());
+        
+        Map<String, String> ret = new HashMap<>();
+        
+        try (ZipFile zipFile = new ZipFile(file)) {
+            Enumeration<ZipArchiveEntry> entryEnum = zipFile.getEntries();
+            while (entryEnum.hasMoreElements()) {
+                ZipArchiveEntry entry = entryEnum.nextElement();
+                if (!entry.getName().endsWith(".class") || entry.isDirectory()) {
+                    continue;
+                }
+
+                try (InputStream is = zipFile.getInputStream(entry)) {
+                    populateSuperClassMapping(is, ret);
+                }
+            }
+        }
+        
+        return ret;
+    }
+
+    
+    private static void populateSuperClassMapping(final InputStream is, Map<String, String> superClassMap) throws IOException {
+        ClassReader classReader = new ClassReader(is);
+        String name = classReader.getClassName();
+        String superName = classReader.getSuperName();
+        
+        superClassMap.put(name, superName);
+    }
 }

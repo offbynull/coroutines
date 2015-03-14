@@ -4,7 +4,6 @@ import static com.offbynull.coroutines.instrumenter.InstructionUtils.addLabel;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.call;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.construct;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.empty;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.invokePopMethodState;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.jumpTo;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadIntConst;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadLocalVariableTable;
@@ -26,6 +25,7 @@ import com.offbynull.coroutines.user.Continuation;
 import com.offbynull.coroutines.user.Continuation.MethodState;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -34,6 +34,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
@@ -73,8 +74,19 @@ public final class Instrumenter {
     private static final Method METHODSTATE_GETSTACK_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getStack");
     
+    private Map<String, String> superClassMapping;
+    
+    public Instrumenter(List<File> classPaths) throws IOException {
+        Validate.notNull(classPaths);
+        Validate.noNullElements(classPaths);
+        
+        superClassMapping = SearchUtils.getSuperClassMappings(classPaths);
+    }
 
     public byte[] instrument(byte[] input) throws IOException {
+        Validate.notNull(input);
+        Validate.isTrue(input.length > 0);
+
         ByteArrayInputStream bais = new ByteArrayInputStream(input);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         instrument(bais, baos);
@@ -247,7 +259,7 @@ public final class Instrumenter {
 
         classNode.accept(new TraceClassVisitor(new PrintWriter(System.out)));
         // Write tree model back out as class
-        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        ClassWriter cw = new CustomClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, superClassMapping);
         classNode.accept(cw);
 
         outputStream.write(cw.toByteArray());
