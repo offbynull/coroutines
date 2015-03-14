@@ -1,7 +1,10 @@
 package com.offbynull.coroutines.instrumenter;
 
+import com.offbynull.coroutines.instrumenter.VariableTable.Variable;
 import com.offbynull.coroutines.user.Continuation;
-import com.offbynull.coroutines.user.InternalContinuationException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.Validate;
@@ -87,8 +90,111 @@ public final class InstructionUtils {
         Validate.notNull(labelNode);
 
         InsnList ret = new InsnList();
-        ret.add(new JumpInsnNode(Opcodes.GOTO, labelNode));
+        ret.add(labelNode);
 
+        return ret;
+    }
+    
+    public static InsnList loadIntConst(int i) {
+        InsnList ret = new InsnList();
+        ret.add(new LdcInsnNode(i));
+        return ret;
+    }
+    
+    /**
+     * Loads an object from the local variable table on to the top of the stack.
+     * @param variable index within local variable table to grab object
+     * @return instructions to load a local variable on to the stack
+     * @throws NullPointerException if any numeric argument is negative
+     */
+    public static InsnList loadObjectVar(Variable variable) {
+        Validate.notNull(variable);
+
+        InsnList ret = new InsnList();
+        ret.add(new VarInsnNode(Opcodes.ALOAD, variable.getIndex()));
+
+        return ret;
+    }
+
+    /**
+     * Saves an object from the the top of the stack to the local variable table.
+     * @param variable index within local variable table to set object
+     * @return instructions to save top item on the stack to the local variables table
+     * @throws NullPointerException if any numeric argument is negative
+     */
+    public static InsnList saveObjectVar(Variable variable) {
+        Validate.notNull(variable);
+
+        InsnList ret = new InsnList();
+        ret.add(new VarInsnNode(Opcodes.ASTORE, variable.getIndex()));
+
+        return ret;
+    }
+    
+    /**
+     * Calls a constructor with a set of arguments.
+     * @param constructor constructor to call
+     * @param args arguments to pass in to constructor
+     * @return instructions to invoke a constructor
+     * @throws NullPointerException if any argument is {@code null} or array contains {@code null}
+     * @throws IllegalArgumentException if the length of {@code args} doesn't match the number of methods being taken in by {@code method}
+     */
+    public static InsnList construct(Constructor<?> constructor, InsnList ... args) {
+        Validate.notNull(constructor);
+        Validate.notNull(args);
+        Validate.isTrue(constructor.getParameterCount() == args.length);
+        
+        
+        InsnList ret = new InsnList();
+        
+        for (InsnList arg : args) {
+            ret.add(arg);
+        }
+        
+        Type clsType = Type.getType(constructor.getDeclaringClass());
+        Type methodType = Type.getType(constructor);
+        
+        ret.add(new TypeInsnNode(Opcodes.NEW, clsType.getInternalName()));
+        ret.add(new LdcInsnNode("a"));
+        ret.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, clsType.getInternalName(), "<init>", methodType.getDescriptor(), false));
+        
+        return ret;
+    }
+
+    /**
+     * Calls a method with a set of arguments. The return result (if present) will be on top of the stack after execution. If method is not
+     * static, first argument must be this pointer to the object on which method is being called.
+     * @param method method to call
+     * @param args arguments to pass in to method
+     * @return instructions to invoke a method
+     * @throws NullPointerException if any argument is {@code null} or array contains {@code null}
+     * @throws IllegalArgumentException if the length of {@code args} doesn't match the number of parameters required by {@code method}
+     */
+    public static InsnList call(Method method, InsnList ... args) {
+        Validate.notNull(method);
+        Validate.notNull(args);
+        
+        
+        InsnList ret = new InsnList();
+        
+        for (InsnList arg : args) {
+            ret.add(arg);
+        }
+        
+        Type clsType = Type.getType(method.getDeclaringClass());
+        Type methodType = Type.getType(method);
+        
+        if ((method.getModifiers() & Modifier.STATIC) == Modifier.STATIC) {
+            Validate.isTrue(method.getParameterCount() == args.length);
+            ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, clsType.getInternalName(), method.getName(), methodType.getDescriptor(), false));
+        } else if (method.getDeclaringClass().isInterface()) {
+            Validate.isTrue(method.getParameterCount() + 1 == args.length);
+            ret.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, clsType.getInternalName(), method.getName(), methodType.getDescriptor(), true));
+        } else {
+            Validate.isTrue(method.getParameterCount() + 1 == args.length);
+            ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, clsType.getInternalName(), method.getName(), methodType.getDescriptor(), false));
+        }
+        
         return ret;
     }
 
@@ -104,65 +210,59 @@ public final class InstructionUtils {
 
         InsnList ret = new InsnList();
 
-        ret.add(new TypeInsnNode(Opcodes.NEW, "com/offbynull/coroutines/user/InternalContinuationException"));
+        ret.add(new TypeInsnNode(Opcodes.NEW, "java/lang/RuntimeException"));
         ret.add(new InsnNode(Opcodes.DUP));
         ret.add(new LdcInsnNode(message));
-        ret.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, 
-                "com/offbynull/coroutines/user/InternalContinuationException", "<init>", "(Ljava/lang/String;)V", false));
+        ret.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/lang/RuntimeException", "<init>", "(Ljava/lang/String;)V", false));
         ret.add(new InsnNode(Opcodes.ATHROW));
 
         return ret;
-    }
-
-    /**
-     * Generates instructions for a switch table (equivalent to calling {@code tableSwitch(defaultInsnList, 0, caseInsnLists) }.
-     *
-     * @param defaultInsnList instructions to execute on default statement ({@code null} means no default statement)
-     * @param caseInsnLists instructions to execute on each case statement (elements that contain {@code null} mean missing case statement)
-     * @return instructions for a switch
-     * @throws NullPointerException if {@code caseInsnLists} argument is {@code null}
-     */
-    public static InsnList tableSwitch(InsnList defaultInsnList, InsnList... caseInsnLists) {
-        return tableSwitch(defaultInsnList, 0, caseInsnLists);
     }
     
     /**
      * Generates instructions for a switch table.
      *
-     * @param defaultInsnList instructions to execute on default statement ({@code null} means no default statement)
+     * @param indexInsnList instructions to calculate the index
+     * @param defaultInsnList instructions to execute on default statement
      * @param caseStartIdx the number which the case statements start at
-     * @param caseInsnLists instructions to execute on each case statement (elements that contain {@code null} mean missing case statement)
+     * @param caseInsnLists instructions to execute on each case statement
      * @return instructions for a switch
-     * @throws NullPointerException if {@code caseInsnLists} argument is {@code null}
-     * @throws IllegalArgumentException if any numeric argument is {@code < 0}
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if {@code caseInsnLists} is empty
      */
-    public static InsnList tableSwitch(InsnList defaultInsnList, int caseStartIdx, InsnList... caseInsnLists) {
+    public static InsnList tableSwitch(InsnList indexInsnList, InsnList defaultInsnList, int caseStartIdx, InsnList... caseInsnLists) {
+        Validate.notNull(defaultInsnList);
+        Validate.notNull(indexInsnList);
         Validate.isTrue(caseStartIdx >= 0);
         Validate.notNull(caseInsnLists);
+        Validate.noNullElements(caseInsnLists);
+        Validate.isTrue(caseInsnLists.length > 0);
         InsnList ret = new InsnList();
 
-        LabelNode endLabelNode = new LabelNode();
-        LabelNode defaultLabelNode = defaultInsnList == null ? endLabelNode : new LabelNode();
+        LabelNode defaultLabelNode = new LabelNode();
         LabelNode[] caseLabelNodes = new LabelNode[caseInsnLists.length];
 
         for (int i = 0; i < caseInsnLists.length; i++) {
-            caseLabelNodes[i] = caseInsnLists[i] == null ? endLabelNode : new LabelNode();
+            caseLabelNodes[i] = new LabelNode();
         }
 
-        ret.add(new TableSwitchInsnNode(caseStartIdx, caseStartIdx + caseInsnLists.length, defaultLabelNode, caseLabelNodes));
+        ret.add(indexInsnList);
+        ret.add(new TableSwitchInsnNode(caseStartIdx, caseStartIdx + caseInsnLists.length - 1, defaultLabelNode, caseLabelNodes));
 
-        for (InsnList caseInsnList : caseInsnLists) {
+        for (int i = 0; i < caseInsnLists.length; i++) {
+            LabelNode caseLabelNode = caseLabelNodes[i];
+            InsnList caseInsnList = caseInsnLists[i];
             if (caseInsnList != null) {
+                ret.add(caseLabelNode);
                 ret.add(caseInsnList);
-                ret.add(new JumpInsnNode(Opcodes.GOTO, endLabelNode));
             }
         }
 
         if (defaultInsnList != null) {
+            ret.add(defaultLabelNode);
             ret.add(defaultInsnList);
-            ret.add(new JumpInsnNode(Opcodes.GOTO, endLabelNode));
         }
-
+        
         return ret;
     }
 
@@ -176,8 +276,8 @@ public final class InstructionUtils {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if numeric arguments are equal
      */
-    public static InsnList loadOperandStack(int arrayLocalsIdx, int tempObjectLocalsIdx, Frame<BasicValue> frame) {
-        validateLocalIndicies(arrayLocalsIdx, tempObjectLocalsIdx);
+    public static InsnList loadOperandStack(Variable arrayLocalsIdx, Variable tempObjectLocalsIdx, Frame<BasicValue> frame) {
+        validateLocalIndicies(arrayLocalsIdx.getIndex(), tempObjectLocalsIdx.getIndex());
         Validate.notNull(frame);
         InsnList ret = new InsnList();
         
@@ -187,7 +287,7 @@ public final class InstructionUtils {
             Type type = basicValue.getType();
 
             // Load item from stack storage array
-            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx));
+            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx.getIndex()));
             ret.add(new LdcInsnNode(i));
             ret.add(new InsnNode(Opcodes.AALOAD));
 
@@ -248,15 +348,15 @@ public final class InstructionUtils {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if numeric arguments are equal
      */
-    public static InsnList saveOperandStack(int arrayLocalsIdx, int tempObjectLocalsIdx, Frame<BasicValue> frame) {
-        validateLocalIndicies(arrayLocalsIdx, tempObjectLocalsIdx);
+    public static InsnList saveOperandStack(Variable arrayLocalsIdx, Variable tempObjectLocalsIdx, Frame<BasicValue> frame) {
+        validateLocalIndicies(arrayLocalsIdx.getIndex(), tempObjectLocalsIdx.getIndex());
         Validate.notNull(frame);
         InsnList ret = new InsnList();
 
         // Create stack storage array and save it in local vars table
         ret.add(new LdcInsnNode(frame.getStackSize()));
         ret.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"));
-        ret.add(new VarInsnNode(Opcodes.ASTORE, arrayLocalsIdx));
+        ret.add(new VarInsnNode(Opcodes.ASTORE, arrayLocalsIdx.getIndex()));
 
         // Save the stack
         for (int i = frame.getStackSize() - 1; i >= 0; i--) {
@@ -267,39 +367,39 @@ public final class InstructionUtils {
             switch (type.getSort()) {
                 case Type.BOOLEAN:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;"));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.BYTE:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.SHORT:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.CHAR:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.INT:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.FLOAT:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.LONG:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.DOUBLE:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.ARRAY:
                 case Type.OBJECT:
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.METHOD:
                 case Type.VOID:
@@ -308,9 +408,9 @@ public final class InstructionUtils {
             }
 
             // Store item in to stack storage array
-            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx));
+            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx.getIndex()));
             ret.add(new LdcInsnNode(i));
-            ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
+            ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx.getIndex()));
             ret.add(new InsnNode(Opcodes.AASTORE));
         }
 
@@ -320,7 +420,7 @@ public final class InstructionUtils {
             Type type = basicValue.getType();
 
             // Load item from stack storage array
-            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx));
+            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx.getIndex()));
             ret.add(new LdcInsnNode(i));
             ret.add(new InsnNode(Opcodes.AALOAD));
 
@@ -381,8 +481,8 @@ public final class InstructionUtils {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if numeric arguments are equal
      */
-    public static InsnList loadLocalVariableTable(int arrayLocalsIdx, int tempObjectLocalsIdx, Frame<BasicValue> frame) {
-        validateLocalIndicies(arrayLocalsIdx, tempObjectLocalsIdx);
+    public static InsnList loadLocalVariableTable(Variable arrayLocalsIdx, Variable tempObjectLocalsIdx, Frame<BasicValue> frame) {
+        validateLocalIndicies(arrayLocalsIdx.getIndex(), tempObjectLocalsIdx.getIndex());
         Validate.notNull(frame);
         InsnList ret = new InsnList();
         
@@ -396,7 +496,7 @@ public final class InstructionUtils {
             }
             
             // Load item from locals storage array
-            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx));
+            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx.getIndex()));
             ret.add(new LdcInsnNode(i));
             ret.add(new InsnNode(Opcodes.AALOAD));
             //ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
@@ -468,15 +568,15 @@ public final class InstructionUtils {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if numeric arguments are equal
      */
-    public static InsnList saveLocalVariableTable(int arrayLocalsIdx, int tempObjectLocalsIdx, Frame<BasicValue> frame) {
-        validateLocalIndicies(arrayLocalsIdx, tempObjectLocalsIdx);
+    public static InsnList saveLocalVariableTable(Variable arrayLocalsIdx, Variable tempObjectLocalsIdx, Frame<BasicValue> frame) {
+        validateLocalIndicies(arrayLocalsIdx.getIndex(), tempObjectLocalsIdx.getIndex());
         Validate.notNull(frame);
         InsnList ret = new InsnList();
 
         // Create array and save it in local vars table
         ret.add(new LdcInsnNode(frame.getLocals()));
         ret.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"));
-        ret.add(new VarInsnNode(Opcodes.ASTORE, arrayLocalsIdx));
+        ret.add(new VarInsnNode(Opcodes.ASTORE, arrayLocalsIdx.getIndex()));
 
         // Save the locals
         for (int i = 0; i < frame.getLocals(); i++) {
@@ -492,47 +592,47 @@ public final class InstructionUtils {
                 case Type.BOOLEAN:
                     ret.add(new VarInsnNode(Opcodes.ILOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;"));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.BYTE:
                     ret.add(new VarInsnNode(Opcodes.ILOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.SHORT:
                     ret.add(new VarInsnNode(Opcodes.ILOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.CHAR:
                     ret.add(new VarInsnNode(Opcodes.ILOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.INT:
                     ret.add(new VarInsnNode(Opcodes.ILOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.FLOAT:
                     ret.add(new VarInsnNode(Opcodes.FLOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.LONG:
                     ret.add(new VarInsnNode(Opcodes.LLOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.DOUBLE:
                     ret.add(new VarInsnNode(Opcodes.DLOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.ARRAY:
                 case Type.OBJECT:
                     ret.add(new VarInsnNode(Opcodes.ALOAD, i));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
+                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx.getIndex()));
                     break;
                 case Type.METHOD:
                 case Type.VOID:
@@ -541,9 +641,9 @@ public final class InstructionUtils {
             }
 
             // Store item in to locals storage array
-            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx));
+            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx.getIndex()));
             ret.add(new LdcInsnNode(i));
-            ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
+            ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx.getIndex()));
             ret.add(new InsnNode(Opcodes.AASTORE));
         }
 

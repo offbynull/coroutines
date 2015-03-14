@@ -1,13 +1,12 @@
 package com.offbynull.coroutines.instrumenter;
 
-import com.offbynull.coroutines.user.Continuation;
+import com.offbynull.coroutines.user.Coroutine;
+import java.io.File;
 import java.io.IOException;
-import org.apache.commons.lang3.ClassUtils;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -84,66 +83,66 @@ public final class InstrumenterTest {
             mv.visitMaxs(1, 1);
             mv.visitEnd();
         }
-        {
-            mv = cw.visitMethod(ACC_PUBLIC + ACC_STATIC, "main", "([Ljava/lang/String;)V", null, null);
-            mv.visitCode();
-            Label l0 = new Label();
-            mv.visitLabel(l0);
-            mv.visitLineNumber(15, l0);
-            mv.visitInsn(RETURN);
-            Label l1 = new Label();
-            mv.visitLabel(l1);
-            mv.visitLocalVariable("args", "[Ljava/lang/String;", null, l0, l1, 0);
-            mv.visitMaxs(0, 1);
-            mv.visitEnd();
-        }
-        {
-            mv = cw.visitMethod(ACC_PUBLIC, "run", "(Lcom/offbynull/coroutines/user/Continuation;)V", null, null);
-            mv.visitCode();
-            Label l0 = new Label();
-            mv.visitLabel(l0);
-            mv.visitLineNumber(18, l0);
-            mv.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-            mv.visitLdcInsn("started!");
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
-            Label l1 = new Label();
-            mv.visitLabel(l1);
-            mv.visitLineNumber(19, l1);
-            mv.visitInsn(ICONST_0);
-            mv.visitVarInsn(ISTORE, 2);
-            Label l2 = new Label();
-            mv.visitLabel(l2);
-            Label l3 = new Label();
-            mv.visitJumpInsn(GOTO, l3);
-            Label l4 = new Label();
-            mv.visitLabel(l4);
-            mv.visitLineNumber(20, l4);
-            mv.visitFrame(Opcodes.F_NEW, 3, new Object[]{"test/Test", "com/offbynull/coroutines/user/Continuation", Opcodes.INTEGER}, 0, new Object[]{});
-            mv.visitVarInsn(ALOAD, 0);
-            mv.visitVarInsn(ALOAD, 1);
-            mv.visitVarInsn(ILOAD, 2);
-            mv.visitMethodInsn(INVOKESPECIAL, "test/Test", "echo", "(Lcom/offbynull/coroutines/user/Continuation;I)V", false);
-            Label l5 = new Label();
-            mv.visitLabel(l5);
-            mv.visitLineNumber(19, l5);
-            mv.visitIincInsn(2, 1);
-            mv.visitLabel(l3);
-            mv.visitFrame(Opcodes.F_NEW, 3, new Object[]{"test/Test", "com/offbynull/coroutines/user/Continuation", Opcodes.INTEGER}, 0, new Object[]{});
-            mv.visitVarInsn(ILOAD, 2);
-            mv.visitIntInsn(BIPUSH, 10);
-            mv.visitJumpInsn(IF_ICMPLT, l4);
-            Label l6 = new Label();
-            mv.visitLabel(l6);
-            mv.visitLineNumber(21, l6);
-            mv.visitInsn(RETURN);
-            Label l7 = new Label();
-            mv.visitLabel(l7);
-            mv.visitLocalVariable("this", "Ltest/Test;", null, l0, l7, 0);
-            mv.visitLocalVariable("continuation", "Lcom/offbynull/coroutines/user/Continuation;", null, l0, l7, 1);
-            mv.visitLocalVariable("i", "I", null, l2, l6, 2);
-            mv.visitMaxs(3, 3);
-            mv.visitEnd();
-        }
+//        {
+//            mv = cw.visitMethod(ACC_PUBLIC + ACC_STATIC, "main", "([Ljava/lang/String;)V", null, null);
+//            mv.visitCode();
+//            Label l0 = new Label();
+//            mv.visitLabel(l0);
+//            mv.visitLineNumber(15, l0);
+//            mv.visitInsn(RETURN);
+//            Label l1 = new Label();
+//            mv.visitLabel(l1);
+//            mv.visitLocalVariable("args", "[Ljava/lang/String;", null, l0, l1, 0);
+//            mv.visitMaxs(0, 1);
+//            mv.visitEnd();
+//        }
+//        {
+//            mv = cw.visitMethod(ACC_PUBLIC, "run", "(Lcom/offbynull/coroutines/user/Continuation;)V", null, null);
+//            mv.visitCode();
+//            Label l0 = new Label();
+//            mv.visitLabel(l0);
+//            mv.visitLineNumber(18, l0);
+//            mv.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+//            mv.visitLdcInsn("started!");
+//            mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+//            Label l1 = new Label();
+//            mv.visitLabel(l1);
+//            mv.visitLineNumber(19, l1);
+//            mv.visitInsn(ICONST_0);
+//            mv.visitVarInsn(ISTORE, 2);
+//            Label l2 = new Label();
+//            mv.visitLabel(l2);
+//            Label l3 = new Label();
+//            mv.visitJumpInsn(GOTO, l3);
+//            Label l4 = new Label();
+//            mv.visitLabel(l4);
+//            mv.visitLineNumber(20, l4);
+//            mv.visitFrame(Opcodes.F_NEW, 3, new Object[]{"test/Test", "com/offbynull/coroutines/user/Continuation", Opcodes.INTEGER}, 0, new Object[]{});
+//            mv.visitVarInsn(ALOAD, 0);
+//            mv.visitVarInsn(ALOAD, 1);
+//            mv.visitVarInsn(ILOAD, 2);
+//            mv.visitMethodInsn(INVOKESPECIAL, "test/Test", "echo", "(Lcom/offbynull/coroutines/user/Continuation;I)V", false);
+//            Label l5 = new Label();
+//            mv.visitLabel(l5);
+//            mv.visitLineNumber(19, l5);
+//            mv.visitIincInsn(2, 1);
+//            mv.visitLabel(l3);
+//            mv.visitFrame(Opcodes.F_NEW, 3, new Object[]{"test/Test", "com/offbynull/coroutines/user/Continuation", Opcodes.INTEGER}, 0, new Object[]{});
+//            mv.visitVarInsn(ILOAD, 2);
+//            mv.visitIntInsn(BIPUSH, 10);
+//            mv.visitJumpInsn(IF_ICMPLT, l4);
+//            Label l6 = new Label();
+//            mv.visitLabel(l6);
+//            mv.visitLineNumber(21, l6);
+//            mv.visitInsn(RETURN);
+//            Label l7 = new Label();
+//            mv.visitLabel(l7);
+//            mv.visitLocalVariable("this", "Ltest/Test;", null, l0, l7, 0);
+//            mv.visitLocalVariable("continuation", "Lcom/offbynull/coroutines/user/Continuation;", null, l0, l7, 1);
+//            mv.visitLocalVariable("i", "I", null, l2, l6, 2);
+//            mv.visitMaxs(3, 3);
+//            mv.visitEnd();
+//        }
         {
             mv = cw.visitMethod(ACC_PRIVATE, "echo", "(Lcom/offbynull/coroutines/user/Continuation;I)V", null, null);
             mv.visitCode();
@@ -174,12 +173,17 @@ public final class InstrumenterTest {
 
         byte[] normalClass = cw.toByteArray();
         byte[] instrumentedClass = new Instrumenter().instrument(normalClass);
+        
+        FileUtils.writeByteArrayToFile(new File("out.class"), instrumentedClass);
+        
         classLoader = SingleClassLoader.create(getClass().getClassLoader(), "test.Test", instrumentedClass);
     }
 
     @After
     public void tearDown() throws IOException {
-        classLoader.close();
+        if (classLoader != null) {
+            classLoader.close();
+        }
     }
 
     @Test
@@ -187,17 +191,17 @@ public final class InstrumenterTest {
         Class<?> cls = classLoader.loadClass("test.Test");
         Object instance = cls.newInstance();
         
-        Continuation continuation = new Continuation();
-        MethodUtils.invokeMethod(instance, "run", continuation);
-        MethodUtils.invokeMethod(instance, "run", continuation);
-        MethodUtils.invokeMethod(instance, "run", continuation);
-        MethodUtils.invokeMethod(instance, "run", continuation);
-        MethodUtils.invokeMethod(instance, "run", continuation);
-        MethodUtils.invokeMethod(instance, "run", continuation);
-        MethodUtils.invokeMethod(instance, "run", continuation);
-        MethodUtils.invokeMethod(instance, "run", continuation);
-        MethodUtils.invokeMethod(instance, "run", continuation);
-        MethodUtils.invokeMethod(instance, "run", continuation);
+        Coroutine coroutine = new Coroutine();
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
     }
 
 }

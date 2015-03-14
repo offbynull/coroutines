@@ -1,47 +1,83 @@
 package com.offbynull.coroutines.instrumenter;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.lang3.Validate;
-import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 
-final class VariableTable {
-    private final int continuationIndex;
-    private final int operandStackArrayIndex;
-    private final int localVarTableArrayIndex;
-    private final int tempObjectIndex;
+public final class VariableTable {
+    private List<Variable> argVars;
+    private int extraOffset;
+    private List<Variable> extraVars;
     
-    public VariableTable(int access, int maxLocals) {
-        int minLocals = (access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC ? 0 : 1;
-        Validate.isTrue(maxLocals >= minLocals);
+    public VariableTable(Type methodType, int maxLocals) {
+        Validate.notNull(methodType);
+        Validate.isTrue(maxLocals >= 0);
         
+        extraOffset = maxLocals;
         
-        // first param -- if static then 0, otherwise 1 (0th idx is this ptr for non-static methods)
-        continuationIndex = minLocals;
+        argVars = new ArrayList<>();
+        extraVars = new ArrayList<>();
         
-        
-        int counter = 0;
-        counter++;
-        tempObjectIndex = maxLocals + counter;
-        counter++;
-        operandStackArrayIndex = maxLocals + counter;
-        counter++;
-        localVarTableArrayIndex = maxLocals + counter;
+        Type[] argTypes = methodType.getArgumentTypes();
+        for (int i = 0; i < argTypes.length; i++) {
+            argVars.add(new Variable(argTypes[i], i, true));
+        }
     }
 
-    public int getContinuationIndex() {
-        return continuationIndex;
-    }
-
-    public int getOperandStackArrayIndex() {
-        return operandStackArrayIndex;
-    }
-
-    public int getLocalVarTableArrayIndex() {
-        return localVarTableArrayIndex;
-    }
-
-    public int getTempObjectIndex() {
-        return tempObjectIndex;
+    public Variable getArgument(int index) {
+        Validate.isTrue(index >= 0 && index < argVars.size());
+        return argVars.get(index);
     }
     
+    public Variable acquireExtra(Type type) {
+        Validate.notNull(type);
+        Validate.isTrue(type.getSort() != Type.VOID);
+        Validate.isTrue(type.getSort() != Type.METHOD);
+        
+        for (Variable var : extraVars) {
+            if (!var.used && var.type.equals(type)) {
+                var.used = true;
+                return var;
+            }
+        }
+        
+        Variable var = new Variable(type, extraOffset + extraVars.size(), true);
+        extraVars.add(var);
+        return var;
+    }
+
+    public void releaseExtra(Variable variable) {
+        Validate.notNull(variable);
+        Validate.isTrue(variable.index >= 0);
+        Validate.isTrue(variable.used);
+
+        variable.used = false;
+    }
+    
+    public final class Variable {
+        private Type type;
+        private int index;
+        private boolean used;
+
+        private Variable(Type type, int index, boolean used) {
+            this.type = type;
+            this.index = index;
+            this.used = used;
+        }
+
+        public Type getType() {
+            return type;
+        }
+
+        public int getIndex() {
+            return index;
+        }
+
+        public boolean isUsed() {
+            return used;
+        }
+        
+    }
     
 }
