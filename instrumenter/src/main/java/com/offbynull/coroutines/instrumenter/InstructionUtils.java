@@ -147,15 +147,14 @@ public final class InstructionUtils {
         
         InsnList ret = new InsnList();
         
-        for (InsnList arg : args) {
-            ret.add(arg);
-        }
-        
         Type clsType = Type.getType(constructor.getDeclaringClass());
         Type methodType = Type.getType(constructor);
         
         ret.add(new TypeInsnNode(Opcodes.NEW, clsType.getInternalName()));
-        ret.add(new LdcInsnNode("a"));
+        ret.add(new InsnNode(Opcodes.DUP));
+        for (InsnList arg : args) {
+            ret.add(arg);
+        }
         ret.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, clsType.getInternalName(), "<init>", methodType.getDescriptor(), false));
         
         return ret;
@@ -499,53 +498,51 @@ public final class InstructionUtils {
             ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsIdx.getIndex()));
             ret.add(new LdcInsnNode(i));
             ret.add(new InsnNode(Opcodes.AALOAD));
-            //ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
 
             // Convert the item from an object stores it in local vars table.
             switch (type.getSort()) {
                 case Type.BOOLEAN:
-                    //ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Boolean"));
                     ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false));
                     ret.add(new VarInsnNode(Opcodes.ISTORE, i));
                     break;
                 case Type.BYTE:
-                    //ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Byte"));
                     ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Byte", "byteValue", "()B", false));
                     ret.add(new VarInsnNode(Opcodes.ISTORE, i));
                     break;
                 case Type.SHORT:
-                    //ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Short"));
                     ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Short", "shortValue", "()S", false));
                     ret.add(new VarInsnNode(Opcodes.ISTORE, i));
                     break;
                 case Type.CHAR:
-                    //ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Character"));
                     ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Character", "charValue", "()C", false));
                     ret.add(new VarInsnNode(Opcodes.ISTORE, i));
                     break;
                 case Type.INT:
-                    //ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Integer"));
                     ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false));
                     ret.add(new VarInsnNode(Opcodes.ISTORE, i));
                     break;
                 case Type.FLOAT:
-                    //ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Float"));
                     ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F", false));
                     ret.add(new VarInsnNode(Opcodes.FSTORE, i));
                     break;
                 case Type.LONG:
-                    //ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Long"));
                     ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false));
                     ret.add(new VarInsnNode(Opcodes.LSTORE, i));
                     break;
                 case Type.DOUBLE:
-                    //ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Double"));
                     ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D", false));
                     ret.add(new VarInsnNode(Opcodes.DSTORE, i));
                     break;
                 case Type.ARRAY:
                 case Type.OBJECT:
-                    //ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
                     ret.add(new VarInsnNode(Opcodes.ASTORE, i));
                     break;
                 case Type.METHOD:

@@ -114,7 +114,8 @@ public final class Instrumenter {
                     = findInvocationsThatStartWithParameters(methodNode.instructions, CONTINUATION_CLASS_TYPE);
 
             // Generate local variable indices
-            VariableTable varTable = new VariableTable(Type.getMethodType(methodNode.desc), methodNode.maxLocals);
+            boolean isStatic = (methodNode.access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC;
+            VariableTable varTable = new VariableTable(isStatic, Type.getMethodType(methodNode.desc), methodNode.maxLocals);
 
             // Generate instructions for continuation points
             int nextId = 0;
@@ -163,7 +164,7 @@ public final class Instrumenter {
             //        ...
             //        ...
             //        ...
-            int continuationArgIdx = (methodNode.access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC ? 0 : 1;
+            int continuationArgIdx = isStatic ? 0 : 1;
             
             Variable contArg = varTable.getArgument(continuationArgIdx);
             Variable methodStateVar = varTable.acquireExtra(Type.getType(MethodState.class));

@@ -1,26 +1,26 @@
 package com.offbynull.coroutines.user;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedList;
-import java.util.List;
 import org.apache.commons.lang3.Validate;
 
 public final class Continuation {
-    private static final int MODE_NORMAL = 0;
-    private static final int MODE_SAVING = 1;
-    private static final int MODE_LOADING = 2;
+    public static final int MODE_STARTING = 0;
+    public static final int MODE_SAVING = 1;
+    public static final int MODE_LOADING = 2;
     private Deque<MethodState> methodStates = new LinkedList<>();
-    private int mode = MODE_NORMAL;
+    private int mode = MODE_STARTING;
 
+    Continuation() {
+        // do nothing
+    }
+    
     public int getMode() {
         return mode;
     }
 
     public void setMode(int mode) {
-        Validate.isTrue(mode == MODE_NORMAL || mode == MODE_SAVING || mode == MODE_LOADING);
+        Validate.isTrue(mode == MODE_STARTING || mode == MODE_SAVING || mode == MODE_LOADING);
         this.mode = mode;
     }
     
@@ -33,7 +33,12 @@ public final class Continuation {
         Validate.validState(!methodStates.isEmpty());
         return methodStates.pop();
     }
-    
+
+    public MethodState peek() {
+        Validate.validState(!methodStates.isEmpty());
+        return methodStates.peek();
+    }
+
     public void suspend() {
         throw new UnsupportedOperationException("Caller not instrumented");
     }
