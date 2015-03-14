@@ -9,29 +9,28 @@ import org.objectweb.asm.tree.analysis.Frame;
 
 final class ContinuationPoint {
 
-    private boolean yield;
+    private boolean suspend;
     private int id;
     private AbstractInsnNode invokeInsnNode;
     private LabelNode restoreLabelNode;
     private Frame frame;
 
-    public ContinuationPoint(boolean yield, int id, AbstractInsnNode invokeInsnNode, Frame<BasicValue> frame,
-            VariableTable variableTable, Type methodReturnType) {
+    public ContinuationPoint(boolean suspend, int id, AbstractInsnNode invokeInsnNode, Frame<BasicValue> frame, Type methodReturnType) {
         Validate.notNull(invokeInsnNode);
         Validate.notNull(frame);
-        Validate.notNull(variableTable);
         Validate.notNull(methodReturnType);
         Validate.isTrue(id >= 0);
         Validate.isTrue(methodReturnType.getSort() != Type.METHOD);
 
-        this.yield = yield;
+        this.suspend = suspend;
         this.id = id;
+        this.invokeInsnNode = invokeInsnNode;
         this.frame = frame;
         restoreLabelNode = new LabelNode();
     }
 
-    public boolean isYield() {
-        return yield;
+    public boolean isSuspend() {
+        return suspend;
     }
 
     public int getId() {

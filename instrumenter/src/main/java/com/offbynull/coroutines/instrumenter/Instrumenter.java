@@ -18,6 +18,8 @@ import static com.offbynull.coroutines.instrumenter.SearchUtils.findInvocationsT
 import static com.offbynull.coroutines.instrumenter.SearchUtils.findMethodsThatStartWithParameters;
 import static com.offbynull.coroutines.instrumenter.SearchUtils.searchForOpcodes;
 import com.offbynull.coroutines.user.Continuation;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -43,11 +45,19 @@ import org.objectweb.asm.tree.analysis.SimpleVerifier;
 public final class Instrumenter {
 
     private static final Type CONTINUATION_CLASS_TYPE = Type.getType(Continuation.class);
-    private static final Type CONTINUATION_YIELD_METHOD_TYPE = Type.getType(MethodUtils.getAccessibleMethod(Continuation.class, "yield"));
+    private static final Type CONTINUATION_SUSPEND_METHOD_TYPE = Type.getType(
+            MethodUtils.getAccessibleMethod(Continuation.class, "suspend"));
 
-    public void instrument(InputStream classInputStream, OutputStream classOutputStream) throws IOException {
+    public byte[] instrument(byte[] input) throws IOException {
+        ByteArrayInputStream bais = new ByteArrayInputStream(input);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        instrument(bais, baos);
+        return baos.toByteArray();
+    }
+    
+    private void instrument(InputStream inputStream, OutputStream outputStream) throws IOException {
         // Read class as tree model
-        ClassReader cr = new ClassReader(classInputStream);
+        ClassReader cr = new ClassReader(inputStream);
         ClassNode classNode = new ClassNode();
         cr.accept(classNode, 0);
 
@@ -72,8 +82,8 @@ public final class Instrumenter {
             }
 
             // Find invocations of continuation points
-            List<AbstractInsnNode> yieldInvocationInsnNodes
-                    = findInvocationsOf(methodNode.instructions, CONTINUATION_YIELD_METHOD_TYPE);
+            List<AbstractInsnNode> suspendInvocationInsnNodes
+                    = findInvocationsOf(methodNode.instructions, CONTINUATION_SUSPEND_METHOD_TYPE);
             List<AbstractInsnNode> saveInvocationInsnNodes
                     = findInvocationsThatStartWithParameters(methodNode.instructions, CONTINUATION_CLASS_TYPE);
 
@@ -84,16 +94,16 @@ public final class Instrumenter {
             int nextId = 0;
             List<ContinuationPoint> continuationPoints = new LinkedList<>();
 
-            for (AbstractInsnNode yieldInvocationInsnNode : yieldInvocationInsnNodes) {
-                int insnIdx = methodNode.instructions.indexOf(yieldInvocationInsnNode);
-                ContinuationPoint cp = new ContinuationPoint(true, nextId, yieldInvocationInsnNode, frames[insnIdx], variableTable, returnType);
+            for (AbstractInsnNode suspendInvocationInsnNode : suspendInvocationInsnNodes) {
+                int insnIdx = methodNode.instructions.indexOf(suspendInvocationInsnNode);
+                ContinuationPoint cp = new ContinuationPoint(true, nextId, suspendInvocationInsnNode, frames[insnIdx], returnType);
                 continuationPoints.add(cp);
                 nextId++;
             }
 
             for (AbstractInsnNode saveInvocationInsnNode : saveInvocationInsnNodes) {
                 int insnIdx = methodNode.instructions.indexOf(saveInvocationInsnNode);
-                ContinuationPoint cp = new ContinuationPoint(false, nextId, saveInvocationInsnNode, frames[insnIdx], variableTable, returnType);
+                ContinuationPoint cp = new ContinuationPoint(false, nextId, saveInvocationInsnNode, frames[insnIdx], returnType);
                 continuationPoints.add(cp);
                 nextId++;
             }
@@ -146,17 +156,17 @@ public final class Instrumenter {
             //      Object[] stack = saveOperandStack();
             //      Object[] locals = saveLocalsStackHere();
             //      continuation.push(new MethodState(<number>, stack, locals);
-            //      #IFDEF yield
+            //      #IFDEF suspend
             //          return <value>;       
             //      #ENDIF
             //
             //      restorePoint_<number>:
-            //      #IFDEF !yield
+            //      #IFDEF !suspend
             //          <method invocation>
             //      #ENDIF
             continuationPoints.forEach((x) -> {
                 methodNode.instructions.insertBefore(x.getInvokeInsnNode(), generateSavePoint(returnType, x, variableTable));
-                if (x.isYield()) {
+                if (x.isSuspend()) {
                     methodNode.instructions.remove(x.getInvokeInsnNode());
                 }
             });
@@ -165,6 +175,8 @@ public final class Instrumenter {
         // Write tree model back out as class
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         classNode.accept(cw);
+        
+        outputStream.write(cw.toByteArray());
     }
 
     private InsnList generateSavePoint(Type methodReturnType, ContinuationPoint continuationPoint, VariableTable variableTable) {
@@ -183,7 +195,7 @@ public final class Instrumenter {
                         variableTable.getOperandStackArrayIndex(),
                         variableTable.getLocalVarTableArrayIndex(),
                         variableTable.getTempObjectIndex()),
-                continuationPoint.isYield() ? returnDummy(methodReturnType) : empty(),
+                continuationPoint.isSuspend() ? returnDummy(methodReturnType) : empty(),
                 addLabel(continuationPoint.getRestoreLabelNode())
         );
     }

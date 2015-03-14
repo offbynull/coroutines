@@ -2,7 +2,6 @@ package com.offbynull.coroutines.instrumenter;
 
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.MethodNode;
 
 final class VariableTable {
     private final int continuationIndex;
