@@ -3,7 +3,6 @@ package com.offbynull.coroutines.instrumenter;
 import com.offbynull.coroutines.user.Continuation;
 import com.offbynull.coroutines.user.InternalContinuationException;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Opcodes;
@@ -52,8 +51,8 @@ public final class InstructionUtils {
         Validate.noNullElements(insnLists);
 
         InsnList ret = new InsnList();
-        for (int i = 0; i < insnLists.length; i++) {
-            ret.add(insnLists[i]);
+        for (InsnList insnList : insnLists) {
+            ret.add(insnList);
         }
 
         return ret;
@@ -148,9 +147,9 @@ public final class InstructionUtils {
 
         ret.add(new TableSwitchInsnNode(caseStartIdx, caseStartIdx + caseInsnLists.length, defaultLabelNode, caseLabelNodes));
 
-        for (int i = 0; i < caseInsnLists.length; i++) {
-            if (caseInsnLists[i] != null) {
-                ret.add(caseInsnLists[i]);
+        for (InsnList caseInsnList : caseInsnLists) {
+            if (caseInsnList != null) {
+                ret.add(caseInsnList);
                 ret.add(new JumpInsnNode(Opcodes.GOTO, endLabelNode));
             }
         }
@@ -174,9 +173,7 @@ public final class InstructionUtils {
      * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if numeric arguments are equal
      */
     public static InsnList loadOperandStack(int arrayLocalsIdx, int tempObjectLocalsIdx, Frame<BasicValue> frame) {
-        Validate.isTrue(arrayLocalsIdx >= 0);
-        Validate.isTrue(tempObjectLocalsIdx >= 0);
-        Validate.isTrue(arrayLocalsIdx != tempObjectLocalsIdx);
+        validateLocalIndicies(arrayLocalsIdx, tempObjectLocalsIdx);
         Validate.notNull(frame);
         InsnList ret = new InsnList();
         
@@ -248,9 +245,7 @@ public final class InstructionUtils {
      * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if numeric arguments are equal
      */
     public static InsnList saveOperandStack(int arrayLocalsIdx, int tempObjectLocalsIdx, Frame<BasicValue> frame) {
-        Validate.isTrue(arrayLocalsIdx >= 0);
-        Validate.isTrue(tempObjectLocalsIdx >= 0);
-        Validate.isTrue(arrayLocalsIdx != tempObjectLocalsIdx);
+        validateLocalIndicies(arrayLocalsIdx, tempObjectLocalsIdx);
         Validate.notNull(frame);
         InsnList ret = new InsnList();
 
@@ -383,9 +378,7 @@ public final class InstructionUtils {
      * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if numeric arguments are equal
      */
     public static InsnList loadLocalVariableTable(int arrayLocalsIdx, int tempObjectLocalsIdx, Frame<BasicValue> frame) {
-        Validate.isTrue(arrayLocalsIdx >= 0);
-        Validate.isTrue(tempObjectLocalsIdx >= 0);
-        Validate.isTrue(arrayLocalsIdx != tempObjectLocalsIdx);
+        validateLocalIndicies(arrayLocalsIdx, tempObjectLocalsIdx);
         Validate.notNull(frame);
         InsnList ret = new InsnList();
         
@@ -472,9 +465,7 @@ public final class InstructionUtils {
      * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if numeric arguments are equal
      */
     public static InsnList saveLocalVariableTable(int arrayLocalsIdx, int tempObjectLocalsIdx, Frame<BasicValue> frame) {
-        Validate.isTrue(arrayLocalsIdx >= 0);
-        Validate.isTrue(tempObjectLocalsIdx >= 0);
-        Validate.isTrue(arrayLocalsIdx != tempObjectLocalsIdx);
+        validateLocalIndicies(arrayLocalsIdx, tempObjectLocalsIdx);
         Validate.notNull(frame);
         InsnList ret = new InsnList();
 
@@ -627,18 +618,7 @@ public final class InstructionUtils {
      */
     public static InsnList invokePopMethodState(int continuationLocalsIdx, int operandStackArrayLocalsIdx, int localVarTableArrayLocalsIdx,
             int tempObjectLocalsIdx) {
-        Validate.isTrue(continuationLocalsIdx >= 0);
-        Validate.isTrue(operandStackArrayLocalsIdx >= 0);
-        Validate.isTrue(localVarTableArrayLocalsIdx >= 0);
-        Validate.isTrue(tempObjectLocalsIdx >= 0);
-        // ensure none of the nums are equal to eachother (more elegant way of doing this?)
-        Validate.isTrue(
-                new HashSet<>(Arrays.asList(
-                        continuationLocalsIdx,
-                        operandStackArrayLocalsIdx,
-                        localVarTableArrayLocalsIdx,
-                        tempObjectLocalsIdx
-                )).size() == 4);
+        validateLocalIndicies(continuationLocalsIdx, operandStackArrayLocalsIdx, localVarTableArrayLocalsIdx, tempObjectLocalsIdx);
         InsnList ret = new InsnList();
         
         // pop
@@ -667,27 +647,18 @@ public final class InstructionUtils {
      * Invokes {@link Continuation#push(com.offbynull.coroutines.user.Continuation.MethodState) () } with a new
      * {@link Continuation.MethodState} object that has {@code id} for its continuation point and {@code operandStackArrayLocalsIdx} and
      * {@code localVarTableArrayLocalsIdx} for its operand stack and local variables table respectively.
+     * @param id continuation point id
      * @param continuationLocalsIdx index within the local variables table of where the {@link Continuation} object is stored
      * @param operandStackArrayLocalsIdx index within the local variables table to store the saved operand stack
      * @param localVarTableArrayLocalsIdx index within the local variables table to store the saved local variables table
      * @param tempObjectLocalsIdx index within the local variables table that a temporary object should be stored
      * @return instructions to grab the latest method state
-     * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if numeric arguments are equal to one another
+     * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if any index arguments are equal to one another
      */
     public static InsnList invokePushMethodState(int id, int continuationLocalsIdx, int operandStackArrayLocalsIdx,
             int localVarTableArrayLocalsIdx, int tempObjectLocalsIdx) {
-        Validate.isTrue(continuationLocalsIdx >= 0);
-        Validate.isTrue(operandStackArrayLocalsIdx >= 0);
-        Validate.isTrue(localVarTableArrayLocalsIdx >= 0);
-        Validate.isTrue(tempObjectLocalsIdx >= 0);
-        // ensure none of the nums are equal to eachother (more elegant way of doing this?)
-        Validate.isTrue(
-                new HashSet<>(Arrays.asList(
-                        continuationLocalsIdx,
-                        operandStackArrayLocalsIdx,
-                        localVarTableArrayLocalsIdx,
-                        tempObjectLocalsIdx
-                )).size() == 4);
+        Validate.isTrue(id >= 0);
+        validateLocalIndicies(continuationLocalsIdx, operandStackArrayLocalsIdx, localVarTableArrayLocalsIdx, tempObjectLocalsIdx);
         InsnList ret = new InsnList();
         
         // create method state
@@ -708,5 +679,11 @@ public final class InstructionUtils {
                 false));
 
         return ret;
+    }
+    
+    private static void validateLocalIndicies(int ... indicies) {
+        Arrays.stream(indicies).forEach((x) -> Validate.isTrue(x >= 0));
+        long uniqueCount = Arrays.stream(indicies).distinct().count();
+        Validate.isTrue(uniqueCount == indicies.length);
     }
 }

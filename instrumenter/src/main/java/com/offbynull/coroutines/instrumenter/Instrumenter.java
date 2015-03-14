@@ -1,16 +1,22 @@
 package com.offbynull.coroutines.instrumenter;
 
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.jumpTo;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.addLabel;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.empty;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.invokePopMethodState;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.invokePushMethodState;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.jumpTo;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadLocalVariableTable;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.merge;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.returnDummy;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveLocalVariableTable;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveOperandStack;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.tableSwitch;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.throwException;
 import com.offbynull.coroutines.user.Continuation;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.commons.lang3.reflect.MethodUtils;
@@ -46,7 +52,7 @@ public final class Instrumenter {
         for (MethodNode methodNode : methodNodesToInstrument) {
             // Get return type
             Type returnType = Type.getMethodType(methodNode.desc).getReturnType();
-            
+
             // Analyze method
             Frame<BasicValue>[] frames;
             try {
@@ -116,14 +122,15 @@ public final class Instrumenter {
                                     throwException("Unexpected state (saving not allowed at this point)"),
                                     tableSwitch(
                                             throwException("Unrecognized restore id"),
-                                            continuationPoints.stream().map((x) -> x.getRestoreInsnList()).toArray((x) -> new InsnList[x])
+                                            continuationPoints.stream().map(
+                                                    (x) -> generateLoadPoint(x, variableTable)).toArray((x) -> new InsnList[x])
                                     ),
                                     jumpTo(startOfMethodLabelNode)
                             ),
                             addLabel(startOfMethodLabelNode)
                     );
             methodNode.instructions.insert(entryPointInsnList);
-            
+
             // Add store logic and restore addLabel for each continuation point
             //
             //      Object[] stack = saveOperandStack();
@@ -137,10 +144,10 @@ public final class Instrumenter {
             //      #IFDEF !yield
             //          <method invocation>
             //      #ENDIF
-            continuationPoints.forEach((cp) -> {
-                methodNode.instructions.insertBefore(cp.getInvokeInsnNode(), cp.getStoreInsnList());
-                if (cp.isYield()) {
-                    methodNode.instructions.remove(cp.getInvokeInsnNode());
+            continuationPoints.forEach((x) -> {
+                methodNode.instructions.insertBefore(x.getInvokeInsnNode(), generateSavePoint(returnType, x, variableTable));
+                if (x.isYield()) {
+                    methodNode.instructions.remove(x.getInvokeInsnNode());
                 }
             });
         }
@@ -148,5 +155,45 @@ public final class Instrumenter {
         // Write tree model back out as class
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         classNode.accept(cw);
+    }
+
+    private InsnList generateSavePoint(Type methodReturnType, ContinuationPoint continuationPoint, VariableTable variableTable) {
+        return merge(
+                saveOperandStack(
+                        variableTable.getOperandStackArrayIndex(),
+                        variableTable.getTempObjectIndex(),
+                        continuationPoint.getFrame()),
+                saveLocalVariableTable(
+                        variableTable.getLocalVarTableArrayIndex(),
+                        variableTable.getTempObjectIndex(),
+                        continuationPoint.getFrame()),
+                invokePushMethodState(
+                        continuationPoint.getId(),
+                        variableTable.getContinuationIndex(),
+                        variableTable.getOperandStackArrayIndex(),
+                        variableTable.getLocalVarTableArrayIndex(),
+                        variableTable.getTempObjectIndex()),
+                continuationPoint.isYield() ? returnDummy(methodReturnType) : empty(),
+                addLabel(continuationPoint.getRestoreLabelNode())
+        );
+    }
+
+    private InsnList generateLoadPoint(ContinuationPoint continuationPoint, VariableTable variableTable) {
+        return merge(
+                invokePopMethodState(
+                        variableTable.getContinuationIndex(),
+                        variableTable.getOperandStackArrayIndex(),
+                        variableTable.getLocalVarTableArrayIndex(),
+                        variableTable.getTempObjectIndex()),
+                loadOperandStack(
+                        variableTable.getOperandStackArrayIndex(),
+                        variableTable.getTempObjectIndex(),
+                        continuationPoint.getFrame()),
+                loadLocalVariableTable(
+                        variableTable.getLocalVarTableArrayIndex(),
+                        variableTable.getTempObjectIndex(),
+                        continuationPoint.getFrame()),
+                jumpTo(continuationPoint.getRestoreLabelNode())
+        );
     }
 }
