@@ -120,6 +120,9 @@ public final class Instrumenter {
                 = findMethodsThatStartWithParameters(classNode.methods, CONTINUATION_CLASS_TYPE);
 
         for (MethodNode methodNode : methodNodesToInstrument) {
+            // Check if method is constructor
+            Validate.isTrue(!"<init>".equals(methodNode.name), "Instrumentation of constructors not allowed");
+            
             // Check method does not contain invalid bytecode
             Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR, Opcodes.MONITORENTER, Opcodes.MONITOREXIT).isEmpty(),
                     "JSR/MONITORENTER/MONITOREXIT are not allowed");

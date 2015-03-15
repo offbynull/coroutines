@@ -6,14 +6,19 @@ import com.offbynull.coroutines.user.CoroutineRunner;
 import java.net.URLClassLoader;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 public final class InstrumenterTest {
 
     private static final String NORMAL_INVOKE_TEST = "NormalInvokeTest";
     private static final String STATIC_INVOKE_TEST = "StaticInvokeTest";
     private static final String INTERFACE_INVOKE_TEST = "InterfaceInvokeTest";
+    private static final String CONSTRUCTOR_INVOKE_TEST = "ConstructorInvokeTest";
 
+    @Rule
+    public ExpectedException thrown = ExpectedException.none();
 
     @Test
     public void shouldProperlySuspendWithVirtualMethods() throws Exception {
@@ -141,6 +146,15 @@ public final class InstrumenterTest {
                     + "0\n"
                     + "1\n"
                     + "2\n", builder.toString());
+        }
+    }
+    
+    @Test
+    public void shouldNotInstrumentConstructors() throws Exception {
+        thrown.expect(IllegalArgumentException.class);
+        thrown.expectMessage("Instrumentation of constructors not allowed");
+
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(CONSTRUCTOR_INVOKE_TEST + ".zip")) {
         }
     }
 }
