@@ -11,6 +11,7 @@ import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadLocalVa
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadVar;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.merge;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.pop;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.returnDummy;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveLocalVariableTable;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveVar;
@@ -269,7 +270,11 @@ public final class Instrumenter {
                                     call(CONTINUATION_SETMODE_METHOD, loadVar(contArg),
                                             loadIntConst(Continuation.MODE_SAVING)),
                                     returnDummy(returnType),            // return dummy value
-                                    addLabel(cp.getRestoreLabelNode())  // add restore point for when in loading mode
+                                    addLabel(cp.getRestoreLabelNode()),  // add restore point for when in loading mode
+                                    pop() // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
+                                          // stack that would have been consumed by that invocation... since we're removing that call, we
+                                          // also need to pop it from the stack... it's important that we explicitly do it at this point
+                                          // becuase during loading the stack will be restored with a point to that continuation object
                             );
                 } else {
                     // When a method that takes in a Continuation object as a parameter is called, We want to ...

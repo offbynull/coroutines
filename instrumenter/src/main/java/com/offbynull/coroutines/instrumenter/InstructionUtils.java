@@ -104,6 +104,18 @@ public final class InstructionUtils {
         return ret;
     }
     
+    
+    /**
+     * Generates instructions for a pop.
+     * @return instructions for a pop
+     */
+    public static InsnList pop() {
+        InsnList ret = new InsnList();
+        ret.add(new InsnNode(Opcodes.POP));
+
+        return ret;
+    }
+    
     public static InsnList loadIntConst(int i) {
         InsnList ret = new InsnList();
         ret.add(new LdcInsnNode(i));
