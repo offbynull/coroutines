@@ -161,7 +161,7 @@ public final class InstructionUtils {
      * @return instructions to save top item on the stack to the local variables table
      * @throws NullPointerException if any numeric argument is negative
      */
-    public static InsnList saveObjectVar(Variable variable) {
+    public static InsnList saveVar(Variable variable) {
         Validate.notNull(variable);
 
         InsnList ret = new InsnList();
@@ -184,7 +184,6 @@ public final class InstructionUtils {
                 break;
             case Type.OBJECT:
             case Type.ARRAY:
-                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, variable.getType().getInternalName()));
                 ret.add(new VarInsnNode(Opcodes.ASTORE, variable.getIndex()));
                 break;
             default:
@@ -417,6 +416,7 @@ public final class InstructionUtils {
                     break;
                 case Type.ARRAY:
                 case Type.OBJECT:
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, basicValue.getType().getInternalName()));
                     break;
                 case Type.METHOD:
                 case Type.VOID:
@@ -550,6 +550,7 @@ public final class InstructionUtils {
                     break;
                 case Type.ARRAY:
                 case Type.OBJECT:
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, basicValue.getType().getInternalName()));
                     break;
                 case Type.METHOD:
                 case Type.VOID:
@@ -634,6 +635,7 @@ public final class InstructionUtils {
                     break;
                 case Type.ARRAY:
                 case Type.OBJECT:
+                    ret.add(new TypeInsnNode(Opcodes.CHECKCAST, basicValue.getType().getInternalName()));
                     ret.add(new VarInsnNode(Opcodes.ASTORE, i));
                     break;
                 case Type.METHOD:

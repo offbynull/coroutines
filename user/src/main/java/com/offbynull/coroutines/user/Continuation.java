@@ -24,19 +24,14 @@ public final class Continuation {
         this.mode = mode;
     }
     
-    public void push(MethodState methodState) {
+    public void insertLast(MethodState methodState) {
         Validate.notNull(methodState);
-        methodStates.push(methodState);
+        methodStates.addLast(methodState);
     }
     
-    public MethodState pop() {
+    public MethodState removeFirst() {
         Validate.validState(!methodStates.isEmpty());
-        return methodStates.pop();
-    }
-
-    public MethodState peek() {
-        Validate.validState(!methodStates.isEmpty());
-        return methodStates.peek();
+        return methodStates.removeFirst();
     }
 
     public void suspend() {

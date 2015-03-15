@@ -24,8 +24,7 @@ import org.objectweb.asm.tree.MethodNode;
 
 public final class InstructionUtilsTest {
     private static final String STUB_CLASSNAME = "SimpleStub";
-    private static final String STUB_REVISED_CLASSNAME = STUB_CLASSNAME + "_REVISED";
-    private static final String STUB_RESOURCE_PATH = STUB_CLASSNAME + ".class";
+    private static final String STUB_RESOURCE_PATH = STUB_CLASSNAME + "_ORIG.class";
     private static final String STUB_METHOD_NAME = "fillMeIn";
 
     private ClassNode classNode;
@@ -35,7 +34,6 @@ public final class InstructionUtilsTest {
     public void setUp() throws Exception {
         // Load class, get method
         classNode = readResourceAsClassNode(STUB_RESOURCE_PATH);
-        classNode.name = STUB_REVISED_CLASSNAME;
         methodNode = findMethodsWithName(classNode.methods, STUB_METHOD_NAME).get(0);        
     }
     
@@ -88,7 +86,7 @@ public final class InstructionUtilsTest {
         
         // Write to JAR file + load up in classloader -- then execute tests
         try (URLClassLoader cl = writeClassNodesToJarAndLoad(classNode)) {
-            Object obj = cl.loadClass(STUB_REVISED_CLASSNAME).newInstance();
+            Object obj = cl.loadClass(STUB_CLASSNAME).newInstance();
             
             assertEquals("OK!", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, 2, 2));
             
@@ -141,7 +139,7 @@ public final class InstructionUtilsTest {
         
         // Write to JAR file + load up in classloader -- then execute tests
         try (URLClassLoader cl = writeClassNodesToJarAndLoad(classNode)) {
-            Object obj = cl.loadClass(STUB_REVISED_CLASSNAME).newInstance();
+            Object obj = cl.loadClass(STUB_CLASSNAME).newInstance();
             
             assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, 2, 2));
             assertEquals("nomatch", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, -2, 2));

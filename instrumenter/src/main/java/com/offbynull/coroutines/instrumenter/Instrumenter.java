@@ -13,7 +13,7 @@ import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadOperand
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.merge;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.returnDummy;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveLocalVariableTable;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveObjectVar;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveVar;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveOperandStack;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.tableSwitch;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.throwException;
@@ -30,7 +30,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
@@ -53,7 +52,6 @@ import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.SimpleVerifier;
-import org.objectweb.asm.util.TraceClassVisitor;
 
 public final class Instrumenter {
 
@@ -66,10 +64,10 @@ public final class Instrumenter {
             = MethodUtils.getAccessibleMethod(Continuation.class, "setMode", Integer.TYPE);
     private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
             = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, Object[].class);
-    private static final Method CONTINUATION_PUSH_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "push", MethodState.class);
-    private static final Method CONTINUATION_POP_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "pop");
+    private static final Method CONTINUATION_INSERTLAST_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "insertLast", MethodState.class);
+    private static final Method CONTINUATION_REMOVEFIRST_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "removeFirst");
     private static final Method METHODSTATE_GETCONTINUATIONPOINT_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getContinuationPoint");
     private static final Method METHODSTATE_GETLOCALTABLE_METHOD
@@ -150,6 +148,14 @@ public final class Instrumenter {
                 nextId++;
             }
 
+            // Manage new variables and arguments
+            int continuationArgIdx = isStatic ? 0 : 1;
+            Variable contArg = varTable.getArgument(continuationArgIdx);
+            Variable methodStateVar = varTable.acquireExtra(Type.getType(MethodState.class));
+            Variable savedLocalsVar = varTable.acquireExtra(Type.getType(Object[].class));
+            Variable savedStackVar = varTable.acquireExtra(Type.getType(Object[].class));
+            Variable tempObjVar = varTable.acquireExtra(Type.getType(Object.class));
+            
             // Generate entrypoint instructions...
             //
             //    switch(continuation.getMode()) {
@@ -179,16 +185,6 @@ public final class Instrumenter {
             //        ...
             //        ...
             //        ...
-            int continuationArgIdx = isStatic ? 0 : 1;
-            
-            Variable contArg = varTable.getArgument(continuationArgIdx);
-            Variable methodStateVar = varTable.acquireExtra(Type.getType(MethodState.class));
-            Variable savedLocalsVar = varTable.acquireExtra(Type.getType(Object[].class));
-            Variable savedStackVar = varTable.acquireExtra(Type.getType(Object[].class));
-            Variable tempObjVar = varTable.acquireExtra(Type.getType(Object.class));
-            
-            
-            
             LabelNode startOfMethodLabelNode = new LabelNode();
             InsnList entryPointInsnList
                     = merge(
@@ -199,12 +195,12 @@ public final class Instrumenter {
                                     jumpTo(startOfMethodLabelNode),
                                     throwException("Unexpected state (saving not allowed at this point)"),
                                     merge(
-                                            call(CONTINUATION_POP_METHOD, loadVar(contArg)),
-                                            saveObjectVar(methodStateVar),
+                                            call(CONTINUATION_REMOVEFIRST_METHOD, loadVar(contArg)),
+                                            saveVar(methodStateVar),
                                             call(METHODSTATE_GETLOCALTABLE_METHOD, loadVar(methodStateVar)),
-                                            saveObjectVar(savedLocalsVar),
+                                            saveVar(savedLocalsVar),
                                             call(METHODSTATE_GETSTACK_METHOD, loadVar(methodStateVar)),
-                                            saveObjectVar(savedStackVar),
+                                            saveVar(savedStackVar),
                                             tableSwitch(
                                                     call(METHODSTATE_GETCONTINUATIONPOINT_METHOD, loadVar(methodStateVar)),
                                                     throwException("Unrecognized restore id"),
@@ -248,7 +244,7 @@ public final class Instrumenter {
                         = merge(
                                 saveOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
                                 saveLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
-                                call(CONTINUATION_PUSH_METHOD, loadVar(contArg),
+                                call(CONTINUATION_INSERTLAST_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(cp.getId()),
                                                 loadVar(savedStackVar),
@@ -257,6 +253,15 @@ public final class Instrumenter {
                 
                 InsnList insnList;
                 if (cp.isSuspend()) {
+                    // When Continuation.suspend() is called, it's a termination point. We want to ...
+                    //
+                    //    1. Save our stack, locals, and restore point and push them on to the Continuation object.
+                    //    2. Put the continuation in to SAVING mode.
+                    //    3. Remove the call to suspend() and return a dummy value in its place.
+                    //    4. Add a label just after the return we added (used by loading code when execution is continued).
+                    //
+                    // By going in to SAVING mode and returning, callers up the chain will know to stop their flow of execution and return
+                    // immediately (see else block below)
                     insnList
                             = merge(
                                     saveBeforeInvokeInsnList,           // save
@@ -264,19 +269,28 @@ public final class Instrumenter {
                                     call(CONTINUATION_SETMODE_METHOD, loadVar(contArg),
                                             loadIntConst(Continuation.MODE_SAVING)),
                                     returnDummy(returnType),            // return dummy value
-                                    addLabel(cp.getRestoreLabelNode())  // add restore point for when we're enter the method in loading mode
+                                    addLabel(cp.getRestoreLabelNode())  // add restore point for when in loading mode
                             );
                 } else {
+                    // When a method that takes in a Continuation object as a parameter is called, We want to ...
+                    //
+                    //    1. Save our stack, locals, and restore point and push them on to the Continuation object.
+                    //    2. Add a label just before the call (used by the loading code when execution is continued).
+                    //    3. Call the method as it normally would be.
+                    //    4. Once the method returns, we check to see if the method is in SAVING mode and return immediately if it is.
+                    //
+                    // If in SAVING mode, it means that suspend() was invoked somewhere down the chain. Callers above it must stop their
+                    // normal flow of execution and return immediately.
                     insnList
                             = merge(
                                     saveBeforeInvokeInsnList,                   // save
+                                    addLabel(cp.getRestoreLabelNode()),         // add restore point for when in loading mode
                                     cloneInvokeNode(cp.getInvokeInsnNode()),    // invoke method
                                     ifIntegersEqual(// if we're saving after invoke, return dummy value
                                             call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                                             loadIntConst(Continuation.MODE_SAVING),
                                             returnDummy(returnType)
-                                    ),
-                                    addLabel(cp.getRestoreLabelNode())  // add restore point for when we're enter the method in loading mode
+                                    )
                             );
                 }
                 
