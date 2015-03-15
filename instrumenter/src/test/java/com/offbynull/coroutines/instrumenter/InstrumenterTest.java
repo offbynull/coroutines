@@ -22,8 +22,6 @@ public final class InstrumenterTest {
 
     @Before
     public void setUp() throws Exception {
-
-
         // Create jar of original class
         byte[] originalClass = getResource("SimpleTest.class");
         File originalJarFile = createJar(new JarEntry("SimpleTest.class", originalClass));

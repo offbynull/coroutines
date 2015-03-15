@@ -8,7 +8,7 @@ import static com.offbynull.coroutines.instrumenter.InstructionUtils.ifIntegersE
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.jumpTo;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadIntConst;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadLocalVariableTable;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadObjectVar;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadVar;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.merge;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.returnDummy;
@@ -130,11 +130,7 @@ public final class Instrumenter {
 
             // Generate local variable indices
             boolean isStatic = (methodNode.access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC;
-            VariableTable varTable = new VariableTable(
-                    isStatic,
-                    Type.getObjectType(classNode.name),
-                    Type.getMethodType(methodNode.desc),
-                    methodNode.maxLocals);
+            VariableTable varTable = new VariableTable(classNode, methodNode);
 
             // Generate instructions for continuation points
             int nextId = 0;
@@ -197,20 +193,20 @@ public final class Instrumenter {
             InsnList entryPointInsnList
                     = merge(
                             tableSwitch(
-                                    call(CONTINUATION_GETMODE_METHOD, loadObjectVar(contArg)),
+                                    call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                                     throwException("Unrecognized state"),
                                     0,
                                     jumpTo(startOfMethodLabelNode),
                                     throwException("Unexpected state (saving not allowed at this point)"),
                                     merge(
-                                            call(CONTINUATION_POP_METHOD, loadObjectVar(contArg)),
+                                            call(CONTINUATION_POP_METHOD, loadVar(contArg)),
                                             saveObjectVar(methodStateVar),
-                                            call(METHODSTATE_GETLOCALTABLE_METHOD, loadObjectVar(methodStateVar)),
+                                            call(METHODSTATE_GETLOCALTABLE_METHOD, loadVar(methodStateVar)),
                                             saveObjectVar(savedLocalsVar),
-                                            call(METHODSTATE_GETSTACK_METHOD, loadObjectVar(methodStateVar)),
+                                            call(METHODSTATE_GETSTACK_METHOD, loadVar(methodStateVar)),
                                             saveObjectVar(savedStackVar),
                                             tableSwitch(
-                                                    call(METHODSTATE_GETCONTINUATIONPOINT_METHOD, loadObjectVar(methodStateVar)),
+                                                    call(METHODSTATE_GETCONTINUATIONPOINT_METHOD, loadVar(methodStateVar)),
                                                     throwException("Unrecognized restore id"),
                                                     0,
                                                     continuationPoints.stream().map((cp) -> {
@@ -252,33 +248,31 @@ public final class Instrumenter {
                         = merge(
                                 saveOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
                                 saveLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
-                                call(CONTINUATION_PUSH_METHOD, loadObjectVar(contArg),
+                                call(CONTINUATION_PUSH_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(cp.getId()),
-                                                loadObjectVar(savedStackVar),
-                                                loadObjectVar(savedLocalsVar)))
+                                                loadVar(savedStackVar),
+                                                loadVar(savedLocalsVar)))
                         );
                 
                 InsnList insnList;
                 if (cp.isSuspend()) {
-                    insnList =
-                            merge(
+                    insnList
+                            = merge(
                                     saveBeforeInvokeInsnList,           // save
                                                                         // set saving mode
-                                    call(CONTINUATION_SETMODE_METHOD, loadObjectVar(contArg),
+                                    call(CONTINUATION_SETMODE_METHOD, loadVar(contArg),
                                             loadIntConst(Continuation.MODE_SAVING)),
                                     returnDummy(returnType),            // return dummy value
                                     addLabel(cp.getRestoreLabelNode())  // add restore point for when we're enter the method in loading mode
                             );
-                    methodNode.instructions.insertBefore(cp.getInvokeInsnNode(), insnList);
-                    methodNode.instructions.remove(cp.getInvokeInsnNode());
                 } else {
-                    insnList =
-                            merge(
+                    insnList
+                            = merge(
                                     saveBeforeInvokeInsnList,                   // save
                                     cloneInvokeNode(cp.getInvokeInsnNode()),    // invoke method
-                                    ifIntegersEqual(                            // if we're saving after invoke, return dummy value
-                                            call(CONTINUATION_GETMODE_METHOD, loadObjectVar(contArg)),
+                                    ifIntegersEqual(// if we're saving after invoke, return dummy value
+                                            call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                                             loadIntConst(Continuation.MODE_SAVING),
                                             returnDummy(returnType)
                                     ),
@@ -291,7 +285,6 @@ public final class Instrumenter {
             });
         }
 
-        classNode.accept(new TraceClassVisitor(new PrintWriter(System.out)));
         // Write tree model back out as class
         ClassWriter cw = new CustomClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, superClassMapping);
         classNode.accept(cw);

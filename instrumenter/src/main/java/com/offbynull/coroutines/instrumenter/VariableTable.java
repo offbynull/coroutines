@@ -3,14 +3,23 @@ package com.offbynull.coroutines.instrumenter;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.Validate;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.MethodNode;
 
 public final class VariableTable {
     private List<Variable> argVars;
     private int extraOffset;
     private List<Variable> extraVars;
     
-    public VariableTable(boolean isStatic, Type objectType, Type methodType, int maxLocals) {
+    public VariableTable(ClassNode classNode, MethodNode methodNode) {
+        this((methodNode.access & Opcodes.ACC_STATIC) != 0, Type.getObjectType(classNode.name), Type.getType(methodNode.desc),
+                methodNode.maxLocals);
+        Validate.isTrue(classNode.methods.contains(methodNode)); // sanity check
+    }
+    
+    private VariableTable(boolean isStatic, Type objectType, Type methodType, int maxLocals) {
         Validate.notNull(objectType);
         Validate.notNull(methodType);
         Validate.isTrue(maxLocals >= 0);

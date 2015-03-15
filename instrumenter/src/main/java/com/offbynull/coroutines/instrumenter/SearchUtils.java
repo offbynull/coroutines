@@ -150,6 +150,31 @@ public final class SearchUtils {
 
         return ret;
     }
+
+    /**
+     * Find methods within a class with a specific name.
+     * @param methodNodes method nodes to search through
+     * @param name method name to search for
+     * @return list of methods
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @throws IllegalArgumentException if any element in {@code expectedStartingParamTypes} is either of sort {@link Type#METHOD}
+     * or {@link Type#VOID}
+     */
+    public static List<MethodNode> findMethodsWithName(Collection<MethodNode> methodNodes, String name) {
+        Validate.notNull(methodNodes);
+        Validate.notNull(name);
+        Validate.noNullElements(methodNodes);
+        
+        
+        List<MethodNode> ret = new ArrayList<>();
+        for (MethodNode methodNode : methodNodes) {
+            if (methodNode.name.equals(name)) {
+                ret.add(methodNode);
+            }
+        }
+
+        return ret;
+    }
     
     /**
      * Find instructions in a certain class that are of a certain set of opcodes.
