@@ -2,13 +2,12 @@ package com.offbynull.coroutines.user;
 
 import java.util.Deque;
 import java.util.LinkedList;
-import org.apache.commons.lang3.Validate;
 
 public final class Continuation {
     public static final int MODE_NORMAL = 0;
     public static final int MODE_SAVING = 1;
     public static final int MODE_LOADING = 2;
-    private Deque<MethodState> methodStates = new LinkedList<>();
+    private Deque methodStates = new LinkedList();
     private int mode = MODE_NORMAL;
 
     Continuation() {
@@ -20,22 +19,33 @@ public final class Continuation {
     }
 
     public void setMode(int mode) {
-        Validate.isTrue(mode == MODE_NORMAL || mode == MODE_SAVING || mode == MODE_LOADING);
+        if (!(mode == MODE_NORMAL || mode == MODE_SAVING || mode == MODE_LOADING)) {
+            throw new IllegalArgumentException();
+        }
         this.mode = mode;
     }
     
     public void insertLast(MethodState methodState) {
-        Validate.notNull(methodState);
+        if (methodState == null) {
+            throw new NullPointerException();
+        }
         methodStates.addLast(methodState);
     }
     
     public MethodState removeFirst() {
-        Validate.validState(!methodStates.isEmpty());
-        return methodStates.removeFirst();
+        if (methodStates.isEmpty()) {
+            throw new IllegalStateException();
+        }
+        return (MethodState) methodStates.removeFirst();
     }
     
     public boolean isEmpty() {
         return methodStates.isEmpty();
+    }
+    
+    public void reset() {
+        methodStates.clear();
+        mode = MODE_NORMAL;
     }
 
     public void suspend() {
@@ -48,12 +58,15 @@ public final class Continuation {
         private final Object[] localTable;
 
         public MethodState(int continuationPoint, Object[] stack, Object[] localTable) {
-            Validate.isTrue(continuationPoint >= 0);
-            Validate.notNull(stack);
-            Validate.notNull(localTable);
+            if (continuationPoint < 0) {
+                throw new IllegalArgumentException();
+            }
+            if (stack == null || localTable == null) {
+                throw new NullPointerException();
+            }
             this.continuationPoint = continuationPoint;
-            this.stack = stack.clone();
-            this.localTable = localTable.clone();
+            this.stack = (Object[]) stack.clone();
+            this.localTable = (Object[]) localTable.clone();
         }
 
         public int getContinuationPoint() {
@@ -61,12 +74,11 @@ public final class Continuation {
         }
 
         public Object[] getStack() {
-            return stack.clone();
+            return (Object[]) stack.clone();
         }
 
         public Object[] getLocalTable() {
-            return localTable.clone();
+            return (Object[]) localTable.clone();
         }
-        
     }
 }
