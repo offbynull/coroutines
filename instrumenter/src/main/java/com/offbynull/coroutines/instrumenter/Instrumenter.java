@@ -234,10 +234,12 @@ public final class Instrumenter {
             //      #IFDEF suspend
             //          continuation.setMode(MODE_SAVING);
             //          return <dummy>;
+            //          restorePoint_<number>:
+            //          continuation.setMode(MODE_NORMAL);
             //      #ENDIF
             //
-            //      restorePoint_<number>:
             //      #IFDEF !suspend
+            //          restorePoint_<number>:
             //          <method invocation>
             //          if (continuation.getMode() == MODE_SAVING) {
             //              return <dummy>;

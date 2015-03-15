@@ -9,11 +9,16 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.commons.compress.archivers.jar.JarArchiveEntry;
+import org.apache.commons.compress.archivers.jar.JarArchiveOutputStream;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
-import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.io.Charsets;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
@@ -35,37 +40,77 @@ public final class TestUtils {
         // do nothing
     }
     
+    public static URLClassLoader loadClassesInZipResourceAndInstrument(String zipPath) throws IOException {
+        // Load original class
+        Map<String, byte[]> classContents = readZipFromResource(zipPath);
+        
+        // Create JAR out of original classes so it can be found by the instrumenter
+        List<JarEntry> originalJarEntries = new ArrayList<>(classContents.size());
+        for (Entry<String, byte[]> entry : classContents.entrySet()) {
+            originalJarEntries.add(new JarEntry(entry.getKey(), entry.getValue()));
+        }
+        File originalJarFile = createJar(originalJarEntries.toArray(new JarEntry[0]));
+        
+        // Get classpath used to run this Java process and add the jar file we created to it (used by the instrumenter)
+        List<File> classpath = getClasspath();
+        classpath.add(originalJarFile);
+        
+        // Instrument classes and write out new jar
+        Instrumenter instrumenter = new Instrumenter(classpath);
+        List<JarEntry> instrumentedJarEntries = new ArrayList<>(classContents.size());
+        for (Entry<String, byte[]> entry : classContents.entrySet()) {
+            byte[] content = entry.getValue();
+            if (entry.getKey().endsWith(".class")) {
+                content = instrumenter.instrument(content);
+            }
+            instrumentedJarEntries.add(new JarEntry(entry.getKey(), content));
+        }
+        File instrumentedJarFile = createJar(instrumentedJarEntries.toArray(new JarEntry[0]));
+        
+        // Load up classloader with instrumented jar
+        return URLClassLoader.newInstance(new URL[] { instrumentedJarFile.toURI().toURL() }, TestUtils.class.getClassLoader());
+    }
+    
     /**
-     * Loads up a resource from the classpath as a {@link ClassNode}. Behaviour is unknown if class is not a parsable Java class file.
-     * @param path path of resource
-     * @return {@link ClassNode} representation of resource
-     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * Load up a ZIP resource from the classpath and generate a {@link ClassNode} for each file with a class extension in that ZIP.
+     * Behaviour is ZIP or classes within are not a parseable.
+     * @param path path of ZIP resource
+     * @return {@link ClassNode} representation of class files in ZIP
+     * @throws NullPointerException if any argument is {@code null}
      * @throws IOException if any IO error occurs
      * @throws IllegalArgumentException if {@code path} cannot be found
      */
-    public static ClassNode readResourceAsClassNode(String path) throws IOException {
+    public static Map<String, ClassNode> readZipResourcesAsClassNodes(String path) throws IOException {
         Validate.notNull(path);
         
-        byte[] stubContents = TestUtils.getResource(path);
-        ClassReader cr = new ClassReader(new ByteArrayInputStream(stubContents));
-        ClassNode classNode = new ClassNode();
-        cr.accept(classNode, 0);
-        
-        return classNode;
+        Map<String, byte[]> files = readZipFromResource(path);
+        Map<String, ClassNode> ret = new LinkedHashMap<>();
+        for (Entry<String, byte[]> entry : files.entrySet()) {
+            if (!entry.getKey().toLowerCase().endsWith(".class")) {
+                continue;
+            }
+            
+            ClassReader cr = new ClassReader(new ByteArrayInputStream(entry.getValue()));
+            ClassNode classNode = new ClassNode();
+            cr.accept(classNode, 0);
+            
+            ret.put(entry.getKey(), classNode);
+        }
+
+        return ret;
     }
 
     /**
-     * Writes {@link ClassNode}s to a JAR. Behaviour is unknown if class is not valid in some way.
+     * Writes {@link ClassNode}s to a JAR and loads it up. Behaviour is unknown if class is not valid in some way.
      * @param classNodes class nodes to put in to jar
-     * @return {@link ClassNode} representation of resource
+     * @return class loader with files in newly created JAR available
      * @throws IOException if any IO error occurs
      * @throws NullPointerException if any argument is {@code null} or contains {@code null}
      * @throws IllegalArgumentException if {@code classNodes} is empty
      */
-    public static URLClassLoader writeClassNodesToJarAndLoad(ClassNode ... classNodes) throws IOException {
+    public static URLClassLoader createJarAndLoad(ClassNode ... classNodes) throws IOException {
         Validate.notNull(classNodes);
         Validate.noNullElements(classNodes);
-        Validate.isTrue(classNodes.length >= 0);
         
         JarEntry[] jarEntries = new JarEntry[classNodes.length];
         for (int i = 0; i < jarEntries.length; i++) {
@@ -75,8 +120,49 @@ public final class TestUtils {
             jarEntries[i] = new JarEntry(classNodes[i].name + ".class", cw.toByteArray());
         }
         
-        File jarFile = createJar(jarEntries);
+        return createJarAndLoad(jarEntries);
+    }
+
+    /**
+     * Writes entries to a JAR and loads it up.
+     * @param entries class nodes to put in to jar
+     * @return class loader with files in newly created JAR available
+     * @throws IOException if any IO error occurs
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @throws IllegalArgumentException if {@code classNodes} is empty
+     */
+    public static URLClassLoader createJarAndLoad(JarEntry ... entries) throws IOException {
+        Validate.notNull(entries);
+        Validate.noNullElements(entries);
+        
+        File jarFile = createJar(entries);
         return URLClassLoader.newInstance(new URL[] { jarFile.toURI().toURL() }, TestUtils.class.getClassLoader());
+    }
+    
+    /**
+     * Loads up a ZIP file that's contained in the classpath.
+     * @param path path of ZIP resource
+     * @return contents of files within the ZIP
+     * @throws IOException if any IO error occurs
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null} elements
+     * @throws IllegalArgumentException if {@code path} cannot be found, or if zipPaths contains duplicates
+     */
+    public static Map<String, byte[]> readZipFromResource(String path) throws IOException {
+        ClassLoader cl = ClassLoader.getSystemClassLoader();
+        URL url = cl.getResource(path);
+        Validate.isTrue(url != null);
+        
+        Map<String, byte[]> ret = new LinkedHashMap<>();
+        
+        try (InputStream is = url.openStream();
+                ZipArchiveInputStream zais = new ZipArchiveInputStream(is)) {
+            ZipArchiveEntry entry;
+            while ((entry = zais.getNextZipEntry()) != null) {
+                ret.put(entry.getName(), IOUtils.toByteArray(zais));
+            }
+        }
+        
+        return ret;
     }
     
     /**
@@ -128,22 +214,23 @@ public final class TestUtils {
         File tempFile = File.createTempFile(TestUtils.class.getSimpleName(), ".jar");
         tempFile.deleteOnExit();
 
-        try (ZipArchiveOutputStream zaos = new ZipArchiveOutputStream(new FileOutputStream(tempFile))) {
-            writeJarEntry(zaos, MANIFEST_PATH, MANIFEST_TEXT.getBytes(Charsets.UTF_8));
+        try (FileOutputStream fos = new FileOutputStream(tempFile);
+                JarArchiveOutputStream jaos = new JarArchiveOutputStream(fos)) {
+            writeJarEntry(jaos, MANIFEST_PATH, MANIFEST_TEXT.getBytes(Charsets.UTF_8));
             for (JarEntry entry : entries) {
-                writeJarEntry(zaos, entry.name, entry.data);
+                writeJarEntry(jaos, entry.name, entry.data);
             }
         }
 
         return tempFile;
     }
 
-    private static void writeJarEntry(ZipArchiveOutputStream zout, String name, byte[] data) throws IOException {
-        ZipArchiveEntry entry = new ZipArchiveEntry(name);
+    private static void writeJarEntry(JarArchiveOutputStream jaos, String name, byte[] data) throws IOException {
+        ZipArchiveEntry entry = new JarArchiveEntry(name);
         entry.setSize(data.length);
-        zout.putArchiveEntry(entry);
-        zout.write(data);
-        zout.closeArchiveEntry();
+        jaos.putArchiveEntry(entry);
+        jaos.write(data);
+        jaos.closeArchiveEntry();
     }
 
     /**

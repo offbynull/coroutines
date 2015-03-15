@@ -8,8 +8,8 @@ import static com.offbynull.coroutines.instrumenter.InstructionUtils.returnValue
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.tableSwitch;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.throwException;
 import static com.offbynull.coroutines.instrumenter.SearchUtils.findMethodsWithName;
-import static com.offbynull.coroutines.instrumenter.TestUtils.readResourceAsClassNode;
-import static com.offbynull.coroutines.instrumenter.TestUtils.writeClassNodesToJarAndLoad;
+import static com.offbynull.coroutines.instrumenter.TestUtils.readZipResourcesAsClassNodes;
+import static com.offbynull.coroutines.instrumenter.TestUtils.createJarAndLoad;
 import com.offbynull.coroutines.instrumenter.VariableTable.Variable;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
@@ -24,7 +24,8 @@ import org.objectweb.asm.tree.MethodNode;
 
 public final class InstructionUtilsTest {
     private static final String STUB_CLASSNAME = "SimpleStub";
-    private static final String STUB_RESOURCE_PATH = STUB_CLASSNAME + "_ORIG.class";
+    private static final String STUB_FILENAME = STUB_CLASSNAME + ".class";
+    private static final String ZIP_RESOURCE_PATH = STUB_CLASSNAME + ".zip";
     private static final String STUB_METHOD_NAME = "fillMeIn";
 
     private ClassNode classNode;
@@ -33,8 +34,8 @@ public final class InstructionUtilsTest {
     @Before
     public void setUp() throws Exception {
         // Load class, get method
-        classNode = readResourceAsClassNode(STUB_RESOURCE_PATH);
-        methodNode = findMethodsWithName(classNode.methods, STUB_METHOD_NAME).get(0);        
+        classNode = readZipResourcesAsClassNodes(ZIP_RESOURCE_PATH).get(STUB_FILENAME);
+        methodNode = findMethodsWithName(classNode.methods, STUB_METHOD_NAME).get(0);
     }
     
     @Test
@@ -85,7 +86,7 @@ public final class InstructionUtilsTest {
                 );
         
         // Write to JAR file + load up in classloader -- then execute tests
-        try (URLClassLoader cl = writeClassNodesToJarAndLoad(classNode)) {
+        try (URLClassLoader cl = createJarAndLoad(classNode)) {
             Object obj = cl.loadClass(STUB_CLASSNAME).newInstance();
             
             assertEquals("OK!", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, 2, 2));
@@ -138,7 +139,7 @@ public final class InstructionUtilsTest {
                 );
         
         // Write to JAR file + load up in classloader -- then execute tests
-        try (URLClassLoader cl = writeClassNodesToJarAndLoad(classNode)) {
+        try (URLClassLoader cl = createJarAndLoad(classNode)) {
             Object obj = cl.loadClass(STUB_CLASSNAME).newInstance();
             
             assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, 2, 2));
