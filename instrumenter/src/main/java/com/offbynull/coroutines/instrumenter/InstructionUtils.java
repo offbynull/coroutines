@@ -7,17 +7,18 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TypeInsnNode;
@@ -104,6 +105,29 @@ public final class InstructionUtils {
         return ret;
     }
     
+    public static InsnList lineNumber(int num) {
+        Validate.isTrue(num >= 0);
+        
+        InsnList ret = new InsnList();
+        
+        LabelNode labelNode = new LabelNode();
+        ret.add(labelNode);
+        ret.add(new LineNumberNode(num, labelNode));
+
+        return ret;
+    }
+
+    public static InsnList debugPrint(String text) {
+        Validate.isTrue(text != null);
+        
+        InsnList ret = new InsnList();
+        
+        ret.add(new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"));
+        ret.add(new LdcInsnNode(text));
+        ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false));
+
+        return ret;
+    }
     
     /**
      * Generates instructions for a pop.
@@ -300,7 +324,7 @@ public final class InstructionUtils {
     }
 
     /**
-     * Generates instructions to throw an exception of type {@link InternalContinuationException} with a constant message;
+     * Generates instructions to throw an exception of type {@link RuntimeException} with a constant message;
      *
      * @param message message of exception
      * @return instructions to throw an exception
@@ -855,82 +879,6 @@ public final class InstructionUtils {
             default:
                 throw new IllegalStateException();
         }
-
-        return ret;
-    }
-    
-    /**
-     * Invokes {@link Continuation#pop() }, then grabs both the saved operand stack and saved local variables table from the returned
-     * {@link Continuation.MethodState} object and puts them in to {@code operandStackArrayLocalsIdx} and
-     * {@code localVarTableArrayLocalsIdx} respectively.
-     * @param continuationLocalsIdx index within the local variables table of where the {@link Continuation} object is stored
-     * @param operandStackArrayLocalsIdx index within the local variables table to store the saved operand stack
-     * @param localVarTableArrayLocalsIdx index within the local variables table to store the saved local variables table
-     * @param tempObjectLocalsIdx index within the local variables table that a temporary object should be stored
-     * @return instructions to grab the latest method state
-     * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if numeric arguments are equal to one another
-     */
-    public static InsnList invokePopMethodState(int continuationLocalsIdx, int operandStackArrayLocalsIdx, int localVarTableArrayLocalsIdx,
-            int tempObjectLocalsIdx) {
-        validateLocalIndicies(continuationLocalsIdx, operandStackArrayLocalsIdx, localVarTableArrayLocalsIdx, tempObjectLocalsIdx);
-        InsnList ret = new InsnList();
-        
-        // pop
-        ret.add(new VarInsnNode(Opcodes.ALOAD, continuationLocalsIdx));
-        ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "com/offbynull/coroutines/user/Continuation", "pop",
-                "()Lcom/offbynull/coroutines/user/Continuation$MethodState;", false));
-        ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx)); // methodstate object
-        
-        // get local table and store
-        ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
-        ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "com/offbynull/coroutines/user/Continuation$MethodState",
-                "getLocalTable", "()[Ljava/lang/Object;", false));
-        ret.add(new VarInsnNode(Opcodes.ASTORE, localVarTableArrayLocalsIdx));
-        
-        // get operand stack and store
-        ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
-        ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "com/offbynull/coroutines/user/Continuation$MethodState",
-                "getStack", "()[Ljava/lang/Object;", false));
-        ret.add(new VarInsnNode(Opcodes.ASTORE, operandStackArrayLocalsIdx));
-        
-        
-        return ret;
-    }
-    
-    /**
-     * Invokes {@link Continuation#push(com.offbynull.coroutines.user.Continuation.MethodState) () } with a new
-     * {@link Continuation.MethodState} object that has {@code id} for its continuation point and {@code operandStackArrayLocalsIdx} and
-     * {@code localVarTableArrayLocalsIdx} for its operand stack and local variables table respectively.
-     * @param id continuation point id
-     * @param continuationLocalsIdx index within the local variables table of where the {@link Continuation} object is stored
-     * @param operandStackArrayLocalsIdx index within the local variables table to store the saved operand stack
-     * @param localVarTableArrayLocalsIdx index within the local variables table to store the saved local variables table
-     * @param tempObjectLocalsIdx index within the local variables table that a temporary object should be stored
-     * @return instructions to grab the latest method state
-     * @throws IllegalArgumentException if any numeric argument is {@code < 0}, or if any index arguments are equal to one another
-     */
-    public static InsnList invokePushMethodState(int id, int continuationLocalsIdx, int operandStackArrayLocalsIdx,
-            int localVarTableArrayLocalsIdx, int tempObjectLocalsIdx) {
-        Validate.isTrue(id >= 0);
-        validateLocalIndicies(continuationLocalsIdx, operandStackArrayLocalsIdx, localVarTableArrayLocalsIdx, tempObjectLocalsIdx);
-        InsnList ret = new InsnList();
-        
-        // create method state
-        ret.add(new TypeInsnNode(Opcodes.NEW, "com/offbynull/coroutines/user/Continuation$MethodState"));
-        ret.add(new InsnNode(Opcodes.DUP));
-        ret.add(new LdcInsnNode(id));
-        ret.add(new VarInsnNode(Opcodes.ALOAD, operandStackArrayLocalsIdx));
-        ret.add(new VarInsnNode(Opcodes.ALOAD, localVarTableArrayLocalsIdx));
-        ret.add(new MethodInsnNode(Opcodes.INVOKESPECIAL,
-                "com/offbynull/coroutines/user/Continuation$MethodState", "<init>", "(I[Ljava/lang/Object;[Ljava/lang/Object;)V", false));
-        ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectLocalsIdx));
-        
-        // call push
-        ret.add(new VarInsnNode(Opcodes.ALOAD, continuationLocalsIdx));
-        ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectLocalsIdx));
-        ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL,
-                "com/offbynull/coroutines/user/Continuation", "push", "(Lcom/offbynull/coroutines/user/Continuation$MethodState;)V",
-                false));
 
         return ret;
     }

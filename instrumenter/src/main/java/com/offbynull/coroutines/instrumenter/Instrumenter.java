@@ -4,6 +4,7 @@ import static com.offbynull.coroutines.instrumenter.InstructionUtils.addLabel;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.call;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.cloneInvokeNode;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.construct;
+import static com.offbynull.coroutines.instrumenter.InstructionUtils.debugPrint;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.ifIntegersEqual;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.jumpTo;
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadIntConst;
@@ -24,6 +25,8 @@ import static com.offbynull.coroutines.instrumenter.SearchUtils.findMethodsThatS
 import static com.offbynull.coroutines.instrumenter.SearchUtils.searchForOpcodes;
 import com.offbynull.coroutines.instrumenter.VariableTable.Variable;
 import com.offbynull.coroutines.user.Continuation;
+import static com.offbynull.coroutines.user.Continuation.MODE_NORMAL;
+import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
 import com.offbynull.coroutines.user.Continuation.MethodState;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -57,8 +60,8 @@ import org.objectweb.asm.tree.analysis.SimpleVerifier;
 public final class Instrumenter {
 
     private static final Type CONTINUATION_CLASS_TYPE = Type.getType(Continuation.class);
-    private static final Type CONTINUATION_SUSPEND_METHOD_TYPE = Type.getType(
-            MethodUtils.getAccessibleMethod(Continuation.class, "suspend"));
+    private static final Type CONTINUATION_SUSPEND_METHOD_TYPE
+            = Type.getType(MethodUtils.getAccessibleMethod(Continuation.class, "suspend"));
     private static final Method CONTINUATION_GETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
     private static final Method CONTINUATION_SETMODE_METHOD
@@ -118,7 +121,7 @@ public final class Instrumenter {
             try {
                 frames = new Analyzer<>(new SimpleVerifier()).analyze(classNode.name, methodNode);
             } catch (AnalyzerException ae) {
-                throw new IllegalArgumentException("Anaylzer failed", ae);
+                throw new IllegalArgumentException("Analyzer failed", ae);
             }
 
             // Find invocations of continuation points
@@ -243,8 +246,11 @@ public final class Instrumenter {
             continuationPoints.forEach((cp) -> {
                 InsnList saveBeforeInvokeInsnList
                         = merge(
+//                                debugPrint("saving operand stack"),
                                 saveOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
+//                                debugPrint("saving locals"),
                                 saveLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
+//                                debugPrint("calling insert"),
                                 call(CONTINUATION_INSERTLAST_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(cp.getId()),
@@ -265,16 +271,23 @@ public final class Instrumenter {
                     // immediately (see else block below)
                     insnList
                             = merge(
-                                    saveBeforeInvokeInsnList,           // save
-                                                                        // set saving mode
-                                    call(CONTINUATION_SETMODE_METHOD, loadVar(contArg),
-                                            loadIntConst(Continuation.MODE_SAVING)),
-                                    returnDummy(returnType),            // return dummy value
-                                    addLabel(cp.getRestoreLabelNode()),  // add restore point for when in loading mode
-                                    pop() // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
-                                          // stack that would have been consumed by that invocation... since we're removing that call, we
-                                          // also need to pop it from the stack... it's important that we explicitly do it at this point
-                                          // becuase during loading the stack will be restored with a point to that continuation object
+                                    saveBeforeInvokeInsnList,                           // save
+                                                                                        // set saving mode
+//                                    debugPrint("setting mode to saving"),
+                                    call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_SAVING)),
+//                                    debugPrint("returning dummy value"),
+                                    returnDummy(returnType),                            // return dummy value
+                                    addLabel(cp.getRestoreLabelNode()),                 // add restore point for when in loading mode
+//                                    debugPrint("entering restore point"),
+                                    pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
+                                           // stack that would have been consumed by that invocation... since we're removing that call, we
+                                           // also need to pop the Continuation reference from the stack... it's important that we
+                                           // explicitly do it at this point becuase during loading the stack will be restored with a point
+                                           // to that continuation object
+//                                    debugPrint("going back in to normal mode"),
+                                                                                        // we're back in to a loading state now
+                                    call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_NORMAL))
+                                    
                             );
                 } else {
                     // When a method that takes in a Continuation object as a parameter is called, We want to ...
@@ -290,10 +303,12 @@ public final class Instrumenter {
                             = merge(
                                     saveBeforeInvokeInsnList,                   // save
                                     addLabel(cp.getRestoreLabelNode()),         // add restore point for when in loading mode
+//                                    debugPrint("invoking"),
                                     cloneInvokeNode(cp.getInvokeInsnNode()),    // invoke method
+//                                    debugPrint("testing if in saving mode"),
                                     ifIntegersEqual(// if we're saving after invoke, return dummy value
                                             call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
-                                            loadIntConst(Continuation.MODE_SAVING),
+                                            loadIntConst(MODE_SAVING),
                                             returnDummy(returnType)
                                     )
                             );

@@ -1,15 +1,10 @@
 package com.offbynull.coroutines.user;
 
 public final class Coroutine {
-    private Continuation continuation;
+    private Continuation continuation = new Continuation();
     
     public Continuation ready() {
-        if (continuation == null) {
-            continuation = new Continuation();
-        } else {
-            continuation.setMode(Continuation.MODE_LOADING);
-        }
-        
+        continuation.setMode(continuation.isEmpty() ? Continuation.MODE_NORMAL : Continuation.MODE_LOADING);
         return continuation;
     }
 }

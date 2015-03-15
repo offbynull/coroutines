@@ -32,7 +32,7 @@ public final class InstrumenterTest {
         
         // Instrument class
         byte[] instrumentedClass = new Instrumenter(instrumentationClasspath).instrument(originalClass);
-        FileUtils.writeByteArrayToFile(new File("out.class"), instrumentedClass); // temp
+//        FileUtils.writeByteArrayToFile(new File("out.class"), instrumentedClass); // temp
         
         // Create jar of instrumented class and set for use in classloader
         File instrumentedJarFile = createJar(new JarEntry("SimpleTest.class", instrumentedClass));
@@ -52,6 +52,10 @@ public final class InstrumenterTest {
         Object instance = cls.newInstance();
         
         Coroutine coroutine = new Coroutine();
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
+        MethodUtils.invokeMethod(instance, "run", coroutine.ready());
         MethodUtils.invokeMethod(instance, "run", coroutine.ready());
         MethodUtils.invokeMethod(instance, "run", coroutine.ready());
         MethodUtils.invokeMethod(instance, "run", coroutine.ready());

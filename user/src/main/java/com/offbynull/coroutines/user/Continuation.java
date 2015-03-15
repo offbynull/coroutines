@@ -5,11 +5,11 @@ import java.util.LinkedList;
 import org.apache.commons.lang3.Validate;
 
 public final class Continuation {
-    public static final int MODE_STARTING = 0;
+    public static final int MODE_NORMAL = 0;
     public static final int MODE_SAVING = 1;
     public static final int MODE_LOADING = 2;
     private Deque<MethodState> methodStates = new LinkedList<>();
-    private int mode = MODE_STARTING;
+    private int mode = MODE_NORMAL;
 
     Continuation() {
         // do nothing
@@ -20,7 +20,7 @@ public final class Continuation {
     }
 
     public void setMode(int mode) {
-        Validate.isTrue(mode == MODE_STARTING || mode == MODE_SAVING || mode == MODE_LOADING);
+        Validate.isTrue(mode == MODE_NORMAL || mode == MODE_SAVING || mode == MODE_LOADING);
         this.mode = mode;
     }
     
@@ -32,6 +32,10 @@ public final class Continuation {
     public MethodState removeFirst() {
         Validate.validState(!methodStates.isEmpty());
         return methodStates.removeFirst();
+    }
+    
+    public boolean isEmpty() {
+        return methodStates.isEmpty();
     }
 
     public void suspend() {
