@@ -12,6 +12,7 @@ public final class InstrumenterTest {
 
     private static final String NORMAL_INVOKE_TEST = "NormalInvokeTest";
     private static final String STATIC_INVOKE_TEST = "StaticInvokeTest";
+    private static final String INTERFACE_INVOKE_TEST = "InterfaceInvokeTest";
 
 
     @Test
@@ -63,6 +64,49 @@ public final class InstrumenterTest {
 
         try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(STATIC_INVOKE_TEST + ".zip")) {
             Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(STATIC_INVOKE_TEST);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertFalse(runner.execute()); // coroutine finished executing here
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+
+            Assert.assertEquals("started\n"
+                    + "0\n"
+                    + "1\n"
+                    + "2\n"
+                    + "3\n"
+                    + "4\n"
+                    + "5\n"
+                    + "6\n"
+                    + "7\n"
+                    + "8\n"
+                    + "9\n"
+                    + "started\n"
+                    + "0\n"
+                    + "1\n"
+                    + "2\n", builder.toString());
+        }
+    }
+
+    @Test
+    public void shouldProperlySuspendWithInterfaceMethods() throws Exception {
+        StringBuilder builder = new StringBuilder();
+
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(INTERFACE_INVOKE_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(INTERFACE_INVOKE_TEST);
             Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
 
             CoroutineRunner runner = new CoroutineRunner(coroutine);

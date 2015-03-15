@@ -88,21 +88,32 @@ public final class Instrumenter {
         superClassMapping = SearchUtils.getSuperClassMappings(classPaths);
     }
 
-    public byte[] instrument(byte[] input) throws IOException {
+    public byte[] instrument(byte[] input) {
+        try {
+            return instrumentClass(input);
+        } catch (IOException ioe) {
+            throw new IllegalStateException(ioe); // this should never happen
+        }
+    }
+    
+    private byte[] instrumentClass(byte[] input) throws IOException {
         Validate.notNull(input);
         Validate.isTrue(input.length > 0);
-
+        
+        
         ByteArrayInputStream bais = new ByteArrayInputStream(input);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        instrument(bais, baos);
-        return baos.toByteArray();
-    }
+        
 
-    private void instrument(InputStream inputStream, OutputStream outputStream) throws IOException {
         // Read class as tree model
-        ClassReader cr = new ClassReader(inputStream);
+        ClassReader cr = new ClassReader(bais);
         ClassNode classNode = new ClassNode();
         cr.accept(classNode, 0);
+        
+        // Don't do anything if interface
+        if ((classNode.access & Opcodes.ACC_INTERFACE) == Opcodes.ACC_INTERFACE) {
+            return input.clone();
+        }
 
         // Find methods that need to be instrumented
         List<MethodNode> methodNodesToInstrument
@@ -325,6 +336,9 @@ public final class Instrumenter {
         ClassWriter cw = new CustomClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, superClassMapping);
         classNode.accept(cw);
 
-        outputStream.write(cw.toByteArray());
+        baos.write(cw.toByteArray());
+        
+        
+        return baos.toByteArray();
     }
 }
