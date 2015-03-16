@@ -52,8 +52,7 @@ public final class Continuation {
         mode = MODE_NORMAL;
     }
 
-    public void replaceSavedMethodStates() {
-        System.out.println("switch");
+    public void finishedExecutionCycle() {
         savedMethodStates = pendingMethodStates;
         pendingMethodStates = new LinkedList();
     }

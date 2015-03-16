@@ -17,6 +17,7 @@ public final class InstrumenterTest {
     private static final String INTERFACE_INVOKE_TEST = "InterfaceInvokeTest";
     private static final String CONSTRUCTOR_INVOKE_TEST = "ConstructorInvokeTest";
     private static final String EXCEPTION_SUSPEND_TEST = "ExceptionSuspendTest";
+    private static final String EXCEPTION_THROW_TEST = "ExceptionThrowTest";
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
@@ -34,6 +35,14 @@ public final class InstrumenterTest {
     @Test
     public void mustProperlySuspendWithInterfaceMethods() throws Exception {
         performCountTest(INTERFACE_INVOKE_TEST);
+    }
+
+    @Test
+    public void mustProperlyReportExceptions() throws Exception {
+        thrown.expect(RuntimeException.class);
+        thrown.expectMessage("Exception thrown during execution");
+        
+        performCountTest(EXCEPTION_THROW_TEST);
     }
 
     private void performCountTest(String testClass) throws Exception {

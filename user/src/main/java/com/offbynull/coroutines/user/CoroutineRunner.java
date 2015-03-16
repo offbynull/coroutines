@@ -11,15 +11,19 @@ public final class CoroutineRunner {
         this.coroutine = coroutine;
     }
     
-    public boolean execute() throws Exception {
-        coroutine.run(continuation);
+    public boolean execute() {
+        try {
+            coroutine.run(continuation);
+            continuation.finishedExecutionCycle();
+        } catch (Exception e) {
+            throw new CoroutineException("Exception thrown during execution", e);
+        }
         
         // if mode was not set to SAVING after return, it means the method finished executing
         if (continuation.getMode() != Continuation.MODE_SAVING) {
             continuation.reset(); // clear methodstates + set to normal, this is not explicitly nessecary at this point but set anyways
             return false;
         } else {
-            continuation.replaceSavedMethodStates();
             continuation.setMode(Continuation.MODE_LOADING); // set to loading for next invokation
             return true;
         }
