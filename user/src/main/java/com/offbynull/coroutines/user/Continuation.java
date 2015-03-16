@@ -1,13 +1,13 @@
 package com.offbynull.coroutines.user;
 
-import java.util.Deque;
 import java.util.LinkedList;
 
 public final class Continuation {
     public static final int MODE_NORMAL = 0;
     public static final int MODE_SAVING = 1;
     public static final int MODE_LOADING = 2;
-    private Deque methodStates = new LinkedList();
+    private LinkedList savedMethodStates = new LinkedList();
+    private LinkedList pendingMethodStates = new LinkedList();
     private int mode = MODE_NORMAL;
 
     Continuation() {
@@ -25,29 +25,39 @@ public final class Continuation {
         this.mode = mode;
     }
     
-    public void insertLast(MethodState methodState) {
+    public void insertPending(MethodState methodState) {
         if (methodState == null) {
             throw new NullPointerException();
         }
-        methodStates.addLast(methodState);
+        pendingMethodStates.addLast(methodState);
     }
-    
-    public MethodState removeFirst() {
-        if (methodStates.isEmpty()) {
+
+    public void removePending() {
+        if (pendingMethodStates.isEmpty()) {
             throw new IllegalStateException();
         }
-        return (MethodState) methodStates.removeFirst();
+        pendingMethodStates.removeLast();
     }
     
-    public boolean isEmpty() {
-        return methodStates.isEmpty();
+    public MethodState removeSaved() {
+        if (savedMethodStates.isEmpty()) {
+            throw new IllegalStateException();
+        }
+        return (MethodState) savedMethodStates.removeFirst();
     }
     
     public void reset() {
-        methodStates.clear();
+        pendingMethodStates.clear();
+        savedMethodStates.clear();
         mode = MODE_NORMAL;
     }
 
+    public void replaceSavedMethodStates() {
+        System.out.println("switch");
+        savedMethodStates = pendingMethodStates;
+        pendingMethodStates = new LinkedList();
+    }
+    
     public void suspend() {
         throw new UnsupportedOperationException("Caller not instrumented");
     }

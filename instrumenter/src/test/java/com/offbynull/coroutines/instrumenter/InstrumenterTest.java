@@ -16,59 +16,31 @@ public final class InstrumenterTest {
     private static final String STATIC_INVOKE_TEST = "StaticInvokeTest";
     private static final String INTERFACE_INVOKE_TEST = "InterfaceInvokeTest";
     private static final String CONSTRUCTOR_INVOKE_TEST = "ConstructorInvokeTest";
+    private static final String EXCEPTION_SUSPEND_TEST = "ExceptionSuspendTest";
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
 
     @Test
-    public void shouldProperlySuspendWithVirtualMethods() throws Exception {
-        StringBuilder builder = new StringBuilder();
-
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(NORMAL_INVOKE_TEST + ".zip")) {
-            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(NORMAL_INVOKE_TEST);
-            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
-
-            CoroutineRunner runner = new CoroutineRunner(coroutine);
-
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertFalse(runner.execute()); // coroutine finished executing here
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-
-            Assert.assertEquals("started\n"
-                    + "0\n"
-                    + "1\n"
-                    + "2\n"
-                    + "3\n"
-                    + "4\n"
-                    + "5\n"
-                    + "6\n"
-                    + "7\n"
-                    + "8\n"
-                    + "9\n"
-                    + "started\n"
-                    + "0\n"
-                    + "1\n"
-                    + "2\n", builder.toString());
-        }
+    public void mustProperlySuspendWithVirtualMethods() throws Exception {
+        performCountTest(NORMAL_INVOKE_TEST);
     }
     
     @Test
-    public void shouldProperlySuspendWithStaticMethods() throws Exception {
+    public void mustProperlySuspendWithStaticMethods() throws Exception {
+        performCountTest(STATIC_INVOKE_TEST);
+    }
+
+    @Test
+    public void mustProperlySuspendWithInterfaceMethods() throws Exception {
+        performCountTest(INTERFACE_INVOKE_TEST);
+    }
+
+    private void performCountTest(String testClass) throws Exception {
         StringBuilder builder = new StringBuilder();
 
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(STATIC_INVOKE_TEST + ".zip")) {
-            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(STATIC_INVOKE_TEST);
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(testClass);
             Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
 
             CoroutineRunner runner = new CoroutineRunner(coroutine);
@@ -107,54 +79,39 @@ public final class InstrumenterTest {
     }
 
     @Test
-    public void shouldProperlySuspendWithInterfaceMethods() throws Exception {
-        StringBuilder builder = new StringBuilder();
-
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(INTERFACE_INVOKE_TEST + ".zip")) {
-            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(INTERFACE_INVOKE_TEST);
-            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
-
-            CoroutineRunner runner = new CoroutineRunner(coroutine);
-
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertFalse(runner.execute()); // coroutine finished executing here
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-            Assert.assertTrue(runner.execute());
-
-            Assert.assertEquals("started\n"
-                    + "0\n"
-                    + "1\n"
-                    + "2\n"
-                    + "3\n"
-                    + "4\n"
-                    + "5\n"
-                    + "6\n"
-                    + "7\n"
-                    + "8\n"
-                    + "9\n"
-                    + "started\n"
-                    + "0\n"
-                    + "1\n"
-                    + "2\n", builder.toString());
-        }
-    }
-    
-    @Test
-    public void shouldNotInstrumentConstructors() throws Exception {
+    public void mustNotInstrumentConstructors() throws Exception {
         thrown.expect(IllegalArgumentException.class);
         thrown.expectMessage("Instrumentation of constructors not allowed");
 
         try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(CONSTRUCTOR_INVOKE_TEST + ".zip")) {
+            // do nothing, exception will occur
+        }
+    }
+
+    @Test
+    public void mustProperlySuspendInTryCatchFinally() throws Exception {
+        StringBuilder builder = new StringBuilder();
+
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(EXCEPTION_SUSPEND_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(EXCEPTION_SUSPEND_TEST);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertFalse(runner.execute()); // coroutine finished executing here
+
+            Assert.assertEquals(
+                    "START\n"
+                    + "IN TRY 1\n"
+                    + "IN TRY 2\n"
+                    + "IN CATCH 1\n"
+                    + "IN CATCH 2\n"
+                    + "IN FINALLY 1\n"
+                    + "IN FINALLY 2\n"
+                    + "END\n", builder.toString());
         }
     }
 }
