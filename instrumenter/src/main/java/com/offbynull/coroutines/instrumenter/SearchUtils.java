@@ -120,6 +120,46 @@ public final class SearchUtils {
     }
 
     /**
+     * Find invocations of any method where the parameter list contains a type.
+     * @param insnList instruction list to search through
+     * @param expectedParamType parameter type
+     * @return list of invocations (may be nodes of type {@link MethodInsnNode} or {@link InvokeDynamicInsnNode})
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code expectedParamType} is either of sort {@link Type#METHOD} or {@link Type#VOID}
+     */
+    public static List<AbstractInsnNode> findInvocationsWithParameter(InsnList insnList,
+            Type expectedParamType) {
+        Validate.notNull(insnList);
+        Validate.notNull(expectedParamType);
+        Validate.isTrue(expectedParamType.getSort() != Type.METHOD && expectedParamType.getSort() != Type.VOID);
+
+        List<AbstractInsnNode> ret = new ArrayList<>();
+        
+        Iterator<AbstractInsnNode> it = insnList.iterator();
+        while (it.hasNext()) {
+            AbstractInsnNode instructionNode = it.next();
+            Type[] methodParamTypes;
+            if (instructionNode instanceof MethodInsnNode) {
+                MethodInsnNode methodInsnNode = (MethodInsnNode) instructionNode;
+                Type methodType = Type.getType(methodInsnNode.desc);
+                methodParamTypes = methodType.getArgumentTypes();
+            } else if (instructionNode instanceof InvokeDynamicInsnNode) {
+                InvokeDynamicInsnNode invokeDynamicInsnNode = (InvokeDynamicInsnNode) instructionNode;
+                Type methodType = Type.getType(invokeDynamicInsnNode.desc);
+                methodParamTypes = methodType.getArgumentTypes();
+            } else {
+                continue;
+            }
+
+            if (Arrays.asList(methodParamTypes).contains(expectedParamType)) {
+                ret.add(instructionNode);
+            }
+        }
+
+        return ret;
+    }
+
+    /**
      * Find methods within a class where the parameter list starts with a certain list of types (order matters).
      * @param methodNodes method nodes to search through
      * @param expectedStartingParamTypes starting parameter types
@@ -144,6 +184,33 @@ public final class SearchUtils {
             Type[] methodParamTypes = methodDescType.getArgumentTypes();
 
             if (doParametersStartWith(methodParamTypes, expectedStartingParamTypes)) {
+                ret.add(methodNode);
+            }
+        }
+
+        return ret;
+    }
+
+    /**
+     * Find methods within a class where the parameter list contains a certain list of type.
+     * @param methodNodes method nodes to search through
+     * @param expectedParamType parameter type to search for
+     * @return list of methods
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code expectedParamType} is either of sort {@link Type#METHOD} or {@link Type#VOID}
+     */
+    public static List<MethodNode> findMethodsWithParameter(Collection<MethodNode> methodNodes, Type expectedParamType) {
+        Validate.notNull(methodNodes);
+        Validate.notNull(expectedParamType);
+        Validate.noNullElements(methodNodes);
+        Validate.isTrue(expectedParamType.getSort() != Type.METHOD && expectedParamType.getSort() != Type.VOID);
+
+        List<MethodNode> ret = new ArrayList<>();
+        for (MethodNode methodNode : methodNodes) {
+            Type methodDescType = Type.getType(methodNode.desc);
+            Type[] methodParamTypes = methodDescType.getArgumentTypes();
+
+            if (Arrays.asList(methodParamTypes).contains(expectedParamType)) {
                 ret.add(methodNode);
             }
         }
