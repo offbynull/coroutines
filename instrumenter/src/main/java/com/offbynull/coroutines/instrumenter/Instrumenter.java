@@ -65,12 +65,12 @@ public final class Instrumenter {
             = MethodUtils.getAccessibleMethod(Continuation.class, "setMode", Integer.TYPE);
     private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
             = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, Object[].class);
-    private static final Method CONTINUATION_INSERTPENDING_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "insertPending", MethodState.class);
-    private static final Method CONTINUATION_REMOVEPENDING_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "removePending");
-    private static final Method CONTINUATION_REMOVESAVED_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "removeSaved");
+    private static final Method CONTINUATION_ADDPENDING_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "addPending", MethodState.class);
+    private static final Method CONTINUATION_REMOVELASTPENDING_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "removeLastPending");
+    private static final Method CONTINUATION_REMOVEFIRSTSAVED_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "removeFirstSaved");
     private static final Method METHODSTATE_GETCONTINUATIONPOINT_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getContinuationPoint");
     private static final Method METHODSTATE_GETLOCALTABLE_METHOD
@@ -180,7 +180,7 @@ public final class Instrumenter {
             //        case SAVING: throw exception
             //        case LOADING:
             //        {
-            //            MethodState methodState = continuation.removeSaved();
+            //            MethodState methodState = continuation.removeFirstSaved();
             //            Object[] stack = methodState.getStack();
             //            Object[] localVars = methodState.getLocalTable();
             //            switch(methodState.getContinuationPoint()) {
@@ -213,7 +213,7 @@ public final class Instrumenter {
                                     throwException("Unexpected state (saving not allowed at this point)"),
                                     merge(
 //                                            debugPrint("calling remove first"),
-                                            call(CONTINUATION_REMOVESAVED_METHOD, loadVar(contArg)),
+                                            call(CONTINUATION_REMOVEFIRSTSAVED_METHOD, loadVar(contArg)),
                                             saveVar(methodStateVar),
                                             call(METHODSTATE_GETLOCALTABLE_METHOD, loadVar(methodStateVar)),
                                             saveVar(savedLocalsVar),
@@ -245,7 +245,7 @@ public final class Instrumenter {
             //      #IFDEF suspend
             //          Object[] stack = saveOperandStack();
             //          Object[] locals = saveLocalsStackHere();
-            //          continuation.insertPending(new MethodState(<number>, stack, locals);
+            //          continuation.addPending(new MethodState(<number>, stack, locals);
             //          continuation.setMode(MODE_SAVING);
             //          return <dummy>;
             //          restorePoint_<number>:
@@ -256,12 +256,12 @@ public final class Instrumenter {
             //          restorePoint_<number>:
             //          Object[] stack = saveOperandStack();
             //          Object[] locals = saveLocalsStackHere();
-            //          continuation.insertPending(new MethodState(<number>, stack, locals);
+            //          continuation.addPending(new MethodState(<number>, stack, locals);
             //          <method invocation>
             //          if (continuation.getMode() == MODE_SAVING) {
             //              return <dummy>;
             //          }
-            //          continuation.removePending();
+            //          continuation.removeLastPending();
             //      #ENDIF
             continuationPoints.forEach((cp) -> {
                 InsnList saveBeforeInvokeInsnList
@@ -271,7 +271,7 @@ public final class Instrumenter {
 //                                debugPrint("saving locals"),
                                 saveLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
 //                                debugPrint("calling insert last"),
-                                call(CONTINUATION_INSERTPENDING_METHOD, loadVar(contArg),
+                                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(cp.getId()),
                                                 loadVar(savedStackVar),
@@ -332,8 +332,9 @@ public final class Instrumenter {
                                             loadIntConst(MODE_SAVING),
                                             returnDummy(returnType)
                                     ),
-                                    call(CONTINUATION_REMOVEPENDING_METHOD,  loadVar(contArg)) // otherwise assume we're normal, and remove
-                                                                                               // the state we added on to pending
+                                    call(CONTINUATION_REMOVELASTPENDING_METHOD,  loadVar(contArg)) // otherwise assume we're normal, and
+                                                                                                   // remove the state we added on to
+                                                                                                   // pending
                             );
                 }
                 

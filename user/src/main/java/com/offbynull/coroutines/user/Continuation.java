@@ -25,21 +25,21 @@ public final class Continuation {
         this.mode = mode;
     }
     
-    public void insertPending(MethodState methodState) {
+    public void addPending(MethodState methodState) {
         if (methodState == null) {
             throw new NullPointerException();
         }
         pendingMethodStates.addLast(methodState);
     }
 
-    public void removePending() {
+    public void removeLastPending() {
         if (pendingMethodStates.isEmpty()) {
             throw new IllegalStateException();
         }
         pendingMethodStates.removeLast();
     }
     
-    public MethodState removeSaved() {
+    public MethodState removeFirstSaved() {
         if (savedMethodStates.isEmpty()) {
             throw new IllegalStateException();
         }
