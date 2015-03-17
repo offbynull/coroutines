@@ -344,7 +344,7 @@ public final class Instrumenter {
         }
 
         // Write tree model back out as class
-        ClassWriter cw = new CustomClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, superClassMapping);
+        ClassWriter cw = new SimpleClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, superClassMapping);
         classNode.accept(cw);
 
         baos.write(cw.toByteArray());

@@ -3,7 +3,9 @@ package com.offbynull.coroutines.instrumenter;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 
@@ -15,12 +17,13 @@ final class ContinuationPoint {
     private LabelNode restoreLabelNode;
     private Frame frame;
 
-    public ContinuationPoint(boolean suspend, int id, AbstractInsnNode invokeInsnNode, Frame<BasicValue> frame, Type methodReturnType) {
+    ContinuationPoint(boolean suspend, int id, AbstractInsnNode invokeInsnNode, Frame<BasicValue> frame, Type methodReturnType) {
         Validate.notNull(invokeInsnNode);
         Validate.notNull(frame);
         Validate.notNull(methodReturnType);
         Validate.isTrue(id >= 0);
         Validate.isTrue(methodReturnType.getSort() != Type.METHOD);
+        Validate.isTrue(invokeInsnNode instanceof MethodInsnNode || invokeInsnNode instanceof InvokeDynamicInsnNode);
 
         this.suspend = suspend;
         this.id = id;
@@ -29,23 +32,23 @@ final class ContinuationPoint {
         restoreLabelNode = new LabelNode();
     }
 
-    public boolean isSuspend() {
+    boolean isSuspend() {
         return suspend;
     }
 
-    public int getId() {
+    int getId() {
         return id;
     }
 
-    public AbstractInsnNode getInvokeInsnNode() {
+    AbstractInsnNode getInvokeInsnNode() {
         return invokeInsnNode;
     }
 
-    public LabelNode getRestoreLabelNode() {
+    LabelNode getRestoreLabelNode() {
         return restoreLabelNode;
     }
 
-    public Frame getFrame() {
+    Frame getFrame() {
         return frame;
     }
 
