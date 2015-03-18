@@ -1,3 +1,4 @@
 /user/target/
 /instrumenter/target/
 /build-tools/target/
+/maven-plugin/target/
