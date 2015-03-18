@@ -14,19 +14,21 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.instrumenter;
+package com.offbynull.coroutines.instrumenter.asm;
 
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.ifIntegersEqual;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadVar;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadStringConst;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.merge;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.returnValue;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.tableSwitch;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.throwException;
-import static com.offbynull.coroutines.instrumenter.SearchUtils.findMethodsWithName;
-import static com.offbynull.coroutines.instrumenter.TestUtils.readZipResourcesAsClassNodes;
-import static com.offbynull.coroutines.instrumenter.TestUtils.createJarAndLoad;
-import com.offbynull.coroutines.instrumenter.VariableTable.Variable;
+import com.offbynull.coroutines.instrumenter.asm.InstructionUtils;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.ifIntegersEqual;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadStringConst;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnValue;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tableSwitch;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.throwException;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithName;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipResourcesAsClassNodes;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
 import org.apache.commons.lang3.reflect.MethodUtils;

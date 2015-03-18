@@ -14,10 +14,11 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.instrumenter;
+package com.offbynull.coroutines.instrumenter.asm;
 
-import static com.offbynull.coroutines.instrumenter.TestUtils.readZipFromResource;
-import com.offbynull.coroutines.instrumenter.VariableTable.Variable;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipFromResource;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.io.IOException;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;

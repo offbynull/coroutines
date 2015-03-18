@@ -14,8 +14,11 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.instrumenter;
+package com.offbynull.coroutines.instrumenter.testhelpers;
 
+import com.offbynull.coroutines.instrumenter.Instrumenter;
+import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
+import com.offbynull.coroutines.instrumenter.asm.ClassInformationRepository;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;

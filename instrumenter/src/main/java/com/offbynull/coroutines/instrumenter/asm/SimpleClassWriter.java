@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.instrumenter;
+package com.offbynull.coroutines.instrumenter.asm;
 
 import java.util.LinkedHashSet;
 import org.apache.commons.lang3.Validate;

@@ -16,7 +16,7 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
-import static com.offbynull.coroutines.instrumenter.TestUtils.loadClassesInZipResourceAndInstrument;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.loadClassesInZipResourceAndInstrument;
 import com.offbynull.coroutines.user.Coroutine;
 import com.offbynull.coroutines.user.CoroutineRunner;
 import java.net.URLClassLoader;

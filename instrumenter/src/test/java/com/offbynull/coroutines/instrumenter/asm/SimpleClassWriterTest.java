@@ -14,22 +14,24 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.instrumenter;
+package com.offbynull.coroutines.instrumenter.asm;
 
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.addLabel;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.call;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.construct;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.jumpTo;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.loadVar;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.merge;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.pop;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.returnDummy;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.saveVar;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.tableSwitch;
-import static com.offbynull.coroutines.instrumenter.InstructionUtils.throwException;
-import static com.offbynull.coroutines.instrumenter.TestUtils.createJarAndLoad;
-import static com.offbynull.coroutines.instrumenter.TestUtils.readZipFromResource;
-import com.offbynull.coroutines.instrumenter.VariableTable.Variable;
+import com.offbynull.coroutines.instrumenter.asm.InstructionUtils;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.jumpTo;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tableSwitch;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.throwException;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipFromResource;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;

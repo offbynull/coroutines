@@ -14,14 +14,14 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.instrumenter;
+package com.offbynull.coroutines.instrumenter.asm;
 
-import static com.offbynull.coroutines.instrumenter.SearchUtils.findInvocationsOf;
-import static com.offbynull.coroutines.instrumenter.SearchUtils.findInvocationsWithParameter;
-import static com.offbynull.coroutines.instrumenter.SearchUtils.findMethodsWithName;
-import static com.offbynull.coroutines.instrumenter.SearchUtils.findMethodsWithParameter;
-import static com.offbynull.coroutines.instrumenter.SearchUtils.searchForOpcodes;
-import static com.offbynull.coroutines.instrumenter.TestUtils.readZipResourcesAsClassNodes;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findInvocationsOf;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findInvocationsWithParameter;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithName;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithParameter;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.searchForOpcodes;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipResourcesAsClassNodes;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.List;

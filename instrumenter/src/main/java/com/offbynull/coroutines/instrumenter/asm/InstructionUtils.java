@@ -14,9 +14,9 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.instrumenter;
+package com.offbynull.coroutines.instrumenter.asm;
 
-import com.offbynull.coroutines.instrumenter.VariableTable.Variable;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
