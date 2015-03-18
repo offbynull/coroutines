@@ -148,7 +148,6 @@
         <!-- This is disabled because of parameter validation checks. Will add too much clutter to add constants for every check. -->
         <!--<module name="MagicNumber"/>-->
         <module name="MissingSwitchDefault"/>
-        <module name="RedundantThrows"/>
         <module name="SimplifyBooleanExpression"/>
         <module name="SimplifyBooleanReturn"/>
 

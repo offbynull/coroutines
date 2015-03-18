@@ -47,6 +47,10 @@ import org.objectweb.asm.tree.analysis.Frame;
  */
 public final class InstructionUtils {
 
+    private InstructionUtils() {
+        // do nothing
+    }
+    
     /**
      * Returns an empty instruction list.
      * @return empty instruction list
@@ -181,6 +185,11 @@ public final class InstructionUtils {
         return ret;
     }
 
+    /**
+     * Generates instruction to push a string constant on to the stack.
+     * @param s string constant to push
+     * @return instructions to push a string constant
+     */
     public static InsnList loadStringConst(String s) {
         InsnList ret = new InsnList();
         ret.add(new LdcInsnNode(s));
@@ -355,13 +364,16 @@ public final class InstructionUtils {
         
         if ((method.getModifiers() & Modifier.STATIC) == Modifier.STATIC) {
             Validate.isTrue(method.getParameterCount() == args.length);
-            ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, clsType.getInternalName(), method.getName(), methodType.getDescriptor(), false));
+            ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, clsType.getInternalName(), method.getName(), methodType.getDescriptor(),
+                    false));
         } else if (method.getDeclaringClass().isInterface()) {
             Validate.isTrue(method.getParameterCount() + 1 == args.length);
-            ret.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, clsType.getInternalName(), method.getName(), methodType.getDescriptor(), true));
+            ret.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, clsType.getInternalName(), method.getName(), methodType.getDescriptor(),
+                    true));
         } else {
             Validate.isTrue(method.getParameterCount() + 1 == args.length);
-            ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, clsType.getInternalName(), method.getName(), methodType.getDescriptor(), false));
+            ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, clsType.getInternalName(), method.getName(), methodType.getDescriptor(),
+                    false));
         }
         
         return ret;

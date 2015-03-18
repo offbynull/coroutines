@@ -31,6 +31,12 @@
                             <artifactId>build-tools</artifactId>
                             <version>${project.version}</version>
                         </dependency>
+                        <dependency>
+                            <!-- This dep is required because the versino of checkstyle used by 2.14 doesn't support Java 8 -->
+                            <groupId>com.puppycrawl.tools</groupId>
+                            <artifactId>checkstyle</artifactId>
+                            <version>6.4.1</version>
+                        </dependency>
                     </dependencies>
                     <configuration>
                         <consoleOutput>true</consoleOutput>

@@ -76,6 +76,11 @@ import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.SimpleVerifier;
 
+/**
+ * Instruments methods in Java classes that are intended to be run as coroutines. Tested with Java 1.2 and Java 8, so hopefully thing should
+ * work with all versions of Java inbetween.
+ * @author Kasra Faghihi
+ */
 public final class Instrumenter {
 
     private static final Type CONTINUATION_CLASS_TYPE = Type.getType(Continuation.class);
@@ -102,6 +107,12 @@ public final class Instrumenter {
 
     private ClassInformationRepository classRepo;
 
+    /**
+     * Constructs a {@link Instrumenter} object.
+     * @param classpath classpath JARs and folders to use for instrumentation (this is needed by ASM to generate stack map frames).
+     * @throws IOException if classes in the classpath could not be loaded up
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     */
     public Instrumenter(List<File> classpath) throws IOException {
         Validate.notNull(classpath);
         Validate.noNullElements(classpath);
@@ -109,6 +120,13 @@ public final class Instrumenter {
         classRepo = ClassInformationRepository.create(classpath);
     }
 
+    /**
+     * Instruments a class.
+     * @param input class file contents
+     * @return instrumented class
+     * @throws IllegalArgumentException if the class could not be instrumented for some reason
+     * @throws NullPointerException if any argument is {@code null}
+     */
     public byte[] instrument(byte[] input) {
         try {
             // Try catch finallies in older versions of Java use the JSR opcode which may cause us some grief, thankfully ASM has something
@@ -446,7 +464,7 @@ public final class Instrumenter {
         //     builder.append("started\n");
         //     for (int i = 0; i < 10; i++) {
         //         Consumer<Integer> consumer = (x) -> {
-        //             temp.length(); // pulls in temp as an arg, which causes c (the Continuation object) to go in as a the second argument  
+        //             temp.length(); // pulls in temp as an arg, which causes c (the Continuation object) to go in as a the second argument
         //             builder.append(x).append('\n');
         //             System.out.println("XXXXXXX");
         //             c.suspend();
