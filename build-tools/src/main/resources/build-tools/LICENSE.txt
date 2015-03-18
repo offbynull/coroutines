@@ -1,0 +1,16 @@
+\Q/*\E
+\Q * Copyright (c) \E\d{4}\Q, Kasra Faghihi, All rights reserved.\E
+\Q * \E
+\Q * This library is free software; you can redistribute it and/or\E
+\Q * modify it under the terms of the GNU Lesser General Public\E
+\Q * License as published by the Free Software Foundation; either\E
+\Q * version 3.0 of the License, or (at your option) any later version.\E
+\Q * \E
+\Q * This library is distributed in the hope that it will be useful,\E
+\Q * but WITHOUT ANY WARRANTY; without even the implied warranty of\E
+\Q * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU\E
+\Q * Lesser General Public License for more details.\E
+\Q * \E
+\Q * You should have received a copy of the GNU Lesser General Public\E
+\Q * License along with this library.\E
+\Q */\E

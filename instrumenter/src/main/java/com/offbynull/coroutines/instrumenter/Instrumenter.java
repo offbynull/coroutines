@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3.0 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.
+ */
 package com.offbynull.coroutines.instrumenter;
 
 import static com.offbynull.coroutines.instrumenter.InstructionUtils.addLabel;
@@ -35,14 +51,16 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.commons.JSRInlinerAdapter;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
@@ -78,38 +96,40 @@ public final class Instrumenter {
             = MethodUtils.getAccessibleMethod(MethodState.class, "getLocalTable");
     private static final Method METHODSTATE_GETSTACK_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getStack");
-    
-    private Map<String, String> superClassMapping;
-    
-    public Instrumenter(List<File> classPaths) throws IOException {
-        Validate.notNull(classPaths);
-        Validate.noNullElements(classPaths);
-        
-        superClassMapping = SearchUtils.getSuperClassMappings(classPaths);
+
+    private ClassInformationRepository classRepo;
+
+    public Instrumenter(List<File> classpath) throws IOException {
+        Validate.notNull(classpath);
+        Validate.noNullElements(classpath);
+
+        classRepo = ClassInformationRepository.create(classpath);
     }
 
     public byte[] instrument(byte[] input) {
         try {
-            return instrumentClass(input);
+            // Try catch finallies in older versions of Java use the JSR opcode which may cause us some grief, thankfully ASM has something
+            // to automatically remove these JSR blocks. Remove them here before passing them off to the main instrumentation code.
+            byte[] inputWithJsrBlocksRemoved = inlineJsrBlocks(input);
+            
+            return instrumentClass(inputWithJsrBlocksRemoved);
         } catch (IOException ioe) {
             throw new IllegalStateException(ioe); // this should never happen
         }
     }
-    
+
     private byte[] instrumentClass(byte[] input) throws IOException {
         Validate.notNull(input);
         Validate.isTrue(input.length > 0);
-        
-        
+
         ByteArrayInputStream bais = new ByteArrayInputStream(input);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        
 
         // Read class as tree model
         ClassReader cr = new ClassReader(bais);
         ClassNode classNode = new ClassNode();
         cr.accept(classNode, 0);
-        
+
         // Don't do anything if interface
         if ((classNode.access & Opcodes.ACC_INTERFACE) == Opcodes.ACC_INTERFACE) {
             return input.clone();
@@ -121,13 +141,24 @@ public final class Instrumenter {
         for (MethodNode methodNode : methodNodesToInstrument) {
             // Check if method is constructor
             Validate.isTrue(!"<init>".equals(methodNode.name), "Instrumentation of constructors not allowed");
-            
-            // Check method does not contain invalid bytecode
-            Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR, Opcodes.MONITORENTER, Opcodes.MONITOREXIT).isEmpty(),
-                    "JSR/MONITORENTER/MONITOREXIT are not allowed");
-            
-            // Get index of continuations object in parameter list
 
+            // Check for JSR blocks -- Emitted for finally blocks in older versions of the JDK. Should never happen since we already inlined
+            // these blocks before coming to this point. This is a sanity check.
+            Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR).isEmpty(),
+                    "JSR instructions not allowed");
+            
+            // Check for synchronized code blocks. Synchronized methods and Java 5 locks are okay, synchronized code blocks aren't okay
+            // because we can't reliably determine if we need to do a MONITOREXIT. It looks like Javaflow has some way of handling this.
+            // More investigation is required.
+            //
+            // On further investigation, it seems that there's no reliable way to detect pairings of MONITORENTER and MONITOREXIT. This link
+            // seems to explain it pretty well: http://mail.openjdk.java.net/pipermail/hotspot-runtime-dev/2008-April/000118.html. I've
+            // confirmed by making a simple java class in JASMIN assembler that did 10 MONITORENTERs in a loop and returned. That code threw
+            // IllegalMonitorStateException when it tried to return.
+            Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.MONITORENTER, Opcodes.MONITOREXIT).isEmpty(),
+                    "MONITORENTER/MONITOREXIT instructions are not allowed");
+
+            // Get index of continuations object in parameter list
             // Get return type
             Type returnType = Type.getMethodType(methodNode.desc).getReturnType();
 
@@ -140,9 +171,11 @@ public final class Instrumenter {
             List<AbstractInsnNode> saveInvocationInsnNodes
                     = findInvocationsWithParameter(methodNode.instructions, CONTINUATION_CLASS_TYPE);
 
+            // Check for invokedynamic instructions, which are currently only used by lambdas. See comments in validateNoInvokeDynamic to
+            // see why we need to do this.
             validateNoInvokeDynamic(suspendInvocationInsnNodes);
             validateNoInvokeDynamic(saveInvocationInsnNodes);
-            
+
             // Generate local variable indices
             VariableTable varTable = new VariableTable(classNode, methodNode);
 
@@ -171,7 +204,7 @@ public final class Instrumenter {
             Variable savedLocalsVar = varTable.acquireExtra(Type.getType(Object[].class));
             Variable savedStackVar = varTable.acquireExtra(Type.getType(Object[].class));
             Variable tempObjVar = varTable.acquireExtra(Type.getType(Object.class));
-            
+
             // Generate entrypoint instructions...
             //
             //    switch(continuation.getMode()) {
@@ -229,10 +262,10 @@ public final class Instrumenter {
                                                                         loadLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
                                                                         jumpTo(cp.getRestoreLabelNode())
                                                                 );
-                                                        return ret;
+                                                                return ret;
                                                     }).toArray((x) -> new InsnList[x])
                                             )
-                                            // jump to not required here, switch above either throws exception or jumps to restore point
+                                    // jump to not required here, switch above either throws exception or jumps to restore point
                                     )
                             ),
                             addLabel(startOfMethodLabelNode)
@@ -269,14 +302,14 @@ public final class Instrumenter {
                                 saveOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
                                 // debugPrint("saving locals" + methodNode.name),
                                 saveLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
-                                // debugPrint("calling add pending" + methodNode.name),
+                                // debugPrint("calling addIndividual pending" + methodNode.name),
                                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(cp.getId()),
                                                 loadVar(savedStackVar),
                                                 loadVar(savedLocalsVar)))
                         );
-                
+
                 InsnList insnList;
                 if (cp.isSuspend()) {
                     // When Continuation.suspend() is called, it's a termination point. We want to ...
@@ -290,23 +323,22 @@ public final class Instrumenter {
                     // immediately (see else block below)
                     insnList
                             = merge(
-                                    saveBeforeInvokeInsnList,                           // save
-                                                                                        // set saving mode
+                                    saveBeforeInvokeInsnList, // save
+                                    // set saving mode
                                     // debugPrint("setting mode to saving" + methodNode.name),
                                     call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_SAVING)),
                                     // debugPrint("returning dummy value" + methodNode.name),
-                                    returnDummy(returnType),                            // return dummy value
-                                    addLabel(cp.getRestoreLabelNode()),                 // add restore point for when in loading mode
+                                    returnDummy(returnType), // return dummy value
+                                    addLabel(cp.getRestoreLabelNode()), // addIndividual restore point for when in loading mode
                                     // debugPrint("entering restore point" + methodNode.name),
                                     pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
-                                           // stack that would have been consumed by that invocation... since we're removing that call, we
-                                           // also need to pop the Continuation reference from the stack... it's important that we
-                                           // explicitly do it at this point becuase during loading the stack will be restored with top
-                                           // of stack pointing to that continuation object
+                                    // stack that would have been consumed by that invocation... since we're removing that call, we
+                                    // also need to pop the Continuation reference from the stack... it's important that we
+                                    // explicitly do it at this point becuase during loading the stack will be restored with top
+                                    // of stack pointing to that continuation object
                                     // debugPrint("going back in to normal mode" + methodNode.name),
-                                                                                        // we're back in to a loading state now
+                                    // we're back in to a loading state now
                                     call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_NORMAL))
-                                    
                             );
                 } else {
                     // When a method that takes in a Continuation object as a parameter is called, We want to ...
@@ -321,10 +353,10 @@ public final class Instrumenter {
                     // normal flow of execution and return immediately.
                     insnList
                             = merge(
-                                    addLabel(cp.getRestoreLabelNode()),         // add restore point for when in loading mode
-                                    saveBeforeInvokeInsnList,                   // save
+                                    addLabel(cp.getRestoreLabelNode()), // addIndividual restore point for when in loading mode
+                                    saveBeforeInvokeInsnList, // save
                                     // debugPrint("invoking" + methodNode.name),
-                                    cloneInvokeNode(cp.getInvokeInsnNode()),    // invoke method
+                                    cloneInvokeNode(cp.getInvokeInsnNode()), // invoke method
                                     // debugPrint("testing if in saving mode" + methodNode.name),
                                     ifIntegersEqual(// if we're saving after invoke, return dummy value
                                             call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
@@ -332,27 +364,42 @@ public final class Instrumenter {
                                             returnDummy(returnType)
                                     ),
                                     // debugPrint("calling remove last pending" + methodNode.name),
-                                    call(CONTINUATION_REMOVELASTPENDING_METHOD,  loadVar(contArg)) // otherwise assume we're normal, and
-                                                                                                   // remove the state we added on to
-                                                                                                   // pending
+                                    call(CONTINUATION_REMOVELASTPENDING_METHOD, loadVar(contArg)) // otherwise assume we're normal, and
+                            // remove the state we added on to
+                            // pending
                             );
                 }
-                
+
                 methodNode.instructions.insertBefore(cp.getInvokeInsnNode(), insnList);
                 methodNode.instructions.remove(cp.getInvokeInsnNode());
             });
         }
 
         // Write tree model back out as class
-        ClassWriter cw = new SimpleClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, superClassMapping);
+        ClassWriter cw = new SimpleClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, classRepo);
         classNode.accept(cw);
 
         baos.write(cw.toByteArray());
-        
-        
+
         return baos.toByteArray();
     }
-    
+
+    private byte[] inlineJsrBlocks(byte[] input) {
+        ClassReader reader = new ClassReader(input);
+        ClassWriter writer = new SimpleClassWriter(0, classRepo);
+        
+        ClassVisitor visitor = new ClassVisitor(Opcodes.ASM5, writer) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
+                MethodVisitor origVisitor = super.visitMethod(access, name, desc, signature, exceptions);
+                return new JSRInlinerAdapter(origVisitor, access, name, desc, signature, exceptions);
+            }
+        };
+        reader.accept(visitor, 0);
+        
+        return writer.toByteArray();
+    }
+
     private Frame[] analyzeFrames(String className, MethodNode methodNode) {
         try {
             return new Analyzer<>(new SimpleVerifier()).analyze(className, methodNode);
@@ -360,14 +407,14 @@ public final class Instrumenter {
             throw new IllegalArgumentException("Analyzer failed to analyze method", ae);
         }
     }
-    
+
     private int getLocalVariableIndexOfContinuationParameter(MethodNode methodNode) {
         // If it is NOT static, the first index in the local variables table is always the "this" pointer, followed by the arguments passed
         // in to the method.
         // If it is static, the local variables table doesn't contain the "this" pointer, just the arguments passed in to the method.
         boolean isStatic = (methodNode.access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC;
         Type[] argumentTypes = Type.getMethodType(methodNode.desc).getArgumentTypes();
-        
+
         int idx = -1;
         for (int i = 0; i < argumentTypes.length; i++) {
             Type type = argumentTypes[i];
@@ -380,10 +427,10 @@ public final class Instrumenter {
                 }
             }
         }
-        
+
         return isStatic ? idx : idx + 1;
     }
-    
+
     private void validateNoInvokeDynamic(List<AbstractInsnNode> insnNodes) {
         // Why is invokedynamic not allowed? because apparently invokedynamic can map to anything... which means that we can't reliably
         // determine if what is being called by invokedynamic is going to be a method we expect to be instrumented to handle Continuations.
@@ -392,17 +439,17 @@ public final class Instrumenter {
         // Java code as an example...
         //
         // public void run(Continuation c) {
-        // 	String temp = "hi";
-        // 	builder.append("started\n");
-        // 	for (int i = 0; i < 10; i++) {
-        // 	    Consumer<Integer> consumer = (x) -> {
-        // 		temp.length(); // pulls in temp as an arg, which causes c (the Continuation object) to go in as a the second argument  
-        // 		builder.append(x).append('\n');
-        // 		System.out.println("XXXXXXX");
-        // 		c.suspend();
-        // 	    };
-        // 	    consumer.accept(i);
-        // 	}
+        //     String temp = "hi";
+        //     builder.append("started\n");
+        //     for (int i = 0; i < 10; i++) {
+        //         Consumer<Integer> consumer = (x) -> {
+        //             temp.length(); // pulls in temp as an arg, which causes c (the Continuation object) to go in as a the second argument  
+        //             builder.append(x).append('\n');
+        //             System.out.println("XXXXXXX");
+        //             c.suspend();
+        //         }
+        //         consumer.accept(i);
+        //     }
         // }
         //
         // This for loop in the above code maps out to...
@@ -450,7 +497,7 @@ public final class Instrumenter {
 
         for (AbstractInsnNode insnNode : insnNodes) {
             if (insnNode instanceof InvokeDynamicInsnNode) {
-                throw new IllegalArgumentException("Invoke dynamic not allowed -- do not use Continuation within lambdas");
+                throw new IllegalArgumentException("INVOKEDYNAMIC instructions are not allowed");
             }
         }
     }

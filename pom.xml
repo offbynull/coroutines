@@ -6,9 +6,74 @@
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
+        <module>build-tools</module>
         <module>user</module>
         <module>instrumenter</module>
     </modules>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-checkstyle-plugin</artifactId>
+                    <version>2.14</version>
+                    <executions>
+                        <execution>
+                            <phase>process-sources</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.offbynull.coroutines</groupId>
+                            <artifactId>build-tools</artifactId>
+                            <version>${project.version}</version>
+                        </dependency>
+                    </dependencies>
+                    <configuration>
+                        <consoleOutput>true</consoleOutput>
+                        <configLocation>build-tools/checkstyle.xml</configLocation>
+                        <headerLocation>build-tools/LICENSE.txt</headerLocation>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-pmd-plugin</artifactId>
+                    <version>3.4</version>
+                    <executions>
+                        <execution>
+                            <phase>process-sources</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <printFailingErrors>true</printFailingErrors>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>findbugs-maven-plugin</artifactId>
+                    <version>3.0.0</version>
+                    <configuration>
+                        <effort>Max</effort>
+                        <threshold>Default</threshold>
+                        <failOnError>false</failOnError>  <!-- Because there isn't an easy way to turn off checks in source -->
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>

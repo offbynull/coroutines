@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3.0 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.
+ */
 package com.offbynull.coroutines.instrumenter;
 
 import java.io.ByteArrayInputStream;
@@ -23,7 +39,6 @@ import org.apache.commons.io.Charsets;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 
 /**
@@ -40,9 +55,18 @@ public final class TestUtils {
         // do nothing
     }
     
-    public static URLClassLoader loadClassesInZipResourceAndInstrument(String zipPath) throws IOException {
+    /**
+     * Opens up a ZIP resource, instruments the classes within, and returns a {@link URLClassLoader} object with access to those classes.
+     * @param path path of zip resource
+     * @return class loader able to access instrumented classes
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IOException if an IO error occurs
+     */
+    public static URLClassLoader loadClassesInZipResourceAndInstrument(String path) throws IOException {
+        Validate.notNull(path);
+        
         // Load original class
-        Map<String, byte[]> classContents = readZipFromResource(zipPath);
+        Map<String, byte[]> classContents = readZipFromResource(path);
         
         // Create JAR out of original classes so it can be found by the instrumenter
         List<JarEntry> originalJarEntries = new ArrayList<>(classContents.size());
@@ -51,7 +75,7 @@ public final class TestUtils {
         }
         File originalJarFile = createJar(originalJarEntries.toArray(new JarEntry[0]));
         
-        // Get classpath used to run this Java process and add the jar file we created to it (used by the instrumenter)
+        // Get classpath used to run this Java process and addIndividual the jar file we created to it (used by the instrumenter)
         List<File> classpath = getClasspath();
         classpath.add(originalJarFile);
         
@@ -112,9 +136,11 @@ public final class TestUtils {
         Validate.notNull(classNodes);
         Validate.noNullElements(classNodes);
         
+        ClassInformationRepository infoRepo = ClassInformationRepository.create(getClasspath());
+        SimpleClassWriter cw = new SimpleClassWriter(SimpleClassWriter.COMPUTE_MAXS | SimpleClassWriter.COMPUTE_FRAMES, infoRepo);
+        
         JarEntry[] jarEntries = new JarEntry[classNodes.length];
         for (int i = 0; i < jarEntries.length; i++) {
-            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             classNodes[i].accept(cw);
 
             jarEntries[i] = new JarEntry(classNodes[i].name + ".class", cw.toByteArray());
@@ -188,15 +214,30 @@ public final class TestUtils {
      * @throws IllegalStateException if the classpath doesn't exist or can't be split up
      */
     public static List<File> getClasspath() {
-        String classpath = System.getProperty("java.class.path");
         String pathSeparator = System.getProperty("path.separator");
-        Validate.validState(classpath != null && pathSeparator != null);
+        Validate.validState(pathSeparator != null);
+        
+        String classpath = System.getProperty("java.class.path");
+        Validate.validState(classpath != null);
         List<File> classPathFiles = Arrays
                 .stream(classpath.split(Pattern.quote(pathSeparator)))
                 .map(x -> new File(x))
+                .filter(x -> x.exists())
                 .collect(Collectors.toList());
 
-        return new ArrayList<>(classPathFiles);
+        String bootClasspath = System.getProperty("sun.boot.class.path");
+        Validate.validState(bootClasspath != null);
+        List<File> bootClassPathFiles = Arrays
+                .stream(bootClasspath.split(Pattern.quote(pathSeparator)))
+                .map(x -> new File(x))
+                .filter(x -> x.exists())
+                .collect(Collectors.toList());
+
+        ArrayList<File> ret = new ArrayList<>();
+        ret.addAll(classPathFiles);
+        ret.addAll(bootClassPathFiles);
+        
+        return ret;
     }
 
     /**
