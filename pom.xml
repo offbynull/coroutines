@@ -9,7 +9,7 @@
         <module>build-tools</module>
         <module>user</module>
         <module>instrumenter</module>
-        <module>maven-plugin</module>
+        <module>coroutine-maven-plugin</module>
     </modules>
     <build>
         <pluginManagement>

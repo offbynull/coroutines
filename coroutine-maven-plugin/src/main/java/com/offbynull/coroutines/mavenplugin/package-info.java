@@ -14,21 +14,9 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.mavenplugin;
-
-import org.apache.maven.plugin.AbstractMojo;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
 
 /**
- * Mojo to run coroutine instrumentation.
+ * Coroutine Maven plugin.
  * @author Kasra Faghihi
  */
-public final class CoroutineMojo extends AbstractMojo {
-
-    @Override
-    public void execute() throws MojoExecutionException, MojoFailureException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-    
-}
+package com.offbynull.coroutines.mavenplugin;
