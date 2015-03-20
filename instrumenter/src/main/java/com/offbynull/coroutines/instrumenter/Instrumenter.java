@@ -46,6 +46,7 @@ import com.offbynull.coroutines.user.Continuation;
 import static com.offbynull.coroutines.user.Continuation.MODE_NORMAL;
 import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
 import com.offbynull.coroutines.user.Continuation.MethodState;
+import com.offbynull.coroutines.user.Instrumented;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -83,6 +84,7 @@ import org.objectweb.asm.tree.analysis.SimpleVerifier;
  */
 public final class Instrumenter {
 
+    private static final Type INSTRUMENTED_CLASS_TYPE = Type.getType(Instrumented.class);
     private static final Type CONTINUATION_CLASS_TYPE = Type.getType(Continuation.class);
     private static final Type CONTINUATION_SUSPEND_METHOD_TYPE
             = Type.getType(MethodUtils.getAccessibleMethod(Continuation.class, "suspend"));
@@ -129,11 +131,17 @@ public final class Instrumenter {
      */
     public byte[] instrument(byte[] input) {
         try {
-            // Try catch finallies in older versions of Java use the JSR opcode which may cause us some grief, thankfully ASM has something
-            // to automatically remove these JSR blocks. Remove them here before passing them off to the main instrumentation code.
-            byte[] inputWithJsrBlocksRemoved = inlineJsrBlocks(input);
+            // Check to see this class has already been instrumented. If it already has been, don't touch anything.
+            if (isAlreadyInstrumented(input)) {
+                return input;
+            }
             
-            return instrumentClass(inputWithJsrBlocksRemoved);
+            // Try-catch-finalli in older versions of Java use the JSR opcode which may cause us some grief, thankfully ASM has something
+            // to automatically remove these JSR blocks. Remove them here before passing them off to the main instrumentation code.
+            input = inlineJsrBlocks(input);
+            
+            // Instrument the class and return the results
+            return instrumentClass(input);
         } catch (IOException ioe) {
             throw new IllegalStateException(ioe); // this should never happen
         }
@@ -151,14 +159,21 @@ public final class Instrumenter {
         ClassNode classNode = new ClassNode();
         cr.accept(classNode, 0);
 
-        // Don't do anything if interface
+        // Don't do anything if this is an interface
         if ((classNode.access & Opcodes.ACC_INTERFACE) == Opcodes.ACC_INTERFACE) {
             return input.clone();
         }
 
         // Find methods that need to be instrumented
         List<MethodNode> methodNodesToInstrument = findMethodsWithParameter(classNode.methods, CONTINUATION_CLASS_TYPE);
+        
+        // If we've found methods, it means that this class will definitely be instrumented. As such, add the Instrumented interface to this
+        // class so if we ever come back to it, we can skip it.
+        if (!methodNodesToInstrument.isEmpty()) {
+            classNode.interfaces.add(INSTRUMENTED_CLASS_TYPE.getInternalName());
+        }
 
+        // Instrument the methods we found.
         for (MethodNode methodNode : methodNodesToInstrument) {
             // Check if method is constructor
             Validate.isTrue(!"<init>".equals(methodNode.name), "Instrumentation of constructors not allowed");
@@ -405,6 +420,16 @@ public final class Instrumenter {
         return baos.toByteArray();
     }
 
+    private boolean isAlreadyInstrumented(byte[] input) throws IOException {
+        ByteArrayInputStream bais = new ByteArrayInputStream(input);
+        
+        ClassReader cr = new ClassReader(bais);
+        ClassNode classNode = new ClassNode();
+        cr.accept(classNode, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        
+        return classNode.interfaces.contains(INSTRUMENTED_CLASS_TYPE.getInternalName());
+    }
+    
     private byte[] inlineJsrBlocks(byte[] input) {
         ClassReader reader = new ClassReader(input);
         ClassWriter writer = new SimpleClassWriter(0, classRepo);
