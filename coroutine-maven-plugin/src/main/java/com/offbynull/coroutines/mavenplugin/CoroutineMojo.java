@@ -33,7 +33,29 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 
 /**
- * Mojo to run coroutine instrumentation.
+ * Mojo to run coroutine instrumentation. Instruments both main classes and test classes.
+ * <p>
+ * Sample usage in POM:
+ * <pre>
+ *     &lt;build&gt;
+ *         &lt;plugins&gt;
+ *             &lt;plugin&gt;
+ *                 &lt;groupId&gt;com.offbynull.coroutines&lt;/groupId&gt;
+ *                 &lt;artifactId&gt;coroutine-maven-plugin&lt;/artifactId&gt;
+ *                 &lt;version&gt;1.0.0-SNAPSHOT&lt;/version&gt;
+ *                 &lt;executions&gt;
+ *                     &lt;execution&gt;
+ *                         &lt;goals&gt;
+ *                             &lt;goal&gt;instrument&lt;/goal&gt;
+ *                         &lt;/goals&gt;
+ *                     &lt;/execution&gt;
+ *                 &lt;/executions&gt;
+ *             &lt;/plugin&gt;
+ *         &lt;/plugins&gt;
+ *     &lt;/build&gt;
+ * </pre>
+ * 
+ * or directly call the goal instrument (e.g. mvn coroutine:instrument)
  *
  * @author Kasra Faghihi
  */
