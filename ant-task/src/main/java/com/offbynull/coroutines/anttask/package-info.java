@@ -16,7 +16,7 @@
  */
 
 /**
- * Coroutines Maven plugin.
+ * Coroutines Ant plugin.
  * @author Kasra Faghihi
  */
-package com.offbynull.coroutines.mavenplugin;
+package com.offbynull.coroutines.anttask;

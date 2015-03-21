@@ -60,7 +60,7 @@ import org.apache.maven.project.MavenProject;
  * @author Kasra Faghihi
  */
 @Mojo(name = "instrument", defaultPhase = LifecyclePhase.PROCESS_CLASSES, requiresDependencyResolution = ResolutionScope.COMPILE)
-public final class CoroutineMojo extends AbstractMojo {
+public final class InstrumentMojo extends AbstractMojo {
 
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;

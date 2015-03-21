@@ -27,11 +27,11 @@ public final class CoroutineMojoTest {
     
     private MavenProject mavenProject;
     
-    private CoroutineMojo fixture;
+    private InstrumentMojo fixture;
     
     @Before
     public void setUp() throws Exception {
-        fixture = new CoroutineMojo();
+        fixture = new InstrumentMojo();
         
         mavenProject = Mockito.mock(MavenProject.class);
         Log log = Mockito.mock(Log.class);
