@@ -1,5 +1,6 @@
-package com.offbynull.coroutines.anttask;
+package com.offbynull.coroutines.antplugin;
 
+import com.offbynull.coroutines.antplugin.InstrumentTask;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;

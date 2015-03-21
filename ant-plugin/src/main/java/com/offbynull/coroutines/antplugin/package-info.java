@@ -19,4 +19,4 @@
  * Coroutines Ant plugin.
  * @author Kasra Faghihi
  */
-package com.offbynull.coroutines.anttask;
+package com.offbynull.coroutines.antplugin;

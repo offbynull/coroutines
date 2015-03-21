@@ -9,8 +9,8 @@
         <module>build-tools</module>
         <module>user</module>
         <module>instrumenter</module>
-        <module>ant-task</module>
-        <module>coroutines-maven-plugin</module>
+        <module>maven-plugin</module>
+        <module>ant-plugin</module>
     </modules>
     <build>
         <pluginManagement>

@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.anttask;
+package com.offbynull.coroutines.antplugin;
 
 import com.offbynull.coroutines.instrumenter.Instrumenter;
 import java.io.File;
@@ -33,9 +33,9 @@ import org.apache.tools.ant.Task;
  * <p>
  * Sample usage in build script:
  * <pre>
- *    &lt;taskdef name="InstrumentTask" classname="com.offbynull.coroutines.anttask.InstrumentTask"&gt;
+ *    &lt;taskdef name="InstrumentTask" classname="com.offbynull.coroutines.antplugin.InstrumentTask"&gt;
  *        &lt;classpath&gt;
- *            &lt;pathelement location="ant-task-{version}-shaded.jar"/&gt;
+ *            &lt;pathelement location="ant-plugin-{version}-shaded.jar"/&gt;
  *        &lt;/classpath&gt;
  *    &lt;/taskdef&gt;
  *    
