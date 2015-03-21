@@ -91,7 +91,7 @@ public final class InstrumentMojo extends AbstractMojo {
             instrumenter = new Instrumenter(classpath);
 
             File mainOutputFolder = new File(project.getBuild().getOutputDirectory());
-            log.info("Scanning main output folder ... ");
+            log.info("Processing main output folder ... ");
             instrumentPath(log, instrumenter, mainOutputFolder);
             
             File testOutputFolder = new File(project.getBuild().getTestOutputDirectory());

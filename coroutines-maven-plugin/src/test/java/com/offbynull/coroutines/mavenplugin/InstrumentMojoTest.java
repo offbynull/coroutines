@@ -23,7 +23,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-public final class CoroutineMojoTest {
+public final class InstrumentMojoTest {
     
     private MavenProject mavenProject;
     

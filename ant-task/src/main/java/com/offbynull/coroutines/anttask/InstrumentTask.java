@@ -20,7 +20,6 @@ import com.offbynull.coroutines.instrumenter.Instrumenter;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -137,14 +136,18 @@ public final class InstrumentTask extends Task {
         if (jdkLibsDirectory == null) {
             throw new BuildException("JDK libs directory not set");
         }
-        if (jdkLibsDirectory.isDirectory()) {
-            throw new BuildException("JDK libs directory is not a directory: " + targetDirectory.getAbsolutePath());
+        if (!jdkLibsDirectory.isDirectory()) {
+            throw new BuildException("JDK libs directory is not a directory: " + jdkLibsDirectory.getAbsolutePath());
         }
 
         List<File> combinedClasspath;
         try {
             log("Getting compile classpath", Project.MSG_DEBUG);
-            combinedClasspath = new ArrayList<>(Arrays.stream(classpath.split(";")).map(x -> new File(x)).collect(Collectors.toList()));
+            combinedClasspath = Arrays.stream(classpath.split(";"))
+                    .map(x -> x.trim())
+                    .filter(x -> !x.isEmpty())
+                    .map(x -> new File(x))
+                    .collect(Collectors.toList());
             log("Getting bootstrap classpath", Project.MSG_DEBUG);
             combinedClasspath.addAll(FileUtils.listFiles(jdkLibsDirectory, new String[]{"jar"}, true));
 
@@ -158,31 +161,24 @@ public final class InstrumentTask extends Task {
             log("Creating instrumenter...", Project.MSG_INFO);
             instrumenter = new Instrumenter(combinedClasspath);
             
-            log("Scanning " + sourceDirectory.getAbsolutePath() + " ... ", Project.MSG_INFO);
-            for (File inputFile : FileUtils.listFiles(sourceDirectory, new String[] {"class"}, false)) {
-                Path relativePath = sourceDirectory.toPath().relativize(inputFile.toPath());
-                Path outputFilePath = targetDirectory.toPath().resolve(relativePath);
-                File outputFile = outputFilePath.toFile();
-                
-                log("Instrumenting " + inputFile.getAbsolutePath(), Project.MSG_INFO);
-                instrumentPath(instrumenter, inputFile);
-                byte[] input = FileUtils.readFileToByteArray(inputFile);
-                byte[] output = instrumenter.instrument(input);
-                log("File size changed from " + input.length + " to " + output.length, Project.MSG_DEBUG);
-                FileUtils.writeByteArrayToFile(outputFile, output);
-            }
+            log("Processing " + sourceDirectory.getAbsolutePath() + " ... ", Project.MSG_INFO);
+            instrumentPath(instrumenter);
         } catch (Exception ex) {
             throw new BuildException("Failed to instrument", ex);
         }
     }
 
-    private void instrumentPath(Instrumenter instrumenter, File path) throws IOException {
-        for (File classFile : FileUtils.listFiles(path, new String[]{"class"}, true)) {
-            log("Instrumenting " + classFile, Project.MSG_INFO);
-            byte[] input = FileUtils.readFileToByteArray(classFile);
+    private void instrumentPath(Instrumenter instrumenter) throws IOException {
+        for (File inputFile : FileUtils.listFiles(sourceDirectory, new String[]{"class"}, true)) {
+            Path relativePath = sourceDirectory.toPath().relativize(inputFile.toPath());
+            Path outputFilePath = targetDirectory.toPath().resolve(relativePath);
+            File outputFile = outputFilePath.toFile();
+
+            log("Instrumenting " + inputFile, Project.MSG_INFO);
+            byte[] input = FileUtils.readFileToByteArray(inputFile);
             byte[] output = instrumenter.instrument(input);
             log("File size changed from " + input.length + " to " + output.length, Project.MSG_DEBUG);
-            FileUtils.writeByteArrayToFile(classFile, output);
+            FileUtils.writeByteArrayToFile(outputFile, output);
         }
     }
 }
