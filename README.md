@@ -42,5 +42,4 @@ started
 * Supports Java8
 * ANT plugin
 * Maven plugin
-* Gradle plugin (coming soon)
 * Well documented
