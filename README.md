@@ -19,7 +19,7 @@ First, declare your coroutine...
     }
 ```
 
-Then, execute your coroutine
+Then, execute your coroutine...
 ```java
     CoroutineRunner r = new CoroutineRunner(new MyCoroutine());
     r.execute();
@@ -28,7 +28,7 @@ Then, execute your coroutine
     r.execute();
 ```
 
-The execution outputs:
+This is what the output looks like...
 ```
 started
 0
