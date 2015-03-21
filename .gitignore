@@ -3,3 +3,4 @@
 /build-tools/target/
 /maven-plugin/target/
 /coroutine-maven-plugin/target/
+/coroutines-maven-plugin/target/
