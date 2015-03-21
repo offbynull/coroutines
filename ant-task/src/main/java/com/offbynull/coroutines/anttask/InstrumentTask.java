@@ -29,29 +29,20 @@ import org.apache.tools.ant.Project;
 import org.apache.tools.ant.Task;
 
 /**
- * Mojo to run coroutine instrumentation. Instruments both main classes and test classes.
+ * ANT task to run coroutine instrumentation.
  * <p>
- * Sample usage in POM:
+ * Sample usage in build script:
  * <pre>
- *     &lt;build&gt;
- *         &lt;plugins&gt;
- *             &lt;plugin&gt;
- *                 &lt;groupId&gt;com.offbynull.coroutines&lt;/groupId&gt;
- *                 &lt;artifactId&gt;coroutine-maven-plugin&lt;/artifactId&gt;
- *                 &lt;version&gt;1.0.0-SNAPSHOT&lt;/version&gt;
- *                 &lt;executions&gt;
- *                     &lt;execution&gt;
- *                         &lt;goals&gt;
- *                             &lt;goal&gt;instrument&lt;/goal&gt;
- *                         &lt;/goals&gt;
- *                     &lt;/execution&gt;
- *                 &lt;/executions&gt;
- *             &lt;/plugin&gt;
- *         &lt;/plugins&gt;
- *     &lt;/build&gt;
+ *    &lt;taskdef name="InstrumentTask" classname="com.offbynull.coroutines.anttask.InstrumentTask"&gt;
+ *        &lt;classpath&gt;
+ *            &lt;pathelement location="ant-task-{version}-shaded.jar"/&gt;
+ *        &lt;/classpath&gt;
+ *    &lt;/taskdef&gt;
+ *    
+ *    &lt;target name="-post-compile"&gt;
+ *        &lt;InstrumentTask classpath="somelib.jar;somefolder;someotherlib.jar" sourceDirectory="build" targetDirectory="build"/&gt;
+ *    &lt;/target&gt;
  * </pre>
- * 
- * or directly call the goal instrument (e.g. mvn coroutine:instrument)
  *
  * @author Kasra Faghihi
  */
@@ -73,6 +64,7 @@ public final class InstrumentTask extends Task {
         if (jdkHome != null) {
             jdkLibsDirectory = new File(jdkHome + "/lib");
         }
+        classpath = "";
     }
 
     /**
