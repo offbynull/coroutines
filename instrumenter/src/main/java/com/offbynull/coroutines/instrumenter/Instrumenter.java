@@ -50,8 +50,6 @@ import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
 import com.offbynull.coroutines.user.MethodState;
 import com.offbynull.coroutines.user.Instrumented;
 import com.offbynull.coroutines.user.LockState;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -130,301 +128,278 @@ public final class Instrumenter {
      * @throws NullPointerException if any argument is {@code null}
      */
     public byte[] instrument(byte[] input) {
-        try {
-            // Check to see this class has already been instrumented. If it already has been, don't touch anything.
-            if (isAlreadyInstrumented(input)) {
-                return input;
-            }
-            
-            // Instrument the class and return the results
-            return instrumentClass(input);
-        } catch (IOException ioe) {
-            throw new IllegalStateException(ioe); // this should never happen
-        }
-    }
-
-    private byte[] instrumentClass(byte[] input) throws IOException {
         Validate.notNull(input);
         Validate.isTrue(input.length > 0);
-
-        ByteArrayInputStream bais = new ByteArrayInputStream(input);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-        // Read class as tree model
-        ClassReader cr = new ClassReader(bais);
+        
+        // Read class as tree model -- because we're using SimpleClassNode, JSR blocks get inlined
+        ClassReader cr = new ClassReader(input);
         ClassNode classNode = new SimpleClassNode();
         cr.accept(classNode, 0);
 
-        // Don't do anything if this is an interface
+        // Is this class an interface? if so, skip it
         if ((classNode.access & Opcodes.ACC_INTERFACE) == Opcodes.ACC_INTERFACE) {
             return input.clone();
         }
 
-        // Find methods that need to be instrumented
+        // Has this class already been instrumented? if so, skip it
+        if (classNode.interfaces.contains(INSTRUMENTED_CLASS_TYPE.getInternalName())) {
+            return input.clone();
+        }
+
+        // Find methods that need to be instrumented. If none are found, skip
         List<MethodNode> methodNodesToInstrument = findMethodsWithParameter(classNode.methods, CONTINUATION_CLASS_TYPE);
+        if (methodNodesToInstrument.isEmpty()) {
+            return input.clone();
+        }
         
-        // If we've found methods, it means that this class will definitely be instrumented. As such, add the Instrumented interface to this
-        // class so if we ever come back to it, we can skip it.
-        if (!methodNodesToInstrument.isEmpty()) {
-            classNode.interfaces.add(INSTRUMENTED_CLASS_TYPE.getInternalName());
-        }
+        // Add the "Instrumented" interface to this class so if we ever come back to it, we can skip it
+        classNode.interfaces.add(INSTRUMENTED_CLASS_TYPE.getInternalName());
 
-        // Instrument the methods we found.
-        for (MethodNode methodNode : methodNodesToInstrument) {
-            // Check if method is constructor
-            Validate.isTrue(!"<init>".equals(methodNode.name), "Instrumentation of constructors not allowed");
-
-            // Check for JSR blocks -- Emitted for finally blocks in older versions of the JDK. Should never happen since we already inlined
-            // these blocks before coming to this point. This is a sanity check.
-            Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR).isEmpty(),
-                    "JSR instructions not allowed");
-            
-            // Check for synchronized code blocks. Synchronized methods and Java 5 locks are okay, synchronized code blocks aren't okay
-            // because we can't reliably determine if we need to do a MONITOREXIT. It looks like Javaflow has some way of handling this.
-            // More investigation is required.
-            //
-            // On further investigation, it seems that there's no reliable way to detect pairings of MONITORENTER and MONITOREXIT. This link
-            // seems to explain it pretty well: http://mail.openjdk.java.net/pipermail/hotspot-runtime-dev/2008-April/000118.html. I've
-            // confirmed by making a simple java class in JASMIN assembler that did 10 MONITORENTERs in a loop and returned. That code threw
-            // IllegalMonitorStateException when it tried to return.
-            Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.MONITORENTER, Opcodes.MONITOREXIT).isEmpty(),
-                    "MONITORENTER/MONITOREXIT instructions are not allowed");
-
-            // Get index of continuations object in parameter list
-            // Get return type
-            Type returnType = Type.getMethodType(methodNode.desc).getReturnType();
-
-            // Analyze method
-            Frame<BasicValue>[] frames = analyzeFrames(classNode.name, methodNode);
-
-            // Find invocations of continuation points
-            List<AbstractInsnNode> suspendInvocationInsnNodes
-                    = findInvocationsOf(methodNode.instructions, CONTINUATION_SUSPEND_METHOD_TYPE);
-            List<AbstractInsnNode> saveInvocationInsnNodes
-                    = findInvocationsWithParameter(methodNode.instructions, CONTINUATION_CLASS_TYPE);
-
-            // Check for invokedynamic instructions, which are currently only used by lambdas. See comments in validateNoInvokeDynamic to
-            // see why we need to do this.
-            validateNoInvokeDynamic(suspendInvocationInsnNodes);
-            validateNoInvokeDynamic(saveInvocationInsnNodes);
-
-            // Generate local variable indices
-            VariableTable varTable = new VariableTable(classNode, methodNode);
-
-            // Generate instructions for continuation points
-            int nextId = 0;
-            List<ContinuationPoint> continuationPoints = new LinkedList<>();
-
-            for (AbstractInsnNode suspendInvocationInsnNode : suspendInvocationInsnNodes) {
-                int insnIdx = methodNode.instructions.indexOf(suspendInvocationInsnNode);
-                ContinuationPoint cp = new ContinuationPoint(true, nextId, suspendInvocationInsnNode, frames[insnIdx], returnType);
-                continuationPoints.add(cp);
-                nextId++;
-            }
-
-            for (AbstractInsnNode saveInvocationInsnNode : saveInvocationInsnNodes) {
-                int insnIdx = methodNode.instructions.indexOf(saveInvocationInsnNode);
-                ContinuationPoint cp = new ContinuationPoint(false, nextId, saveInvocationInsnNode, frames[insnIdx], returnType);
-                continuationPoints.add(cp);
-                nextId++;
-            }
-
-            // Manage new variables and arguments
-            int continuationArgIdx = getLocalVariableIndexOfContinuationParameter(methodNode);
-            Variable contArg = varTable.getArgument(continuationArgIdx);
-            Variable methodStateVar = varTable.acquireExtra(Type.getType(MethodState.class));
-            Variable savedLocalsVar = varTable.acquireExtra(Type.getType(Object[].class));
-            Variable savedStackVar = varTable.acquireExtra(Type.getType(Object[].class));
-            Variable tempObjVar = varTable.acquireExtra(Type.getType(Object.class));
-
-            // Generate entrypoint instructions...
-            //
-            //    switch(continuation.getMode()) {
-            //        case NORMAL: goto start
-            //        case SAVING: throw exception
-            //        case LOADING:
-            //        {
-            //            MethodState methodState = continuation.removeFirstSaved();
-            //            Object[] stack = methodState.getStack();
-            //            Object[] localVars = methodState.getLocalTable();
-            //            switch(methodState.getContinuationPoint()) {
-            //                case <number>:
-            //                    restoreOperandStack(stack);
-            //                    restoreLocalsStack(localVars);
-            //                    goto restorePoint_<number>;
-            //                ...
-            //                ...
-            //                ...
-            //                default: throw exception
-            //            }
-            //            goto start;
-            //        }
-            //        default: throw exception
-            //    }
-            //
-            //    start:
-            //        ...
-            //        ...
-            //        ...
-            LabelNode startOfMethodLabelNode = new LabelNode();
-            InsnList entryPointInsnList
-                    = merge(
-                            tableSwitch(
-                                    call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
-                                    throwException("Unrecognized state"),
-                                    0,
-                                    jumpTo(startOfMethodLabelNode),
-                                    throwException("Unexpected state (saving not allowed at this point)"),
-                                    merge(
-                                            // debugPrint("calling remove first saved" + methodNode.name),
-                                            call(CONTINUATION_REMOVEFIRSTSAVED_METHOD, loadVar(contArg)),
-                                            saveVar(methodStateVar),
-                                            call(METHODSTATE_GETLOCALTABLE_METHOD, loadVar(methodStateVar)),
-                                            saveVar(savedLocalsVar),
-                                            call(METHODSTATE_GETSTACK_METHOD, loadVar(methodStateVar)),
-                                            saveVar(savedStackVar),
-                                            tableSwitch(
-                                                    call(METHODSTATE_GETCONTINUATIONPOINT_METHOD, loadVar(methodStateVar)),
-                                                    throwException("Unrecognized restore id" + methodNode.name),
-                                                    0,
-                                                    continuationPoints.stream().map((cp) -> {
-                                                        InsnList ret
-                                                                = merge(
-                                                                        loadOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
-                                                                        loadLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
-                                                                        jumpTo(cp.getRestoreLabelNode())
-                                                                );
-                                                                return ret;
-                                                    }).toArray((x) -> new InsnList[x])
-                                            )
-                                    // jump to not required here, switch above either throws exception or jumps to restore point
-                                    )
-                            ),
-                            addLabel(startOfMethodLabelNode)
-                    );
-            methodNode.instructions.insert(entryPointInsnList);
-
-            // Add store logic and restore addLabel for each continuation point
-            //
-            //      #IFDEF suspend
-            //          Object[] stack = saveOperandStack();
-            //          Object[] locals = saveLocalsStackHere();
-            //          continuation.addPending(new MethodState(<number>, stack, locals);
-            //          continuation.setMode(MODE_SAVING);
-            //          return <dummy>;
-            //          restorePoint_<number>:
-            //          continuation.setMode(MODE_NORMAL);
-            //      #ENDIF
-            //
-            //      #IFDEF !suspend
-            //          restorePoint_<number>:
-            //          Object[] stack = saveOperandStack();
-            //          Object[] locals = saveLocalsStackHere();
-            //          continuation.addPending(new MethodState(<number>, stack, locals);
-            //          <method invocation>
-            //          if (continuation.getMode() == MODE_SAVING) {
-            //              return <dummy>;
-            //          }
-            //          continuation.removeLastPending();
-            //      #ENDIF
-            continuationPoints.forEach((cp) -> {
-                InsnList saveBeforeInvokeInsnList
-                        = merge(
-                                // debugPrint("saving operand stack" + methodNode.name),
-                                saveOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
-                                // debugPrint("saving locals" + methodNode.name),
-                                saveLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
-                                // debugPrint("calling addIndividual pending" + methodNode.name),
-                                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
-                                        construct(METHODSTATE_INIT_METHOD,
-                                                loadIntConst(cp.getId()),
-                                                loadVar(savedStackVar),
-                                                loadVar(savedLocalsVar),
-                                                loadNull()))
-                        );
-
-                InsnList insnList;
-                if (cp.isSuspend()) {
-                    // When Continuation.suspend() is called, it's a termination point. We want to ...
-                    //
-                    //    1. Save our stack, locals, and restore point and push them on to the Continuation object.
-                    //    2. Put the continuation in to SAVING mode.
-                    //    3. Remove the call to suspend() and return a dummy value in its place.
-                    //    4. Add a label just after the return we added (used by loading code when execution is continued).
-                    //
-                    // By going in to SAVING mode and returning, callers up the chain will know to stop their flow of execution and return
-                    // immediately (see else block below)
-                    insnList
-                            = merge(
-                                    saveBeforeInvokeInsnList, // save
-                                    // set saving mode
-                                    // debugPrint("setting mode to saving" + methodNode.name),
-                                    call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_SAVING)),
-                                    // debugPrint("returning dummy value" + methodNode.name),
-                                    returnDummy(returnType), // return dummy value
-                                    addLabel(cp.getRestoreLabelNode()), // addIndividual restore point for when in loading mode
-                                    // debugPrint("entering restore point" + methodNode.name),
-                                    pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
-                                    // stack that would have been consumed by that invocation... since we're removing that call, we
-                                    // also need to pop the Continuation reference from the stack... it's important that we
-                                    // explicitly do it at this point becuase during loading the stack will be restored with top
-                                    // of stack pointing to that continuation object
-                                    // debugPrint("going back in to normal mode" + methodNode.name),
-                                    // we're back in to a loading state now
-                                    call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_NORMAL))
-                            );
-                } else {
-                    // When a method that takes in a Continuation object as a parameter is called, We want to ...
-                    //
-                    //    1. Add a label (used by the loading code when execution is continued).
-                    //    2. Save our stack, locals, and restore point and push them on to the Continuation object.
-                    //    3. Call the method as it normally would be.
-                    //    4. Once the method returns, we check to see if the method is in SAVING mode and return immediately if it is. If it
-                    //       isn't, then this is the normal flow of execution and the save we did in step 2 isn't nessecary so remove it.
-                    //
-                    // If in SAVING mode, it means that suspend() was invoked somewhere down the chain. Callers above it must stop their
-                    // normal flow of execution and return immediately.
-                    insnList
-                            = merge(
-                                    addLabel(cp.getRestoreLabelNode()), // addIndividual restore point for when in loading mode
-                                    saveBeforeInvokeInsnList, // save
-                                    // debugPrint("invoking" + methodNode.name),
-                                    cloneInvokeNode(cp.getInvokeInsnNode()), // invoke method
-                                    // debugPrint("testing if in saving mode" + methodNode.name),
-                                    ifIntegersEqual(// if we're saving after invoke, return dummy value
-                                            call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
-                                            loadIntConst(MODE_SAVING),
-                                            returnDummy(returnType)
-                                    ),
-                                    // debugPrint("calling remove last pending" + methodNode.name),
-                                    call(CONTINUATION_REMOVELASTPENDING_METHOD, loadVar(contArg)) // otherwise assume we're normal, and
-                            // remove the state we added on to
-                            // pending
-                            );
-                }
-
-                methodNode.instructions.insertBefore(cp.getInvokeInsnNode(), insnList);
-                methodNode.instructions.remove(cp.getInvokeInsnNode());
-            });
-        }
+        // Instrument each method that was returned
+        methodNodesToInstrument.forEach(methodNode -> instrumentMethod(classNode, methodNode));
 
         // Write tree model back out as class
         ClassWriter cw = new SimpleClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, classRepo);
         classNode.accept(cw);
-
-        baos.write(cw.toByteArray());
-
-        return baos.toByteArray();
+        return cw.toByteArray();
     }
 
-    private boolean isAlreadyInstrumented(byte[] input) throws IOException {
-        ByteArrayInputStream bais = new ByteArrayInputStream(input);
-        
-        ClassReader cr = new ClassReader(bais);
-        ClassNode classNode = new ClassNode();
-        cr.accept(classNode, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
-        
-        return classNode.interfaces.contains(INSTRUMENTED_CLASS_TYPE.getInternalName());
+    private void instrumentMethod(ClassNode classNode, MethodNode methodNode) {
+        // Check if method is constructor
+        Validate.isTrue(!"<init>".equals(methodNode.name), "Instrumentation of constructors not allowed");
+
+        // Check for JSR blocks -- Emitted for finally blocks in older versions of the JDK. Should never happen since we already inlined
+        // these blocks before coming to this point. This is a sanity check.
+        Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR).isEmpty(),
+                "JSR instructions not allowed");
+
+        // Check for synchronized code blocks. Synchronized methods and Java 5 locks are okay, synchronized code blocks aren't okay
+        // because we can't reliably determine if we need to do a MONITOREXIT. It looks like Javaflow has some way of handling this.
+        // More investigation is required.
+        //
+        // On further investigation, it seems that there's no reliable way to detect pairings of MONITORENTER and MONITOREXIT. This link
+        // seems to explain it pretty well: http://mail.openjdk.java.net/pipermail/hotspot-runtime-dev/2008-April/000118.html. I've
+        // confirmed by making a simple java class in JASMIN assembler that did 10 MONITORENTERs in a loop and returned. That code threw
+        // IllegalMonitorStateException when it tried to return.
+        Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.MONITORENTER, Opcodes.MONITOREXIT).isEmpty(),
+                "MONITORENTER/MONITOREXIT instructions are not allowed");
+
+        // Get index of continuations object in parameter list
+        // Get return type
+        Type returnType = Type.getMethodType(methodNode.desc).getReturnType();
+
+        // Analyze method
+        Frame<BasicValue>[] frames = analyzeFrames(classNode.name, methodNode);
+
+        // Find invocations of continuation points
+        List<AbstractInsnNode> suspendInvocationInsnNodes
+                = findInvocationsOf(methodNode.instructions, CONTINUATION_SUSPEND_METHOD_TYPE);
+        List<AbstractInsnNode> saveInvocationInsnNodes
+                = findInvocationsWithParameter(methodNode.instructions, CONTINUATION_CLASS_TYPE);
+
+        // Check for invokedynamic instructions, which are currently only used by lambdas. See comments in validateNoInvokeDynamic to
+        // see why we need to do this.
+        validateNoInvokeDynamic(suspendInvocationInsnNodes);
+        validateNoInvokeDynamic(saveInvocationInsnNodes);
+
+        // Generate local variable indices
+        VariableTable varTable = new VariableTable(classNode, methodNode);
+
+        // Generate instructions for continuation points
+        int nextId = 0;
+        List<ContinuationPoint> continuationPoints = new LinkedList<>();
+
+        for (AbstractInsnNode suspendInvocationInsnNode : suspendInvocationInsnNodes) {
+            int insnIdx = methodNode.instructions.indexOf(suspendInvocationInsnNode);
+            ContinuationPoint cp = new ContinuationPoint(true, nextId, suspendInvocationInsnNode, frames[insnIdx], returnType);
+            continuationPoints.add(cp);
+            nextId++;
+        }
+
+        for (AbstractInsnNode saveInvocationInsnNode : saveInvocationInsnNodes) {
+            int insnIdx = methodNode.instructions.indexOf(saveInvocationInsnNode);
+            ContinuationPoint cp = new ContinuationPoint(false, nextId, saveInvocationInsnNode, frames[insnIdx], returnType);
+            continuationPoints.add(cp);
+            nextId++;
+        }
+
+        // Manage new variables and arguments
+        int continuationArgIdx = getLocalVariableIndexOfContinuationParameter(methodNode);
+        Variable contArg = varTable.getArgument(continuationArgIdx);
+        Variable methodStateVar = varTable.acquireExtra(Type.getType(MethodState.class));
+        Variable savedLocalsVar = varTable.acquireExtra(Type.getType(Object[].class));
+        Variable savedStackVar = varTable.acquireExtra(Type.getType(Object[].class));
+        Variable tempObjVar = varTable.acquireExtra(Type.getType(Object.class));
+
+        // Generate entrypoint instructions...
+        //
+        //    switch(continuation.getMode()) {
+        //        case NORMAL: goto start
+        //        case SAVING: throw exception
+        //        case LOADING:
+        //        {
+        //            MethodState methodState = continuation.removeFirstSaved();
+        //            Object[] stack = methodState.getStack();
+        //            Object[] localVars = methodState.getLocalTable();
+        //            switch(methodState.getContinuationPoint()) {
+        //                case <number>:
+        //                    restoreOperandStack(stack);
+        //                    restoreLocalsStack(localVars);
+        //                    goto restorePoint_<number>;
+        //                ...
+        //                ...
+        //                ...
+        //                default: throw exception
+        //            }
+        //            goto start;
+        //        }
+        //        default: throw exception
+        //    }
+        //
+        //    start:
+        //        ...
+        //        ...
+        //        ...
+        LabelNode startOfMethodLabelNode = new LabelNode();
+        InsnList entryPointInsnList
+                = merge(
+                        tableSwitch(
+                                call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
+                                throwException("Unrecognized state"),
+                                0,
+                                jumpTo(startOfMethodLabelNode),
+                                throwException("Unexpected state (saving not allowed at this point)"),
+                                merge(
+                                        // debugPrint("calling remove first saved" + methodNode.name),
+                                        call(CONTINUATION_REMOVEFIRSTSAVED_METHOD, loadVar(contArg)),
+                                        saveVar(methodStateVar),
+                                        call(METHODSTATE_GETLOCALTABLE_METHOD, loadVar(methodStateVar)),
+                                        saveVar(savedLocalsVar),
+                                        call(METHODSTATE_GETSTACK_METHOD, loadVar(methodStateVar)),
+                                        saveVar(savedStackVar),
+                                        tableSwitch(
+                                                call(METHODSTATE_GETCONTINUATIONPOINT_METHOD, loadVar(methodStateVar)),
+                                                throwException("Unrecognized restore id" + methodNode.name),
+                                                0,
+                                                continuationPoints.stream().map((cp) -> {
+                                                    InsnList ret
+                                                            = merge(
+                                                                    loadOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
+                                                                    loadLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
+                                                                    jumpTo(cp.getRestoreLabelNode())
+                                                            );
+                                                            return ret;
+                                                }).toArray((x) -> new InsnList[x])
+                                        )
+                                // jump to not required here, switch above either throws exception or jumps to restore point
+                                )
+                        ),
+                        addLabel(startOfMethodLabelNode)
+                );
+        methodNode.instructions.insert(entryPointInsnList);
+
+        // Add store logic and restore addLabel for each continuation point
+        //
+        //      #IFDEF suspend
+        //          Object[] stack = saveOperandStack();
+        //          Object[] locals = saveLocalsStackHere();
+        //          continuation.addPending(new MethodState(<number>, stack, locals);
+        //          continuation.setMode(MODE_SAVING);
+        //          return <dummy>;
+        //          restorePoint_<number>:
+        //          continuation.setMode(MODE_NORMAL);
+        //      #ENDIF
+        //
+        //      #IFDEF !suspend
+        //          restorePoint_<number>:
+        //          Object[] stack = saveOperandStack();
+        //          Object[] locals = saveLocalsStackHere();
+        //          continuation.addPending(new MethodState(<number>, stack, locals);
+        //          <method invocation>
+        //          if (continuation.getMode() == MODE_SAVING) {
+        //              return <dummy>;
+        //          }
+        //          continuation.removeLastPending();
+        //      #ENDIF
+        continuationPoints.forEach((cp) -> {
+            InsnList saveBeforeInvokeInsnList
+                    = merge(
+                            // debugPrint("saving operand stack" + methodNode.name),
+                            saveOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
+                            // debugPrint("saving locals" + methodNode.name),
+                            saveLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
+                            // debugPrint("calling addIndividual pending" + methodNode.name),
+                            call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
+                                    construct(METHODSTATE_INIT_METHOD,
+                                            loadIntConst(cp.getId()),
+                                            loadVar(savedStackVar),
+                                            loadVar(savedLocalsVar),
+                                            loadNull()))
+                    );
+
+            InsnList insnList;
+            if (cp.isSuspend()) {
+                // When Continuation.suspend() is called, it's a termination point. We want to ...
+                //
+                //    1. Save our stack, locals, and restore point and push them on to the Continuation object.
+                //    2. Put the continuation in to SAVING mode.
+                //    3. Remove the call to suspend() and return a dummy value in its place.
+                //    4. Add a label just after the return we added (used by loading code when execution is continued).
+                //
+                // By going in to SAVING mode and returning, callers up the chain will know to stop their flow of execution and return
+                // immediately (see else block below)
+                insnList
+                        = merge(
+                                saveBeforeInvokeInsnList, // save
+                                // set saving mode
+                                // debugPrint("setting mode to saving" + methodNode.name),
+                                call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_SAVING)),
+                                // debugPrint("returning dummy value" + methodNode.name),
+                                returnDummy(returnType), // return dummy value
+                                addLabel(cp.getRestoreLabelNode()), // addIndividual restore point for when in loading mode
+                                // debugPrint("entering restore point" + methodNode.name),
+                                pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
+                                // stack that would have been consumed by that invocation... since we're removing that call, we
+                                // also need to pop the Continuation reference from the stack... it's important that we
+                                // explicitly do it at this point becuase during loading the stack will be restored with top
+                                // of stack pointing to that continuation object
+                                // debugPrint("going back in to normal mode" + methodNode.name),
+                                // we're back in to a loading state now
+                                call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_NORMAL))
+                        );
+            } else {
+                // When a method that takes in a Continuation object as a parameter is called, We want to ...
+                //
+                //    1. Add a label (used by the loading code when execution is continued).
+                //    2. Save our stack, locals, and restore point and push them on to the Continuation object.
+                //    3. Call the method as it normally would be.
+                //    4. Once the method returns, we check to see if the method is in SAVING mode and return immediately if it is. If it
+                //       isn't, then this is the normal flow of execution and the save we did in step 2 isn't nessecary so remove it.
+                //
+                // If in SAVING mode, it means that suspend() was invoked somewhere down the chain. Callers above it must stop their
+                // normal flow of execution and return immediately.
+                insnList
+                        = merge(
+                                addLabel(cp.getRestoreLabelNode()), // addIndividual restore point for when in loading mode
+                                saveBeforeInvokeInsnList, // save
+                                // debugPrint("invoking" + methodNode.name),
+                                cloneInvokeNode(cp.getInvokeInsnNode()), // invoke method
+                                // debugPrint("testing if in saving mode" + methodNode.name),
+                                ifIntegersEqual(// if we're saving after invoke, return dummy value
+                                        call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
+                                        loadIntConst(MODE_SAVING),
+                                        returnDummy(returnType)
+                                ),
+                                // debugPrint("calling remove last pending" + methodNode.name),
+                                call(CONTINUATION_REMOVELASTPENDING_METHOD, loadVar(contArg)) // otherwise assume we're normal, and
+                        // remove the state we added on to
+                        // pending
+                        );
+            }
+
+            methodNode.instructions.insertBefore(cp.getInvokeInsnNode(), insnList);
+            methodNode.instructions.remove(cp.getInvokeInsnNode());
+        });
     }
 
     private Frame[] analyzeFrames(String className, MethodNode methodNode) {

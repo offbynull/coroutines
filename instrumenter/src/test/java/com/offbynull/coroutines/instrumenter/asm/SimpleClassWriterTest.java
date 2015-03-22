@@ -16,8 +16,6 @@
  */
 package com.offbynull.coroutines.instrumenter.asm;
 
-import com.offbynull.coroutines.instrumenter.asm.InstructionUtils;
-import com.offbynull.coroutines.instrumenter.asm.VariableTable;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;

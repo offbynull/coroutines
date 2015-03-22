@@ -16,7 +16,6 @@
  */
 package com.offbynull.coroutines.instrumenter.asm;
 
-import com.offbynull.coroutines.instrumenter.asm.VariableTable;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipFromResource;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.io.IOException;
