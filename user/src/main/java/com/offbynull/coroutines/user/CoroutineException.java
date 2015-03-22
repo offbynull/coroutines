@@ -22,8 +22,15 @@ package com.offbynull.coroutines.user;
  */
 public class CoroutineException extends RuntimeException {
     
-    CoroutineException(String message, Throwable cause) {
-        super(message, cause);
-    }
+    private Throwable nested;
     
+    CoroutineException(String message, Throwable cause) {
+        // super(message, cause); NOT SUPPORTED IN 1.2! NEED AT LEAST 1.4 FOR THIS CONSTRUCTOR
+        super(message);
+        nested = cause;
+    }
+
+    public Throwable getNested() {
+        return nested;
+    }
 }

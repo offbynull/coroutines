@@ -165,7 +165,7 @@ public final class Instrumenter {
     }
 
     private void instrumentMethod(ClassNode classNode, MethodNode methodNode) {
-        // Check if method is constructor
+        // Check if method is constructor -- we cannot instrument constructor
         Validate.isTrue(!"<init>".equals(methodNode.name), "Instrumentation of constructors not allowed");
 
         // Check for JSR blocks -- Emitted for finally blocks in older versions of the JDK. Should never happen since we already inlined
@@ -184,7 +184,6 @@ public final class Instrumenter {
         Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.MONITORENTER, Opcodes.MONITOREXIT).isEmpty(),
                 "MONITORENTER/MONITOREXIT instructions are not allowed");
 
-        // Get index of continuations object in parameter list
         // Get return type
         Type returnType = Type.getMethodType(methodNode.desc).getReturnType();
 
@@ -229,6 +228,7 @@ public final class Instrumenter {
         Variable methodStateVar = varTable.acquireExtra(Type.getType(MethodState.class));
         Variable savedLocalsVar = varTable.acquireExtra(Type.getType(Object[].class));
         Variable savedStackVar = varTable.acquireExtra(Type.getType(Object[].class));
+        Variable lockStateVar = varTable.acquireExtra(Type.getType(Object[].class));
         Variable tempObjVar = varTable.acquireExtra(Type.getType(Object.class));
 
         // Generate entrypoint instructions...

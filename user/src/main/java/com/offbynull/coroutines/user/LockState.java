@@ -16,8 +16,8 @@
  */
 package com.offbynull.coroutines.user;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.LinkedList;
+import java.util.ListIterator;
 
 /**
  * Do not use -- for internal use only.
@@ -27,7 +27,30 @@ import java.util.Map;
  */
 public final class LockState {
 
-    private Map monitors = new HashMap();
+    // We use a linkedlist to make sure that we retain the order of monitors as they come in. Otherwise we're going to deal with deadlock
+    // issues if we have code structured with double locks. For example, imagine the following scenario...
+    //
+    // Method 1:
+    // synchronized(a) {
+    //    synchronized(b) {
+    //        continuation.suspend();
+    //    }
+    // }
+    //
+    // Method 2 (same as method1):
+    // synchronized(a) {
+    //    synchronized(b) {
+    //        continuation.suspend();
+    //    }
+    // }
+    //
+    //
+    // If we weren't ordered, we may end up coming back after a suspend and re-locking the monitors in the wrong order. For example,
+    // we may lock b before we lock a. That has the potential for a deadlock because another thread could execute the locking logic
+    // correctly (first a and then b). Dual locking without retaining the same order = a deadlock waiting to happen.
+    //
+    // Long story short: it's vital that we keep the order which locks happen
+    private LinkedList monitors = new LinkedList();
 
     /**
      * Do not use -- for internal use only.
@@ -40,13 +63,8 @@ public final class LockState {
             throw new NullPointerException();
         }
 
-        Counter counter = (Counter) monitors.get(monitor);
-        if (counter == null) {
-            counter = new Counter();
-            monitors.put(monitor, counter);
-        }
-
-        counter.increment();
+        WrappedObject wrappedMonitor = new WrappedObject(monitor);
+        monitors.add(wrappedMonitor);
     }
 
     /**
@@ -60,18 +78,26 @@ public final class LockState {
             throw new NullPointerException();
         }
 
-        Counter counter = (Counter) monitors.get(monitor);
-        if (counter == null) {
-            throw new IllegalArgumentException();
-        }
-
-        counter.decrement();
-        if (counter.isZero()) {
-            Object removedObject = monitors.remove(monitor);
-            if (removedObject == null) {
-                throw new IllegalArgumentException();
+        // remove last
+        WrappedObject wrappedMonitor = new WrappedObject(monitor);
+        ListIterator it = monitors.listIterator(monitors.size());
+        while (it.hasPrevious()) {
+            Object prev = it.previous();
+            if (wrappedMonitor.equals(prev)) {
+                it.remove();
+                return;
             }
         }
+        
+        throw new IllegalArgumentException(); // not found
+    }
+    
+    /**
+     * Dumps monitors out as an array. Order is retained.
+     * @return monitors
+     */
+    public Object[] toArray() {
+        return monitors.toArray();
     }
 
     private static final class WrappedObject {
@@ -109,32 +135,5 @@ public final class LockState {
             return true;
         }
 
-    }
-
-    private static final class Counter {
-
-        private int count;
-
-        public void increment() {
-            if (count == Integer.MAX_VALUE) { // sanity check
-                throw new IllegalStateException();
-            }
-            count++;
-        }
-
-        public void decrement() {
-            if (count == 0) { // sanity check
-                throw new IllegalStateException();
-            }
-            count--;
-        }
-
-        public boolean isZero() {
-            return count == 0;
-        }
-
-        public int getCount() {
-            return count;
-        }
     }
 }
