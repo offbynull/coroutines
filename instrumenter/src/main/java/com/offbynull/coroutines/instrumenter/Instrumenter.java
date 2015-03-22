@@ -27,6 +27,7 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.ifInteg
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.jumpTo;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadIntConst;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadLocalVariableTable;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadNull;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
@@ -41,12 +42,14 @@ import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findInvocati
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findInvocationsWithParameter;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithParameter;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.searchForOpcodes;
+import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import com.offbynull.coroutines.user.Continuation;
 import static com.offbynull.coroutines.user.Continuation.MODE_NORMAL;
 import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
-import com.offbynull.coroutines.user.Continuation.MethodState;
+import com.offbynull.coroutines.user.MethodState;
 import com.offbynull.coroutines.user.Instrumented;
+import com.offbynull.coroutines.user.LockState;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -59,12 +62,9 @@ import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.JSRInlinerAdapter;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
@@ -93,7 +93,7 @@ public final class Instrumenter {
     private static final Method CONTINUATION_SETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "setMode", Integer.TYPE);
     private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
-            = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, Object[].class);
+            = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, Object[].class, LockState.class);
     private static final Method CONTINUATION_ADDPENDING_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "addPending", MethodState.class);
     private static final Method CONTINUATION_REMOVELASTPENDING_METHOD
@@ -136,10 +136,6 @@ public final class Instrumenter {
                 return input;
             }
             
-            // Try-catch-finalli in older versions of Java use the JSR opcode which may cause us some grief, thankfully ASM has something
-            // to automatically remove these JSR blocks. Remove them here before passing them off to the main instrumentation code.
-            input = inlineJsrBlocks(input);
-            
             // Instrument the class and return the results
             return instrumentClass(input);
         } catch (IOException ioe) {
@@ -156,7 +152,7 @@ public final class Instrumenter {
 
         // Read class as tree model
         ClassReader cr = new ClassReader(bais);
-        ClassNode classNode = new ClassNode();
+        ClassNode classNode = new SimpleClassNode();
         cr.accept(classNode, 0);
 
         // Don't do anything if this is an interface
@@ -343,7 +339,8 @@ public final class Instrumenter {
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(cp.getId()),
                                                 loadVar(savedStackVar),
-                                                loadVar(savedLocalsVar)))
+                                                loadVar(savedLocalsVar),
+                                                loadNull()))
                         );
 
                 InsnList insnList;
@@ -428,22 +425,6 @@ public final class Instrumenter {
         cr.accept(classNode, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
         
         return classNode.interfaces.contains(INSTRUMENTED_CLASS_TYPE.getInternalName());
-    }
-    
-    private byte[] inlineJsrBlocks(byte[] input) {
-        ClassReader reader = new ClassReader(input);
-        ClassWriter writer = new SimpleClassWriter(0, classRepo);
-        
-        ClassVisitor visitor = new ClassVisitor(Opcodes.ASM5, writer) {
-            @Override
-            public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
-                MethodVisitor origVisitor = super.visitMethod(access, name, desc, signature, exceptions);
-                return new JSRInlinerAdapter(origVisitor, access, name, desc, signature, exceptions);
-            }
-        };
-        reader.accept(visitor, 0);
-        
-        return writer.toByteArray();
     }
 
     private Frame[] analyzeFrames(String className, MethodNode methodNode) {

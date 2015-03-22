@@ -189,13 +189,25 @@ public final class InstructionUtils {
      * Generates instruction to push a string constant on to the stack.
      * @param s string constant to push
      * @return instructions to push a string constant
+     * @throws NullPointerException if any argument is {@code null}
      */
     public static InsnList loadStringConst(String s) {
+        Validate.notNull(s);
         InsnList ret = new InsnList();
         ret.add(new LdcInsnNode(s));
         return ret;
     }
-    
+
+    /**
+     * Generates instruction to push a null on to the stack.
+     * @return instructions to push a null
+     */
+    public static InsnList loadNull() {
+        InsnList ret = new InsnList();
+        ret.add(new InsnNode(Opcodes.ACONST_NULL));
+        return ret;
+    }
+
     /**
      * Copies a local variable on to the stack.
      * @param variable variable within the local variable table to load from
