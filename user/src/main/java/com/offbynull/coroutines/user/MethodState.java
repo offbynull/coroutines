@@ -26,7 +26,7 @@ public final class MethodState {
     private final int continuationPoint;
     private final Object[] stack;
     private final Object[] localTable;
-    private final LockState lockTracker;
+    private final LockState lockState;
 
     /**
      * Do not use -- for internal use only.
@@ -36,9 +36,9 @@ public final class MethodState {
      * instrumenter to mark that point)
      * @param stack operand stack at the point which state was saved
      * @param localTable local variable table at the point which state was saved
-     * @param lockTracker monitors entered at the point which state was saved (may be {@code null})
+     * @param lockState monitors entered at the point which state was saved (may be {@code null})
      */
-    public MethodState(int continuationPoint, Object[] stack, Object[] localTable, LockState lockTracker) {
+    public MethodState(int continuationPoint, Object[] stack, Object[] localTable, LockState lockState) {
         if (continuationPoint < 0) {
             throw new IllegalArgumentException();
         }
@@ -48,7 +48,7 @@ public final class MethodState {
         this.continuationPoint = continuationPoint;
         this.stack = stack;
         this.localTable = localTable;
-        this.lockTracker = lockTracker;
+        this.lockState = lockState;
     }
 
     /**
@@ -89,7 +89,7 @@ public final class MethodState {
      * @return monitors entered at the point which state was saved
      */
     public LockState getLockState() {
-        return lockTracker;
+        return lockState;
     }
     
 }

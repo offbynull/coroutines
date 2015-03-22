@@ -22,11 +22,15 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.IincInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
@@ -76,6 +80,61 @@ public final class InstructionUtils {
         return ret;
     }
 
+    /**
+     * Clones a monitorenter/monitorexit node and returns it as an instruction list.
+     * @param insnNode instruction to clone
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if node isn't of invoke type
+     * @return instruction list with cloned instruction
+     */
+    public static InsnList cloneMonitorNode(AbstractInsnNode insnNode) {
+        Validate.notNull(insnNode);
+        Validate.isTrue(insnNode instanceof InsnNode);
+        Validate.isTrue(insnNode.getOpcode() == Opcodes.MONITORENTER || insnNode.getOpcode() == Opcodes.MONITOREXIT);
+
+        InsnList ret = new InsnList();
+        ret.add(insnNode.clone(new HashMap<>()));
+
+        return ret;
+    }
+
+    /**
+     * Clones an instruction list. All labels are remapped unless otherwise specified.
+     * @param insnList instruction list to clone
+     * @param globalLabels set of labels that should not be remapped
+     * @throws NullPointerException if any argument is {@code null}
+     * @return instruction list with cloned instructions
+     */
+    public static InsnList cloneInsnList(InsnList insnList, Set<LabelNode> globalLabels) {
+        Validate.notNull(insnList);
+
+        // remap all labelnodes
+        Map<LabelNode, LabelNode> labelNodeMapping = new HashMap<>();
+        ListIterator<AbstractInsnNode> it = insnList.iterator();
+        while (it.hasNext()) {
+            AbstractInsnNode abstractInsnNode = it.next();
+            if (abstractInsnNode instanceof LabelNode) {
+                LabelNode existingLabelNode = (LabelNode) abstractInsnNode;
+                labelNodeMapping.put(existingLabelNode, new LabelNode());
+            }
+        }
+        
+        // override remapping such that global labels stay the same
+        for (LabelNode globalLabel : globalLabels) {
+            labelNodeMapping.put(globalLabel, globalLabel);
+        }
+        
+        // clone
+        InsnList ret = new InsnList();
+        it = insnList.iterator();
+        while (it.hasNext()) {
+            AbstractInsnNode abstractInsnNode = it.next();
+            ret.add(abstractInsnNode.clone(labelNodeMapping));
+        }
+
+        return ret;
+    }
+    
     /**
      * Combines multiple instruction lists in to a single instruction list.
      * @param insnLists instruction lists to merge
@@ -170,6 +229,28 @@ public final class InstructionUtils {
     public static InsnList pop() {
         InsnList ret = new InsnList();
         ret.add(new InsnNode(Opcodes.POP));
+
+        return ret;
+    }
+
+    /**
+     * Generates a MONITORENTER instruction, which consumes an Object from the top of the stack.
+     * @return instructions for a pop
+     */
+    public static InsnList monitorEnter() {
+        InsnList ret = new InsnList();
+        ret.add(new InsnNode(Opcodes.MONITORENTER));
+
+        return ret;
+    }
+
+    /**
+     * Generates a MONITOREXIT instruction, which consumes an Object from the top of the stack.
+     * @return instructions for a pop
+     */
+    public static InsnList monitorExit() {
+        InsnList ret = new InsnList();
+        ret.add(new InsnNode(Opcodes.MONITOREXIT));
 
         return ret;
     }
@@ -348,7 +429,94 @@ public final class InstructionUtils {
         
         return ret;
     }
-    
+
+/**
+     * Compares two objects and performs some action if the objects are the same (uses == to check if same, not the equals method).
+     * @param lhs left hand side instruction list -- must leave an object on top of the stack
+     * @param rhs right hand side instruction list -- must leave an object on top of the stack
+     * @param action action to perform if results of {@code lhs} and {@code rhs} are equal
+     * @return instructions instruction list to perform some action if two objects are equal
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList ifObjectsEqual(InsnList lhs, InsnList rhs, InsnList action) {
+        Validate.notNull(lhs);
+        Validate.notNull(rhs);
+        Validate.notNull(action);
+        
+        
+        InsnList ret = new InsnList();
+        
+        LabelNode notEqualLabelNode = new LabelNode();
+        
+        ret.add(lhs);
+        ret.add(rhs);
+        ret.add(new JumpInsnNode(Opcodes.IF_ACMPNE, notEqualLabelNode));
+        ret.add(action);
+        ret.add(notEqualLabelNode);
+        
+        return ret;
+    }
+
+    /**
+     * For each element in an object array, performs an action.
+     * @param counterVar parameter used to keep track of count in loop
+     * @param arrayLenVar parameter used to keep track of array length
+     * @param array object array instruction list -- must leave an array on top of the stack
+     * @param action action to perform on each element -- element will be at top of stack and must be consumed by these instructions
+     * @return instructions instruction list to perform some action if two ints are equal
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList forEach(Variable counterVar, Variable arrayLenVar, InsnList array, InsnList action) {
+        Validate.notNull(counterVar);
+        Validate.notNull(arrayLenVar);
+        Validate.notNull(array);
+        Validate.notNull(action);
+        Validate.isTrue(counterVar.getType().equals(Type.INT_TYPE));
+        Validate.isTrue(arrayLenVar.getType().equals(Type.INT_TYPE));
+        
+        
+        InsnList ret = new InsnList();
+        
+        LabelNode doneLabelNode = new LabelNode();
+        LabelNode loopLabelNode = new LabelNode();
+        
+        // put zero in to counterVar
+        ret.add(new LdcInsnNode(0)); // int
+        ret.add(new VarInsnNode(Opcodes.ISTORE, counterVar.getIndex())); //
+        
+        // load array we'll be traversing over
+        ret.add(array); // object[]
+        
+        // put array length in to arrayLenVar
+        ret.add(new InsnNode(Opcodes.DUP)); // object[], object[]
+        ret.add(new InsnNode(Opcodes.ARRAYLENGTH)); // object[], int
+        ret.add(new VarInsnNode(Opcodes.ISTORE, arrayLenVar.getIndex())); // object[]
+        
+        // loopLabelNode: test if counterVar == arrayLenVar, if it does then jump to doneLabelNode
+        ret.add(loopLabelNode);
+        ret.add(new VarInsnNode(Opcodes.ILOAD, counterVar.getIndex())); // object[], int
+        ret.add(new VarInsnNode(Opcodes.ILOAD, arrayLenVar.getIndex())); // object[], int, int
+        ret.add(new JumpInsnNode(Opcodes.IF_ICMPEQ, doneLabelNode)); // object[]
+        
+        // load object from object[]
+        ret.add(new InsnNode(Opcodes.DUP)); // object[], object[]
+        ret.add(new VarInsnNode(Opcodes.ILOAD, counterVar.getIndex())); // object[], object[], int
+        ret.add(new InsnNode(Opcodes.AALOAD)); // object[], object
+        
+        // call action
+        ret.add(action); // object[]
+        
+        // increment counter var and goto loopLabelNode
+        ret.add(new IincInsnNode(counterVar.getIndex(), 1)); // object[]
+        ret.add(new JumpInsnNode(Opcodes.GOTO, loopLabelNode)); // object[]
+        
+        // doneLabelNode: pop object[] off of stack
+        ret.add(doneLabelNode);
+        ret.add(new InsnNode(Opcodes.POP)); //
+        
+        return ret;
+    }
+
     /**
      * Calls a method with a set of arguments. After execution the stack may have an extra item pushed on it: the object that was returned
      * by this method (if any).

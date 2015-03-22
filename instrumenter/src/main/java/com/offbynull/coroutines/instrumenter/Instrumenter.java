@@ -22,7 +22,10 @@ import com.offbynull.coroutines.instrumenter.asm.VariableTable;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInvokeNode;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneMonitorNode;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.empty;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.forEach;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.ifIntegersEqual;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.jumpTo;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadIntConst;
@@ -31,6 +34,7 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadNul
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.monitorEnter;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveLocalVariableTable;
@@ -54,8 +58,14 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
@@ -66,6 +76,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -90,20 +101,30 @@ public final class Instrumenter {
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
     private static final Method CONTINUATION_SETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "setMode", Integer.TYPE);
-    private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
-            = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, Object[].class, LockState.class);
     private static final Method CONTINUATION_ADDPENDING_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "addPending", MethodState.class);
     private static final Method CONTINUATION_REMOVELASTPENDING_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "removeLastPending");
     private static final Method CONTINUATION_REMOVEFIRSTSAVED_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "removeFirstSaved");
+    private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
+            = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, Object[].class, LockState.class);
     private static final Method METHODSTATE_GETCONTINUATIONPOINT_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getContinuationPoint");
     private static final Method METHODSTATE_GETLOCALTABLE_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getLocalTable");
     private static final Method METHODSTATE_GETSTACK_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getStack");
+    private static final Method METHODSTATE_GETLOCKSTATE_METHOD
+            = MethodUtils.getAccessibleMethod(MethodState.class, "getLockState");
+    private static final Constructor<LockState> LOCKSTATE_INIT_METHOD
+            = ConstructorUtils.getAccessibleConstructor(LockState.class);
+    private static final Method LOCKSTATE_ENTER_METHOD
+            = MethodUtils.getAccessibleMethod(LockState.class, "enter", Object.class);
+    private static final Method LOCKSTATE_EXIT_METHOD
+            = MethodUtils.getAccessibleMethod(LockState.class, "exit", Object.class);
+    private static final Method LOCKSTATE_TOARRAY_METHOD
+            = MethodUtils.getAccessibleMethod(LockState.class, "toArray");
 
     private ClassInformationRepository classRepo;
 
@@ -156,40 +177,196 @@ public final class Instrumenter {
         classNode.interfaces.add(INSTRUMENTED_CLASS_TYPE.getInternalName());
 
         // Instrument each method that was returned
-        methodNodesToInstrument.forEach(methodNode -> instrumentMethod(classNode, methodNode));
+        for (MethodNode methodNode : methodNodesToInstrument) {
+            // Check if method is constructor -- we cannot instrument constructor
+            Validate.isTrue(!"<init>".equals(methodNode.name), "Instrumentation of constructors not allowed");
+
+            // Check for JSR blocks -- Emitted for finally blocks in older versions of the JDK. Should never happen since we already inlined
+            // these blocks before coming to this point. This is a sanity check.
+            Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR).isEmpty(),
+                    "JSR instructions not allowed");
+            
+            // Analyze method
+            Frame<BasicValue>[] frames = analyzeFrames(classNode.name, methodNode);
+            
+            // Manage arguments and additional local variables that we need for instrumentation
+            int contArgIdx = getLocalVariableIndexOfContinuationParameter(methodNode);
+            
+            VariableTable varTable = new VariableTable(classNode, methodNode);
+            Variable contArg = varTable.getArgument(contArgIdx);
+            Variable methodStateVar = varTable.acquireExtra(MethodState.class);
+            Variable savedLocalsVar = varTable.acquireExtra(Object[].class);
+            Variable savedStackVar = varTable.acquireExtra(Object[].class);
+            Variable tempObjVar = varTable.acquireExtra(Object.class);
+            Variable lockStateVar = varTable.acquireExtra(LockState.class);
+            Variable counterVar = varTable.acquireExtra(Type.INT_TYPE);
+            Variable arrayLenVar = varTable.acquireExtra(Type.INT_TYPE);
+                   
+            // Generate code to deal with suspending around synchronized blocks
+            MonitorInstrumentationLogic monitorInstrumentationLogic = generateMonitorInstrumentationLogic(
+                    methodNode, tempObjVar, counterVar, arrayLenVar, lockStateVar, methodStateVar);
+            
+            // Generate code to deal with flow control (makes use of some of the code generated in monitorInstrumentationLogic)
+            FlowInstrumentationLogic flowInstrumentationLogic = generateFlowInstrumentationLogic(
+                    methodNode, frames, monitorInstrumentationLogic, contArg, methodStateVar, savedLocalsVar, savedStackVar, tempObjVar);
+            
+            // Apply generated code
+            applyInstrumentationLogic(methodNode, flowInstrumentationLogic, monitorInstrumentationLogic);
+        }
 
         // Write tree model back out as class
         ClassWriter cw = new SimpleClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, classRepo);
         classNode.accept(cw);
         return cw.toByteArray();
     }
+    
+    private MonitorInstrumentationLogic generateMonitorInstrumentationLogic(MethodNode methodNode,
+            Variable tempObjVar,
+            Variable counterVar,
+            Variable arrayLenVar,
+            Variable lockStateVar,
+            Variable methodStateVar) {
 
-    private void instrumentMethod(ClassNode classNode, MethodNode methodNode) {
-        // Check if method is constructor -- we cannot instrument constructor
-        Validate.isTrue(!"<init>".equals(methodNode.name), "Instrumentation of constructors not allowed");
-
-        // Check for JSR blocks -- Emitted for finally blocks in older versions of the JDK. Should never happen since we already inlined
-        // these blocks before coming to this point. This is a sanity check.
-        Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR).isEmpty(),
-                "JSR instructions not allowed");
-
-        // Check for synchronized code blocks. Synchronized methods and Java 5 locks are okay, synchronized code blocks aren't okay
-        // because we can't reliably determine if we need to do a MONITOREXIT. It looks like Javaflow has some way of handling this.
-        // More investigation is required.
+        
+        // Find monitorenter/monitorexit and create replacement instructions that keep track of which objects were entered/exited.
         //
-        // On further investigation, it seems that there's no reliable way to detect pairings of MONITORENTER and MONITOREXIT. This link
-        // seems to explain it pretty well: http://mail.openjdk.java.net/pipermail/hotspot-runtime-dev/2008-April/000118.html. I've
-        // confirmed by making a simple java class in JASMIN assembler that did 10 MONITORENTERs in a loop and returned. That code threw
-        // IllegalMonitorStateException when it tried to return.
-        Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.MONITORENTER, Opcodes.MONITOREXIT).isEmpty(),
-                "MONITORENTER/MONITOREXIT instructions are not allowed");
+        //
+        // Check for synchronized code blocks. Synchronized methods and Java 5 locks are okay to ignore, but synchronized blocks need to
+        // be instrumented. For every MONITORENTER instruction that's performed on an object, there needs to be an equivalent MONITOREXIT
+        // before the method exits. Otherwise, the method throws an IllegalMonitorState exception when it exits. I've confirmed by making a
+        // simple java class in JASMIN assembler that did 10 MONITORENTERs in a loop and returned. That code threw
+        // IllegalMonitorStateException when it tried to return. This link seems to explain it pretty well:
+        // http://mail.openjdk.java.net/pipermail/hotspot-runtime-dev/2008-April/000118.html.
+        //
+        // So that means that if we're going to instrument the code to suspend and return in places, we need to make sure to exit all
+        // monitors when we return and to re-enter those monitors when we come back in. We can't handle this via static analysis like we do
+        // with inspecting the operand stack and local variables. It looks like static analysis is what Javaflow tries to do, which will
+        // work in 99% of cases but won't in some edge cases like if the code was written in some JVM langauge other than Java.
+        //
+        // The following code creates replacements for every MONITORENTER and MONITOREXIT instruction such that those monitors get tracked
+        // in a LockState object.
+        List<AbstractInsnNode> monitorInsnNodes = searchForOpcodes(methodNode.instructions, Opcodes.MONITORENTER, Opcodes.MONITOREXIT);
+        Map<AbstractInsnNode, InsnList> monitorInsnNodeReplacements = new HashMap<>();
+        
+        
+        // IMPORTANT NOTE: The following code only generates code if monitorInsnNodes is NOT empty. That means that there has to be at least
+        // one MONITORENTER or one MONITOREXIT for this method to generate instructions. Otherwise, all instruction listings will be stubbed
+        // out with empty instruction lists.
+        
+        for (AbstractInsnNode monitorInsnNode : monitorInsnNodes) {
+            InsnNode insnNode = (InsnNode) monitorInsnNode;
+            InsnList replacementLogic;
+            
+            switch (insnNode.getOpcode()) {
+                case Opcodes.MONITORENTER:
+                    replacementLogic
+                            = merge(
+                                    saveVar(tempObjVar),
+                                    loadVar(tempObjVar),
+                                    cloneMonitorNode(insnNode),
+                                    call(LOCKSTATE_ENTER_METHOD, loadVar(lockStateVar), loadVar(tempObjVar)) // track after entered
+                            );
+                    break;
+                case Opcodes.MONITOREXIT:
+                    replacementLogic
+                            = merge(
+                                    saveVar(tempObjVar),
+                                    loadVar(tempObjVar),
+                                    call(LOCKSTATE_EXIT_METHOD, loadVar(lockStateVar), loadVar(tempObjVar)), // discard before exit
+                                    cloneMonitorNode(insnNode)
+                            );
+                    break;
+                default:
+                    throw new IllegalStateException(); // should never happen
+            }
+            
+            monitorInsnNodeReplacements.put(monitorInsnNode, replacementLogic);
+        }
+        
+        
+        // Create code to create a new lockstate object
+        InsnList createAndStoreLockStateInsnList;
+        if (monitorInsnNodeReplacements.isEmpty()) { // if we don't have any MONITORENTER/MONITOREXIT, ignore this
+            createAndStoreLockStateInsnList = empty();
+        } else {
+            createAndStoreLockStateInsnList
+                    = merge(
+                            construct(LOCKSTATE_INIT_METHOD),
+                            saveVar(lockStateVar)
+                    );
+        }
+        
+        
+        // Create code to load lockstate object from methodstate
+        InsnList loadAndStoreLockStateFromMethodStateInsnList;
+        if (monitorInsnNodeReplacements.isEmpty()) {
+            loadAndStoreLockStateFromMethodStateInsnList = empty();
+        } else {
+            loadAndStoreLockStateFromMethodStateInsnList
+                    = merge(
+                            call(METHODSTATE_GETLOCKSTATE_METHOD, loadVar(methodStateVar)),
+                            saveVar(lockStateVar)
+                    );
+        }
+
+        
+        // Create code to load lockstate object to the stack
+        InsnList loadLockStateToStackInsnList;
+        if (monitorInsnNodeReplacements.isEmpty()) {
+            loadLockStateToStackInsnList = loadNull();
+        } else {
+            loadLockStateToStackInsnList
+                    = merge(
+                            call(METHODSTATE_GETLOCKSTATE_METHOD, loadVar(methodStateVar)),
+                            saveVar(lockStateVar)
+                    );
+        }
+
+        
+        // Create code to enter all monitors in lockstate object
+        InsnList enterMonitorsInLockStateInsnList;
+        if (monitorInsnNodeReplacements.isEmpty()) {
+            enterMonitorsInLockStateInsnList = empty();
+        } else {
+            enterMonitorsInLockStateInsnList
+                    = forEach(counterVar, arrayLenVar,
+                            call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar)),
+                            monitorEnter());
+        }
+
+        
+
+        // Create code to exit all monitors in lockstate object
+        InsnList exitMonitorsInLockStateInsnList;
+        if (monitorInsnNodeReplacements.isEmpty()) {
+            exitMonitorsInLockStateInsnList = empty();
+        } else {
+            exitMonitorsInLockStateInsnList
+                    = forEach(counterVar, arrayLenVar,
+                            call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar)),
+                            monitorEnter());
+        }
+        
+        return new MonitorInstrumentationLogic(monitorInsnNodeReplacements,
+                createAndStoreLockStateInsnList,
+                loadAndStoreLockStateFromMethodStateInsnList,
+                loadLockStateToStackInsnList,
+                enterMonitorsInLockStateInsnList,
+                exitMonitorsInLockStateInsnList,
+                Collections.emptySet());
+    }
+    
+    private FlowInstrumentationLogic generateFlowInstrumentationLogic(MethodNode methodNode, Frame[] frames,
+            MonitorInstrumentationLogic monitorInstrumentationLogic,
+            Variable contArg,
+            Variable methodStateVar,
+            Variable savedLocalsVar,
+            Variable savedStackVar,
+            Variable tempObjVar) {
 
         // Get return type
         Type returnType = Type.getMethodType(methodNode.desc).getReturnType();
-
-        // Analyze method
-        Frame<BasicValue>[] frames = analyzeFrames(classNode.name, methodNode);
-
+        
         // Find invocations of continuation points
         List<AbstractInsnNode> suspendInvocationInsnNodes
                 = findInvocationsOf(methodNode.instructions, CONTINUATION_SUSPEND_METHOD_TYPE);
@@ -201,40 +378,36 @@ public final class Instrumenter {
         validateNoInvokeDynamic(suspendInvocationInsnNodes);
         validateNoInvokeDynamic(saveInvocationInsnNodes);
 
-        // Generate local variable indices
-        VariableTable varTable = new VariableTable(classNode, methodNode);
-
         // Generate instructions for continuation points
         int nextId = 0;
         List<ContinuationPoint> continuationPoints = new LinkedList<>();
 
         for (AbstractInsnNode suspendInvocationInsnNode : suspendInvocationInsnNodes) {
             int insnIdx = methodNode.instructions.indexOf(suspendInvocationInsnNode);
-            ContinuationPoint cp = new ContinuationPoint(true, nextId, suspendInvocationInsnNode, frames[insnIdx], returnType);
+            ContinuationPoint cp = new ContinuationPoint(true, nextId, suspendInvocationInsnNode, frames[insnIdx]);
             continuationPoints.add(cp);
             nextId++;
         }
 
         for (AbstractInsnNode saveInvocationInsnNode : saveInvocationInsnNodes) {
             int insnIdx = methodNode.instructions.indexOf(saveInvocationInsnNode);
-            ContinuationPoint cp = new ContinuationPoint(false, nextId, saveInvocationInsnNode, frames[insnIdx], returnType);
+            ContinuationPoint cp = new ContinuationPoint(false, nextId, saveInvocationInsnNode, frames[insnIdx]);
             continuationPoints.add(cp);
             nextId++;
         }
 
-        // Manage new variables and arguments
-        int continuationArgIdx = getLocalVariableIndexOfContinuationParameter(methodNode);
-        Variable contArg = varTable.getArgument(continuationArgIdx);
-        Variable methodStateVar = varTable.acquireExtra(Type.getType(MethodState.class));
-        Variable savedLocalsVar = varTable.acquireExtra(Type.getType(Object[].class));
-        Variable savedStackVar = varTable.acquireExtra(Type.getType(Object[].class));
-        Variable lockStateVar = varTable.acquireExtra(Type.getType(Object[].class));
-        Variable tempObjVar = varTable.acquireExtra(Type.getType(Object.class));
-
+        // IMPORTANT NOTE: Code dealing with locks (e.g. anything to do with LockState) will only be present if this method contains
+        // MONITORENTER/MONITOREXIT. See comments in generateMonitorInstrumentationLogic for more information.
+        
         // Generate entrypoint instructions...
         //
+        //    LockState lockState;
         //    switch(continuation.getMode()) {
-        //        case NORMAL: goto start
+        //        case NORMAL:
+        //        {
+        //            lockState = new LockState();
+        //            goto start;
+        //        }
         //        case SAVING: throw exception
         //        case LOADING:
         //        {
@@ -243,6 +416,7 @@ public final class Instrumenter {
         //            Object[] localVars = methodState.getLocalTable();
         //            switch(methodState.getContinuationPoint()) {
         //                case <number>:
+        //                    enterLocks(lockState);
         //                    restoreOperandStack(stack);
         //                    restoreLocalsStack(localVars);
         //                    goto restorePoint_<number>;
@@ -267,9 +441,14 @@ public final class Instrumenter {
                                 call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                                 throwException("Unrecognized state"),
                                 0,
-                                jumpTo(startOfMethodLabelNode),
+                                merge(
+                                        // debugPrint("fresh invoke" + methodNode.name),
+                                        monitorInstrumentationLogic.getCreateAndStoreLockStateInsnList(),
+                                        jumpTo(startOfMethodLabelNode)
+                                ),
                                 throwException("Unexpected state (saving not allowed at this point)"),
                                 merge(
+                                        monitorInstrumentationLogic.getLoadAndStoreLockStateFromMethodStateInsnList(),
                                         // debugPrint("calling remove first saved" + methodNode.name),
                                         call(CONTINUATION_REMOVEFIRSTSAVED_METHOD, loadVar(contArg)),
                                         saveVar(methodStateVar),
@@ -284,6 +463,7 @@ public final class Instrumenter {
                                                 continuationPoints.stream().map((cp) -> {
                                                     InsnList ret
                                                             = merge(
+                                                                    monitorInstrumentationLogic.getEnterMonitorsInLockStateInsnList(),
                                                                     loadOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
                                                                     loadLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
                                                                     jumpTo(cp.getRestoreLabelNode())
@@ -296,14 +476,18 @@ public final class Instrumenter {
                         ),
                         addLabel(startOfMethodLabelNode)
                 );
-        methodNode.instructions.insert(entryPointInsnList);
+        
 
-        // Add store logic and restore addLabel for each continuation point
+        // IMPORTANT NOTE: Code dealing with locks (e.g. anything to do with LockState) will only be present if this method contains
+        // MONITORENTER/MONITOREXIT. See comments in generateMonitorInstrumentationLogic for more information.
+        
+        // Generates store logic and restore addLabel for each continuation point
         //
         //      #IFDEF suspend
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocalsStackHere();
-        //          continuation.addPending(new MethodState(<number>, stack, locals);
+        //          exitLocks(lockState);
+        //          continuation.addPending(new MethodState(<number>, stack, locals, lockState);
         //          continuation.setMode(MODE_SAVING);
         //          return <dummy>;
         //          restorePoint_<number>:
@@ -314,13 +498,15 @@ public final class Instrumenter {
         //          restorePoint_<number>:
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocalsStackHere();
-        //          continuation.addPending(new MethodState(<number>, stack, locals);
+        //          exitLocks(lockState);
+        //          continuation.addPending(new MethodState(<number>, stack, locals, lockState);
         //          <method invocation>
         //          if (continuation.getMode() == MODE_SAVING) {
         //              return <dummy>;
         //          }
         //          continuation.removeLastPending();
         //      #ENDIF
+        Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements = new HashMap<>();
         continuationPoints.forEach((cp) -> {
             InsnList saveBeforeInvokeInsnList
                     = merge(
@@ -328,13 +514,15 @@ public final class Instrumenter {
                             saveOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
                             // debugPrint("saving locals" + methodNode.name),
                             saveLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
+                            // debugPrint("exiting monitors" + methodNode.name),
+                            monitorInstrumentationLogic.getExitMonitorsInLockStateInsnList(),
                             // debugPrint("calling addIndividual pending" + methodNode.name),
                             call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                                     construct(METHODSTATE_INIT_METHOD,
                                             loadIntConst(cp.getId()),
                                             loadVar(savedStackVar),
                                             loadVar(savedLocalsVar),
-                                            loadNull()))
+                                            monitorInstrumentationLogic.getLoadLockStateToStackInsnList()))
                     );
 
             InsnList insnList;
@@ -359,10 +547,10 @@ public final class Instrumenter {
                                 addLabel(cp.getRestoreLabelNode()), // addIndividual restore point for when in loading mode
                                 // debugPrint("entering restore point" + methodNode.name),
                                 pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
-                                // stack that would have been consumed by that invocation... since we're removing that call, we
-                                // also need to pop the Continuation reference from the stack... it's important that we
-                                // explicitly do it at this point becuase during loading the stack will be restored with top
-                                // of stack pointing to that continuation object
+                                       // stack that would have been consumed by that invocation... since we're removing that call, we
+                                       // also need to pop the Continuation reference from the stack... it's important that we
+                                       // explicitly do it at this point becuase during loading the stack will be restored with top
+                                       // of stack pointing to that continuation object
                                 // debugPrint("going back in to normal mode" + methodNode.name),
                                 // we're back in to a loading state now
                                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_NORMAL))
@@ -392,14 +580,46 @@ public final class Instrumenter {
                                 ),
                                 // debugPrint("calling remove last pending" + methodNode.name),
                                 call(CONTINUATION_REMOVELASTPENDING_METHOD, loadVar(contArg)) // otherwise assume we're normal, and
-                        // remove the state we added on to
-                        // pending
+                                                                                              // remove the state we added on to
+                                                                                              // pending
                         );
             }
 
-            methodNode.instructions.insertBefore(cp.getInvokeInsnNode(), insnList);
-            methodNode.instructions.remove(cp.getInvokeInsnNode());
+            invokeInsnNodeReplacements.put(cp.getInvokeInsnNode(), insnList);
         });
+        
+        // We don't want labels to continuationPoints to be remapped when FlowInstrumentationLogic returns them
+        Set<LabelNode> globalLabelNodes = continuationPoints.stream().map(x -> x.getRestoreLabelNode()).collect(Collectors.toSet());
+        return new FlowInstrumentationLogic(entryPointInsnList, invokeInsnNodeReplacements, globalLabelNodes);
+    }
+    
+    private void applyInstrumentationLogic(MethodNode methodNode,
+            FlowInstrumentationLogic flowInstrumentationLogic,
+            MonitorInstrumentationLogic monitorInstrumentationLogic) {
+        
+        // Add loading code
+        InsnList entryPointInsnList = flowInstrumentationLogic.getEntryPointInsnList();
+        methodNode.instructions.insert(entryPointInsnList);
+        
+        // Add instrumented method invocations
+        Map<AbstractInsnNode, InsnList> invokeReplacements = flowInstrumentationLogic.getInvokeInsnNodeReplacements();
+        for (Entry<AbstractInsnNode, InsnList> replaceEntry : invokeReplacements.entrySet()) {
+            AbstractInsnNode nodeToReplace = replaceEntry.getKey();
+            InsnList insnsToReplaceWith = replaceEntry.getValue();
+            
+            methodNode.instructions.insertBefore(nodeToReplace, insnsToReplaceWith);
+            methodNode.instructions.remove(nodeToReplace);
+        }
+        
+        // Add instrumented monitorenter/monitorexits instructions
+        Map<AbstractInsnNode, InsnList> monitorReplacements = monitorInstrumentationLogic.getMonitorInsnNodeReplacements();
+        for (Entry<AbstractInsnNode, InsnList> replaceEntry : monitorReplacements.entrySet()) {
+            AbstractInsnNode nodeToReplace = replaceEntry.getKey();
+            InsnList insnsToReplaceWith = replaceEntry.getValue();
+            
+            methodNode.instructions.insertBefore(nodeToReplace, insnsToReplaceWith);
+            methodNode.instructions.remove(nodeToReplace);
+        }
     }
 
     private Frame[] analyzeFrames(String className, MethodNode methodNode) {

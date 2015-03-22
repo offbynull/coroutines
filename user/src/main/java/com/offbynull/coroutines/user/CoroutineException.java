@@ -30,7 +30,11 @@ public class CoroutineException extends RuntimeException {
         nested = cause;
     }
 
-    public Throwable getNested() {
+    /**
+     * Since chained exceptions aren't supported in Java1.2, this is how {@link CoroutineException} passes back the underlying exception.
+     * @return underlying exception
+     */
+    public final Throwable getNested() {
         return nested;
     }
 }

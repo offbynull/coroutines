@@ -81,6 +81,18 @@ public final class VariableTable {
         Validate.isTrue(index >= 0 && index < argVars.size());
         return argVars.get(index);
     }
+
+    /**
+     * Equivalent to calling {@code acquireExtra(Type.getType(type))}.
+     * @param type type which variable is for
+     * @return new variable
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public Variable acquireExtra(Class<?> type) {
+        Validate.notNull(type);
+        
+        return acquireExtra(Type.getType(type));
+    }
     
     /**
      * Acquire a new variable for use when instrumenting some code within the method this {@link VariableTable} is for.

@@ -56,7 +56,7 @@ public final class InstrumenterTest {
     }
 
     @Test
-    public void mustProperlySuspendWithLambdas() throws Exception {
+    public void mustRejectLambdas() throws Exception {
         thrown.expect(IllegalArgumentException.class);
         thrown.expectMessage("INVOKEDYNAMIC instructions are not allowed");
         

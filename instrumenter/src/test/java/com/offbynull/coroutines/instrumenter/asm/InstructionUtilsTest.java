@@ -16,11 +16,14 @@
  */
 package com.offbynull.coroutines.instrumenter.asm;
 
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.forEach;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.ifIntegersEqual;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.ifObjectsEqual;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadStringConst;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnValue;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tableSwitch;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.throwException;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithName;
@@ -161,6 +164,63 @@ public final class InstructionUtilsTest {
             assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, 2, 2));
             assertEquals("nomatch", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, -2, 2));
             assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, -2, -2));
+        }
+    }
+
+    @Test
+    public void mustCreateAndRunForEachStatement() throws Exception {
+        // Augment signature
+        methodNode.desc = Type.getMethodDescriptor(Type.getType(String.class), new Type[] {
+            Type.getType(Object[].class),
+            Type.getType(Object.class)
+        });
+        methodNode.maxLocals += 2; // We've added 2 parameters to the method, and we need to upgrade maxLocals or else varTable will give
+                                   // us bad indexes for variables we grab with acquireExtra(). This is because VariableTable uses maxLocals
+                                   // to determine at what point to start adding extra local variables.
+        
+        // Initialize variable table
+        VariableTable varTable = new VariableTable(classNode, methodNode);
+        Variable objectArrVar = varTable.getArgument(1);
+        Variable searchObjVar = varTable.getArgument(2);
+        Variable counterVar = varTable.acquireExtra(Type.INT_TYPE);
+        Variable arrayLenVar = varTable.acquireExtra(Type.INT_TYPE);
+        Variable tempObjectVar = varTable.acquireExtra(Object.class);
+        
+        // Update method logic
+        /**
+         * for (Object[] o : arg1) {
+         *     if (o == arg2) {
+         *         return "match";
+         *     }
+         * }
+         * return "nomatch";
+         */
+        methodNode.instructions
+                = merge(
+                        forEach(counterVar, arrayLenVar,
+                                loadVar(objectArrVar),
+                                merge(
+                                        saveVar(tempObjectVar),
+                                        ifObjectsEqual(loadVar(tempObjectVar), loadVar(searchObjVar),
+                                                returnValue(Type.getType(String.class), loadStringConst("match")))
+                                )
+                        ),
+                        returnValue(Type.getType(String.class), loadStringConst("nomatch"))
+                );
+        
+        // Write to JAR file + load up in classloader -- then execute tests
+        try (URLClassLoader cl = createJarAndLoad(classNode)) {
+            Object obj = cl.loadClass(STUB_CLASSNAME).newInstance();
+            
+            Object o1 = new Object();
+            Object o2 = new Object();
+            Object o3 = new Object();
+            
+            assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, (Object) new Object[] { o1, o2, o3 }, o1));
+            assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, (Object) new Object[] { o1, o2, o3 }, o2));
+            assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, (Object) new Object[] { o1, o2, o3 }, o3));
+            assertEquals("nomatch", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, (Object) new Object[] { o1, o2, o3 }, null));
+            assertEquals("nomatch", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, (Object) new Object[] { o1, o2, o3 }, new Object()));
         }
     }
 }
