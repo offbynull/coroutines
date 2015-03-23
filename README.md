@@ -1,10 +1,15 @@
 # Coroutines
 
-Inspired by the Apache Commons Javaflow project, the Coroutines project is a Java toolkit that allows users to suspend the execution of their method, save that method's state, and resume running that method at a later point in time.
+Inspired by the Apache Commons Javaflow project, the Coroutines project is a Java toolkit that allows you to suspend the execution of your method, save its state, and resume executing it from that state at a later point in time.
+
+More information on the topic of coroutines can be found at ...
+
+* [Wikipedia: Coroutine](http://en.wikipedia.org/wiki/Coroutine)
+* [Stackoverflow: Difference between a "coroutine" and a "thread"?](http://stackoverflow.com/a/23436125)
 
 ## How do you use it?
 
-Here's a simple example...
+### A simple example
 
 First, declare your coroutine...
 ```java
@@ -47,11 +52,6 @@ started
 ```
 
 
-
-Some more information on coroutines vs threads can be found at ...
-
-* [Wikipedia: Coroutine](http://en.wikipedia.org/wiki/Coroutine)
-* [Stackoverflow: Difference between a "coroutine" and a "thread"?](http://stackoverflow.com/a/23436125)
 
 ### Running Maven as your build system?
 
