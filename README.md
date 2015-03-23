@@ -4,11 +4,11 @@ Inspired by the Apache Commons Javaflow project, the Coroutines project is a Jav
 
 Why not just use Javaflow? Unfortunately, Javaflow seems to be largely unsupported at this point. But, aside from that, using the Coroutines ...
 
-1. is roughly 25% to 50% faster than Javaflow.
-1. has both a Maven plugin and an Ant plugin _(Javaflow only provides an Ant plugin)_.
-1. has support for Java 8 bytecode _(Javaflow has issues dealing with stackmap frames due to it's reliance on ASM's default behaviour for deriving common superclasses)_.
-1. has proper support for synchronized blocks _(Javaflow attempts to use static analysis for this which may not be valid in certain cases)_
-1. is modular and the code is readable, well commented, and well tested code _(Javaflow is difficult to follow and everything is embedded in to a single project)_.
+1. *is roughly 25% to 50% faster than Javaflow* _(Javaflow has a reliance on thread local storage and other threading constructs)_.
+1. *has both a Maven plugin and an Ant plugin* _(Javaflow only provides an Ant plugin)_.
+1. *has support for Java 8 bytecode* _(Javaflow has issues dealing with stackmap frames due to it's reliance on ASM's default behaviour for deriving common superclasses)_.
+1. *has proper support for synchronized blocks* _(Javaflow attempts to use static analysis to determine which monitors need to be exitted and reentered, which may not be valid in certain cases)_.
+1. *is modular and the code is readable, well commented, and well tested code* _(Javaflow is difficult to follow and everything is embedded in to a single project)_.
 
 More information on the topic of coroutines can be found at ...
 
