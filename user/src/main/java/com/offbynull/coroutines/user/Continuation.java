@@ -100,7 +100,15 @@ public final class Continuation {
         }
         return (MethodState) savedMethodStates.removeFirst();
     }
-    
+
+    /**
+     * Do not use -- for internal use only. For testing.
+     * @param idx n/a
+     * @return n/a
+     */
+    public MethodState getSaved(int idx) {
+        return (MethodState) savedMethodStates.get(idx);
+    }
     /**
      * Do not use -- for internal use only.
      */

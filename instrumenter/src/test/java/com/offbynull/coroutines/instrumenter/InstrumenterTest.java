@@ -17,10 +17,14 @@
 package com.offbynull.coroutines.instrumenter;
 
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.loadClassesInZipResourceAndInstrument;
+import com.offbynull.coroutines.user.Continuation;
 import com.offbynull.coroutines.user.Coroutine;
 import com.offbynull.coroutines.user.CoroutineRunner;
 import java.net.URLClassLoader;
+import java.util.Arrays;
+import java.util.LinkedList;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -36,6 +40,7 @@ public final class InstrumenterTest {
     private static final String EXCEPTION_SUSPEND_TEST = "ExceptionSuspendTest";
     private static final String JSR_EXCEPTION_SUSPEND_TEST = "JsrExceptionSuspendTest";
     private static final String EXCEPTION_THROW_TEST = "ExceptionThrowTest";
+    private static final String MONITOR_INVOKE_TEST = "MonitorInvokeTest";
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
@@ -175,6 +180,53 @@ public final class InstrumenterTest {
                     + "IN FINALLY 1\n"
                     + "IN FINALLY 2\n"
                     + "END\n", builder.toString());
+        }
+    }
+    
+    @Test
+    public void mustKeepTrackOfSynchronizedBlocks() throws Exception {
+        LinkedList<String> tracker = new LinkedList();
+        Object mon1 = new Object();
+        Object mon2 = new Object();
+        Object mon3 = new Object();
+
+        // All we're testing here is tracking. It's difficult to test to see if monitors were re-entered/exited.
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(MONITOR_INVOKE_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(MONITOR_INVOKE_TEST);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, tracker, mon1, mon2, mon3);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+            
+            // get continuation object so that we can inspect it and make sure its lockstate is what we expect
+            Continuation continuation = (Continuation) FieldUtils.readField(runner, "continuation", true);
+
+            Assert.assertTrue(runner.execute());
+            Assert.assertEquals(Arrays.asList("mon1", "mon2", "mon3", "mon1"), tracker);
+            Assert.assertArrayEquals(new Object[] { mon1 }, continuation.getSaved(0).getLockState().toArray());
+            Assert.assertArrayEquals(new Object[] { mon2, mon3, mon1 }, continuation.getSaved(1).getLockState().toArray());
+            
+            Assert.assertTrue(runner.execute());
+            Assert.assertEquals(Arrays.asList("mon1", "mon2", "mon3"), tracker);
+            Assert.assertArrayEquals(new Object[] { mon1 }, continuation.getSaved(0).getLockState().toArray());
+            Assert.assertArrayEquals(new Object[] { mon2, mon3 }, continuation.getSaved(1).getLockState().toArray());
+            
+            Assert.assertTrue(runner.execute());
+            Assert.assertEquals(Arrays.asList("mon1", "mon2"), tracker);
+            Assert.assertArrayEquals(new Object[] { mon1 }, continuation.getSaved(0).getLockState().toArray());
+            Assert.assertArrayEquals(new Object[] { mon2 }, continuation.getSaved(1).getLockState().toArray());
+            
+            Assert.assertTrue(runner.execute());
+            Assert.assertEquals(Arrays.asList("mon1"), tracker);
+            Assert.assertArrayEquals(new Object[] { mon1 }, continuation.getSaved(0).getLockState().toArray());
+            Assert.assertArrayEquals(new Object[] { }, continuation.getSaved(1).getLockState().toArray());
+            
+            Assert.assertTrue(runner.execute());
+            Assert.assertEquals(Arrays.asList(), tracker);
+            Assert.assertArrayEquals(new Object[] { }, continuation.getSaved(0).getLockState().toArray());
+            
+            Assert.assertFalse(runner.execute()); // coroutine finished executing here
+
+            
         }
     }
 }

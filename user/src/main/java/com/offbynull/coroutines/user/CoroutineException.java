@@ -22,19 +22,7 @@ package com.offbynull.coroutines.user;
  */
 public class CoroutineException extends RuntimeException {
     
-    private Throwable nested;
-    
     CoroutineException(String message, Throwable cause) {
-        // super(message, cause); NOT SUPPORTED IN 1.2! NEED AT LEAST 1.4 FOR THIS CONSTRUCTOR
-        super(message);
-        nested = cause;
-    }
-
-    /**
-     * Since chained exceptions aren't supported in Java1.2, this is how {@link CoroutineException} passes back the underlying exception.
-     * @return underlying exception
-     */
-    public final Throwable getNested() {
-        return nested;
+        super(message, cause);
     }
 }

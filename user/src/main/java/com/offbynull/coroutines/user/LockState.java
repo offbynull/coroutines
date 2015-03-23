@@ -16,6 +16,7 @@
  */
 package com.offbynull.coroutines.user;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.ListIterator;
 
@@ -97,7 +98,17 @@ public final class LockState {
      * @return monitors
      */
     public Object[] toArray() {
-        return monitors.toArray();
+        Object[] ret = new Object[monitors.size()];
+        
+        Iterator it = monitors.iterator();
+        int count = 0;
+        while (it.hasNext()) {
+            WrappedObject next = (WrappedObject) it.next();
+            ret[count] = next.getObject();
+            count++;
+        }
+        
+        return ret;
     }
 
     private static final class WrappedObject {
@@ -109,6 +120,10 @@ public final class LockState {
                 throw new NullPointerException();
             }
             this.object = object;
+        }
+
+        public Object getObject() {
+            return object;
         }
 
         public int hashCode() {

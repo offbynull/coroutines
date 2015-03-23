@@ -35,6 +35,7 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.monitorEnter;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.monitorExit;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveLocalVariableTable;
@@ -261,6 +262,7 @@ public final class Instrumenter {
                 case Opcodes.MONITORENTER:
                     replacementLogic
                             = merge(
+                                    // debugPrint("enter monitor"),
                                     saveVar(tempObjVar),
                                     loadVar(tempObjVar),
                                     cloneMonitorNode(insnNode),
@@ -270,10 +272,11 @@ public final class Instrumenter {
                 case Opcodes.MONITOREXIT:
                     replacementLogic
                             = merge(
+                                    // debugPrint("exit monitor"),
                                     saveVar(tempObjVar),
                                     loadVar(tempObjVar),
-                                    call(LOCKSTATE_EXIT_METHOD, loadVar(lockStateVar), loadVar(tempObjVar)), // discard before exit
-                                    cloneMonitorNode(insnNode)
+                                    cloneMonitorNode(insnNode),
+                                    call(LOCKSTATE_EXIT_METHOD, loadVar(lockStateVar), loadVar(tempObjVar)) // discard after exit
                             );
                     break;
                 default:
@@ -315,11 +318,7 @@ public final class Instrumenter {
         if (monitorInsnNodeReplacements.isEmpty()) {
             loadLockStateToStackInsnList = loadNull();
         } else {
-            loadLockStateToStackInsnList
-                    = merge(
-                            call(METHODSTATE_GETLOCKSTATE_METHOD, loadVar(methodStateVar)),
-                            saveVar(lockStateVar)
-                    );
+            loadLockStateToStackInsnList = loadVar(lockStateVar);
         }
 
         
@@ -331,7 +330,11 @@ public final class Instrumenter {
             enterMonitorsInLockStateInsnList
                     = forEach(counterVar, arrayLenVar,
                             call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar)),
-                            monitorEnter());
+                            merge(
+                                    // debugPrint("temp monitor enter"),
+                                    monitorEnter()
+                            )
+                    );
         }
 
         
@@ -344,7 +347,11 @@ public final class Instrumenter {
             exitMonitorsInLockStateInsnList
                     = forEach(counterVar, arrayLenVar,
                             call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar)),
-                            monitorEnter());
+                                    merge(
+                                    // debugPrint("temp monitor exit"),
+                                    monitorExit()
+                            )
+                    );
         }
         
         return new MonitorInstrumentationLogic(monitorInsnNodeReplacements,
@@ -414,6 +421,7 @@ public final class Instrumenter {
         //            MethodState methodState = continuation.removeFirstSaved();
         //            Object[] stack = methodState.getStack();
         //            Object[] localVars = methodState.getLocalTable();
+        //            lockState = methodState.getLockState();
         //            switch(methodState.getContinuationPoint()) {
         //                case <number>:
         //                    enterLocks(lockState);
@@ -448,7 +456,6 @@ public final class Instrumenter {
                                 ),
                                 throwException("Unexpected state (saving not allowed at this point)"),
                                 merge(
-                                        monitorInstrumentationLogic.getLoadAndStoreLockStateFromMethodStateInsnList(),
                                         // debugPrint("calling remove first saved" + methodNode.name),
                                         call(CONTINUATION_REMOVEFIRSTSAVED_METHOD, loadVar(contArg)),
                                         saveVar(methodStateVar),
@@ -456,6 +463,7 @@ public final class Instrumenter {
                                         saveVar(savedLocalsVar),
                                         call(METHODSTATE_GETSTACK_METHOD, loadVar(methodStateVar)),
                                         saveVar(savedStackVar),
+                                        monitorInstrumentationLogic.getLoadAndStoreLockStateFromMethodStateInsnList(),
                                         tableSwitch(
                                                 call(METHODSTATE_GETCONTINUATIONPOINT_METHOD, loadVar(methodStateVar)),
                                                 throwException("Unrecognized restore id" + methodNode.name),
@@ -486,9 +494,9 @@ public final class Instrumenter {
         //      #IFDEF suspend
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocalsStackHere();
-        //          exitLocks(lockState);
         //          continuation.addPending(new MethodState(<number>, stack, locals, lockState);
         //          continuation.setMode(MODE_SAVING);
+        //          exitLocks(lockState);
         //          return <dummy>;
         //          restorePoint_<number>:
         //          continuation.setMode(MODE_NORMAL);
@@ -498,10 +506,10 @@ public final class Instrumenter {
         //          restorePoint_<number>:
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocalsStackHere();
-        //          exitLocks(lockState);
         //          continuation.addPending(new MethodState(<number>, stack, locals, lockState);
         //          <method invocation>
         //          if (continuation.getMode() == MODE_SAVING) {
+        //              exitLocks(lockState);
         //              return <dummy>;
         //          }
         //          continuation.removeLastPending();
@@ -514,8 +522,6 @@ public final class Instrumenter {
                             saveOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
                             // debugPrint("saving locals" + methodNode.name),
                             saveLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
-                            // debugPrint("exiting monitors" + methodNode.name),
-                            monitorInstrumentationLogic.getExitMonitorsInLockStateInsnList(),
                             // debugPrint("calling addIndividual pending" + methodNode.name),
                             call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                                     construct(METHODSTATE_INIT_METHOD,
@@ -542,6 +548,8 @@ public final class Instrumenter {
                                 // set saving mode
                                 // debugPrint("setting mode to saving" + methodNode.name),
                                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_SAVING)),
+                                // debugPrint("exiting monitors" + methodNode.name),
+                                monitorInstrumentationLogic.getExitMonitorsInLockStateInsnList(),
                                 // debugPrint("returning dummy value" + methodNode.name),
                                 returnDummy(returnType), // return dummy value
                                 addLabel(cp.getRestoreLabelNode()), // addIndividual restore point for when in loading mode
@@ -576,7 +584,12 @@ public final class Instrumenter {
                                 ifIntegersEqual(// if we're saving after invoke, return dummy value
                                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                                         loadIntConst(MODE_SAVING),
-                                        returnDummy(returnType)
+                                        merge(
+                                                // debugPrint("exiting monitors" + methodNode.name),
+                                                monitorInstrumentationLogic.getExitMonitorsInLockStateInsnList(),
+                                                // debugPrint("returning dummy value" + methodNode.name),
+                                                returnDummy(returnType)
+                                        )
                                 ),
                                 // debugPrint("calling remove last pending" + methodNode.name),
                                 call(CONTINUATION_REMOVELASTPENDING_METHOD, loadVar(contArg)) // otherwise assume we're normal, and
