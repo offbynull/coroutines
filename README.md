@@ -2,6 +2,15 @@
 
 Inspired by the Apache Commons Javaflow project, the Coroutines project is a Java toolkit that allows you to suspend the execution of your method, save its state, and resume executing it from that state at a later point in time.
 
+Why not just use Javaflow? Unfortunately, Javaflow seems to be largely unsupported at this point. But, aside from that, using the Coroutines ...
+
+1. is roughly 25% to 50% faster than Javaflow (likely due to the fact that Javaflow makes use of threading constructs like ThreadLocal storage).
+1. has both Maven plugin and an Ant plugin (Javaflow only provides an Ant plugin).
+1. has support for Java 8 bytecode (Javaflow has issues dealing with stackmap frames due to it's reliance on ASM's default behaviour for deriving common superclasses).
+1. is modular and the code is readable, well commented, and well tested code (Javaflow is difficult to follow and everything is embedded in to a single project).
+
+ This is  (e.g. threadlocal and thread-safe collections) while this project doesn't.
+
 More information on the topic of coroutines can be found at ...
 
 * [Wikipedia: Coroutine](http://en.wikipedia.org/wiki/Coroutine)
@@ -69,7 +78,7 @@ Then, make use of the following plugin...
 <plugin>
     <groupId>com.offbynull.coroutines</groupId>
     <artifactId>maven-plugin</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <executions>
         <execution>
             <goals>
@@ -98,13 +107,4 @@ Just define the task and bind to the target of your choice...
 ### Running Gradle as your build system?
 
 Unfortunately there isn't a Gradle plugin currently available. However, Gradle does allow calling Ant tasks. As such, you could make use of the provided Ant task in Gradle.
-
-## Why not just use Javaflow?
-
-Apache Commons Javaflow seems to be largely unsupported at this point. But, aside from that, using the Coroutines project has the following advantages ...
-
-1. Simple benchmarking has shown Coroutines to be roughly 25% to 50% faster than Javaflow. This is likely due to the use of threading constructs in Javaflow.
-1. Coroutines provides both a Maven plugin and an Ant plugin. Javaflow only provides an Ant plugin.
-1. Coroutines has support for Java 8 bytecode. Javaflow has had issues dealing with stackmap frames due to it's reliance on ASM's default behaviour of using the current classloader to derive the common superclass.
-1. Coroutines project is modular and the code is readable, well commented, and well tested code.
 
