@@ -16,7 +16,6 @@
  */
 package com.offbynull.coroutines.user;
 
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.ListIterator;
 
@@ -64,8 +63,7 @@ public final class LockState {
             throw new NullPointerException();
         }
 
-        WrappedObject wrappedMonitor = new WrappedObject(monitor);
-        monitors.add(wrappedMonitor);
+        monitors.add(monitor);
     }
 
     /**
@@ -80,11 +78,11 @@ public final class LockState {
         }
 
         // remove last
-        WrappedObject wrappedMonitor = new WrappedObject(monitor);
         ListIterator it = monitors.listIterator(monitors.size());
         while (it.hasPrevious()) {
             Object prev = it.previous();
-            if (wrappedMonitor.equals(prev)) {
+            if (monitor == prev) { // Never use equals() to test equality. We always need to make sure that the objects are the same, we
+                                   // don't care if they're the objects are logically equivalent
                 it.remove();
                 return;
             }
@@ -98,57 +96,6 @@ public final class LockState {
      * @return monitors
      */
     public Object[] toArray() {
-        Object[] ret = new Object[monitors.size()];
-        
-        Iterator it = monitors.iterator();
-        int count = 0;
-        while (it.hasNext()) {
-            WrappedObject next = (WrappedObject) it.next();
-            ret[count] = next.getObject();
-            count++;
-        }
-        
-        return ret;
-    }
-
-    private static final class WrappedObject {
-
-        private final Object object;
-
-        public WrappedObject(Object object) {
-            if (object == null) {
-                throw new NullPointerException();
-            }
-            this.object = object;
-        }
-
-        public Object getObject() {
-            return object;
-        }
-
-        public int hashCode() {
-            return System.identityHashCode(object); // We don't want the original hashCode() on the object field. The hashCode() method may
-                                                    // have been overwritten along with the equals() method for logical equivalence. We
-                                                    // don't care about logical equivallency in this case, we just care about if the objects
-                                                    // being compared are the same object.
-        }
-
-        public boolean equals(Object obj) {
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final WrappedObject other = (WrappedObject) obj;
-            if (this.object != other.object) { // We don't ever want to call the equals() method on the object field. We're trying to track
-                                               // objects being used as monitors, so logical equivalence is not what we want. We want to
-                                               // make sure that the two objects are the same actual object, not that they're logically
-                                               // equivallent.
-                return false;
-            }
-            return true;
-        }
-
+        return monitors.toArray();
     }
 }

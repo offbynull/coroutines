@@ -21,6 +21,7 @@ import com.offbynull.coroutines.user.Continuation;
 import com.offbynull.coroutines.user.Coroutine;
 import com.offbynull.coroutines.user.CoroutineRunner;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
@@ -186,9 +187,13 @@ public final class InstrumenterTest {
     @Test
     public void mustKeepTrackOfSynchronizedBlocks() throws Exception {
         LinkedList<String> tracker = new LinkedList();
-        Object mon1 = new Object();
-        Object mon2 = new Object();
-        Object mon3 = new Object();
+        
+        // mon1/mon2/mon3 all point to different objects that are logically equivalent but different objects. Tracking should ignore logical
+        // equivallence and instead focus on checking to make sure that they references are the same. We don't want to call MONITOREXIT on
+        // the wrong object because it .equals() another object in the list of monitors being tracked.
+        Object mon1 = new ArrayList<>();
+        Object mon2 = new ArrayList<>();
+        Object mon3 = new ArrayList<>();
 
         // All we're testing here is tracking. It's difficult to test to see if monitors were re-entered/exited.
         try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(MONITOR_INVOKE_TEST + ".zip")) {
