@@ -1,8 +1,10 @@
-# coroutines
+# Coroutines
 
-Inspired by the Apache Commons Javaflow project, The Coroutines project is a Java toolkit that allows users to suspend the execution of their method, save that method's state, and resume running that method at a later point in time.
+Inspired by the Apache Commons Javaflow project, the Coroutines project is a Java toolkit that allows users to suspend the execution of their method, save that method's state, and resume running that method at a later point in time.
 
-An introductory example...
+## How do you use it?
+
+Here's a simple example...
 
 First, declare your coroutine...
 ```java
@@ -47,8 +49,9 @@ started
 
 
 Some more information on coroutines vs threads can be found at ...
-[Wikipedia: Coroutine](http://en.wikipedia.org/wiki/Coroutine)
-[Stackoverflow: Difference between a "coroutine" and a "thread"?](http://stackoverflow.com/a/23436125)
+
+* [Wikipedia: Coroutine](http://en.wikipedia.org/wiki/Coroutine)
+* [Stackoverflow: Difference between a "coroutine" and a "thread"?](http://stackoverflow.com/a/23436125)
 
 ### Running Maven as your build system?
 
@@ -94,11 +97,11 @@ Just define the task and bind to the target of your choice...
 
 ### Running Gradle as your build system?
 
-Unfortunately there isn't a Gradle plugin currently available. However, Gradle does allow using calling Ant tasks. As such, you could make use of the provided Ant task in your Grade 
+Unfortunately there isn't a Gradle plugin currently available. However, Gradle does allow calling Ant tasks. As such, you could make use of the provided Ant task in Gradle.
 
-### Why not just use Javaflow?
+## Why not just use Javaflow?
 
-Apache Commons Javaflow seems to be largely unsupported at this point. But, aside from that, using the Coroutines project has the following advantages:
+Apache Commons Javaflow seems to be largely unsupported at this point. But, aside from that, using the Coroutines project has the following advantages ...
 
 1. Simple benchmarking has shown Coroutines to be roughly 25% to 50% faster than Javaflow. This is likely due to the use of threading constructs in Javaflow.
 1. Coroutines provides both a Maven plugin and an Ant plugin. Javaflow only provides an Ant plugin.
