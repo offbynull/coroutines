@@ -2,7 +2,7 @@
 
 Inspired by the Apache Commons Javaflow project, the Coroutines project is a Java toolkit that allows you to suspend the execution of your method, save its state, and resume executing it from that state at a later point in time.
 
-Why not just use Javaflow? Unfortunately, Javaflow seems to be largely unsupported at this point. But, aside from that, using the Coroutines ...
+Why not just use Javaflow? Unfortunately, Javaflow seems to be largely unsupported at this point. But, aside from that, the Coroutines project ...
 
 1. **is roughly 25% to 50% faster than Javaflow** _(Javaflow has a reliance on thread local storage and other threading constructs)_.
 1. **has both a Maven plugin and an Ant plugin** _(Javaflow only provides an Ant plugin)_.
