@@ -21,6 +21,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.ListIterator;
 import java.util.Map;
@@ -99,7 +100,17 @@ public final class InstructionUtils {
     }
 
     /**
-     * Clones an instruction list. All labels are remapped unless otherwise specified.
+     * Clones an instruction list. Equivalent to calling {@code cloneInsnList(insnList, Collections.emptySet())}.
+     * @param insnList instruction list to clone
+     * @throws NullPointerException if any argument is {@code null}
+     * @return instruction list with cloned instructions
+     */
+    public static InsnList cloneInsnList(InsnList insnList) {
+        return cloneInsnList(insnList, Collections.emptySet());
+    }
+    
+    /**
+     * Clones an instruction list. All labels are remapped unless otherwise specified in {@code globalLabels}.
      * @param insnList instruction list to clone
      * @param globalLabels set of labels that should not be remapped
      * @throws NullPointerException if any argument is {@code null}

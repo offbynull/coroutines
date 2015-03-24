@@ -16,35 +16,27 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.LabelNode;
 
 final class FlowInstrumentationLogic {
     private final InsnList entryPointInsnList;
     private final Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements;
-    private final Set<LabelNode> globalLabelNodes;
 
-    FlowInstrumentationLogic(InsnList entryPointInsnList, Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements,
-            Set<LabelNode> globalLabelNodes) {
+    FlowInstrumentationLogic(InsnList entryPointInsnList, Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements) {
         this.entryPointInsnList = entryPointInsnList;
         this.invokeInsnNodeReplacements = invokeInsnNodeReplacements;
-        this.globalLabelNodes = globalLabelNodes;
     }
-
-    // Always clone all instruction lists being passed out, because if that instruction list gets added to another instruction list it will
-    // be emptied. Subsequent operations that may need to add that same instruction list will silently insert nothing.
+    
+    // WARNING: Be careful with using these more than once. If you insert one InsnList in to another InsnList, it'll become empty. If you
+    // need to insert the instructions in an InsnList multiple times, make sure to CLONE IT FIRST!
     
     InsnList getEntryPointInsnList() {
-        return cloneInsnList(entryPointInsnList, globalLabelNodes);
+        return entryPointInsnList;
     }
 
     Map<AbstractInsnNode, InsnList> getInvokeInsnNodeReplacements() {
-        return invokeInsnNodeReplacements.entrySet().stream()
-                .collect(Collectors.toMap(k -> k.getKey(), v -> cloneInsnList(v.getValue(), globalLabelNodes)));
+        return invokeInsnNodeReplacements;
     }
 }

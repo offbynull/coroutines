@@ -21,6 +21,7 @@ import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInvokeNode;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneMonitorNode;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;
@@ -59,14 +60,11 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
@@ -359,8 +357,7 @@ public final class Instrumenter {
                 loadAndStoreLockStateFromMethodStateInsnList,
                 loadLockStateToStackInsnList,
                 enterMonitorsInLockStateInsnList,
-                exitMonitorsInLockStateInsnList,
-                Collections.emptySet());
+                exitMonitorsInLockStateInsnList);
     }
     
     private FlowInstrumentationLogic generateFlowInstrumentationLogic(MethodNode methodNode, Frame[] frames,
@@ -442,6 +439,7 @@ public final class Instrumenter {
         //        ...
         //        ...
         //        ...
+        InsnList enterMonitorsInLockStateInsnList = monitorInstrumentationLogic.getEnterMonitorsInLockStateInsnList();
         LabelNode startOfMethodLabelNode = new LabelNode();
         InsnList entryPointInsnList
                 = merge(
@@ -471,7 +469,8 @@ public final class Instrumenter {
                                                 continuationPoints.stream().map((cp) -> {
                                                     InsnList ret
                                                             = merge(
-                                                                    monitorInstrumentationLogic.getEnterMonitorsInLockStateInsnList(),
+                                                                                                      // inserted many times, must be cloned
+                                                                    cloneInsnList(enterMonitorsInLockStateInsnList), 
                                                                     loadOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
                                                                     loadLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
                                                                     jumpTo(cp.getRestoreLabelNode())
@@ -514,6 +513,7 @@ public final class Instrumenter {
         //          }
         //          continuation.removeLastPending();
         //      #ENDIF
+        InsnList loadLockStateToStackInsnList = monitorInstrumentationLogic.getLoadLockStateToStackInsnList();
         Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements = new HashMap<>();
         continuationPoints.forEach((cp) -> {
             InsnList saveBeforeInvokeInsnList
@@ -528,9 +528,12 @@ public final class Instrumenter {
                                             loadIntConst(cp.getId()),
                                             loadVar(savedStackVar),
                                             loadVar(savedLocalsVar),
-                                            monitorInstrumentationLogic.getLoadLockStateToStackInsnList()))
+                                            cloneInsnList(loadLockStateToStackInsnList) // inserted many times, must be cloned
+                                    )
+                            )
                     );
 
+            InsnList exitMonitorsInLockStateInsnList = monitorInstrumentationLogic.getExitMonitorsInLockStateInsnList();
             InsnList insnList;
             if (cp.isSuspend()) {
                 // When Continuation.suspend() is called, it's a termination point. We want to ...
@@ -549,7 +552,7 @@ public final class Instrumenter {
                                 // debugPrint("setting mode to saving" + methodNode.name),
                                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_SAVING)),
                                 // debugPrint("exiting monitors" + methodNode.name),
-                                monitorInstrumentationLogic.getExitMonitorsInLockStateInsnList(),
+                                cloneInsnList(exitMonitorsInLockStateInsnList), // used several times, must be cloned
                                 // debugPrint("returning dummy value" + methodNode.name),
                                 returnDummy(returnType), // return dummy value
                                 addLabel(cp.getRestoreLabelNode()), // addIndividual restore point for when in loading mode
@@ -586,7 +589,7 @@ public final class Instrumenter {
                                         loadIntConst(MODE_SAVING),
                                         merge(
                                                 // debugPrint("exiting monitors" + methodNode.name),
-                                                monitorInstrumentationLogic.getExitMonitorsInLockStateInsnList(),
+                                                cloneInsnList(exitMonitorsInLockStateInsnList), // inserted many times, must be cloned
                                                 // debugPrint("returning dummy value" + methodNode.name),
                                                 returnDummy(returnType)
                                         )
@@ -602,8 +605,7 @@ public final class Instrumenter {
         });
         
         // We don't want labels to continuationPoints to be remapped when FlowInstrumentationLogic returns them
-        Set<LabelNode> globalLabelNodes = continuationPoints.stream().map(x -> x.getRestoreLabelNode()).collect(Collectors.toSet());
-        return new FlowInstrumentationLogic(entryPointInsnList, invokeInsnNodeReplacements, globalLabelNodes);
+        return new FlowInstrumentationLogic(entryPointInsnList, invokeInsnNodeReplacements);
     }
     
     private void applyInstrumentationLogic(MethodNode methodNode,
