@@ -78,9 +78,9 @@ You'll also need to include the "user" module's JAR in your classpath as a part 
 
 ### Writing a coroutine
 
-The entry-point for your coroutine should always implement the **Coroutine** interface.
+The entry-point for your coroutine should always implement the *Coroutine* interface.
 
-Call **CoroutineRunner.execute()** to start or resume execution of your coroutine. Call **Continuation.suspend()** when you want your coroutine to suspend it's execution. Any method that takes in a **Continuation** type as a parameter will be instrumented by the plugin to work as a coroutine. 
+Call *CoroutineRunner.execute()* to start or resume execution of your coroutine. Call *Continuation.suspend* when you want your coroutine to suspend it's execution. Any method that takes in a *Continuation* type as a parameter will be instrumented by the plugin to work as a coroutine. 
 
 It's as simple as that.
 
