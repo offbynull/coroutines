@@ -84,6 +84,8 @@ Call *CoroutineRunner.execute()* to start or resume execution of your coroutine.
 
 It's as simple as that.
 
+**IMPORTANT**: Although your code can target any version of Java down to version 1.4, the Ant and Maven plugins that instrument your code will require Java8 to run.
+
 #### A quick example
 
 First, declare your coroutine...
