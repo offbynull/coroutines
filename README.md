@@ -131,7 +131,7 @@ started
 
 1. Although your code can target any version of Java down to version 1.4, the Ant and Maven plugins that instrument your code will require Java8 to run.
 1. Only use the *Continuation* object supplied via method argument. Never set this object as a field or otherwise pass it to methods that aren't intended to run as part of a coroutine.
-1. The only methods on *Continuations* that you should be calling are *suspend()*, *getContext()*, and *setContext()*. All other methods are for internal use only.
+1. The only methods on *Continuation* that you should be calling are *suspend()*, *getContext()*, and *setContext()*. All other methods are for internal use only.
 
 
 ##Footnotes
