@@ -14,7 +14,17 @@
     <description>Coroutines build configuration (e.g. checkstyle config, PMD config, etc..).</description>
     <url>https://github.com/offbynull/coroutines</url>
     
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build> 
+        </profile>
+    </profiles>
 </project>
