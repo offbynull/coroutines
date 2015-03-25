@@ -56,7 +56,7 @@ Then, add the Maven plugin so that your classes get instrumented when you build.
 
 In your build script...
 
-First, define the Ant Task.
+First, define the Ant Task. You can download it from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/ant-plugin/1.0.0/ant-plugin-1.0.0-shaded.jar).
 ```xml
 <taskdef name="InstrumentTask" classname="com.offbynull.coroutines.anttask.InstrumentTask">
     <classpath>
