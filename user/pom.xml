@@ -8,6 +8,11 @@
     </parent>
     <artifactId>user</artifactId>
     <packaging>jar</packaging>
+    
+    <name>${project.groupId}:${project.artifactId}</name>
+    <description>Coroutines user-level library.</description>
+    <url>https://github.com/offbynull/coroutines</url>
+    
     <build>
         <plugins>
             <plugin>

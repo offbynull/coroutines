@@ -8,6 +8,11 @@
     </parent>
     <artifactId>maven-plugin</artifactId>
     <packaging>maven-plugin</packaging>
+    
+    <name>${project.groupId}:${project.artifactId}</name>
+    <description>Coroutines Maven plugin.</description>
+    <url>https://github.com/offbynull/coroutines</url>
+    
     <dependencies>
         <dependency>
             <groupId>org.apache.maven</groupId>

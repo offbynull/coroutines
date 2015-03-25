@@ -8,6 +8,11 @@
     </parent>
     <artifactId>instrumenter</artifactId>
     <packaging>jar</packaging>
+    
+    <name>${project.groupId}:${project.artifactId}</name>
+    <description>Coroutines instrumentation library.</description>
+    <url>https://github.com/offbynull/coroutines</url>
+    
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
