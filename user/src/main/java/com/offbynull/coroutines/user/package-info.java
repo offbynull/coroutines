@@ -18,7 +18,7 @@
 /**
  * User-level classes for coroutines. The entry-point of your coroutine should be a class that implements
  * {@link com.offbynull.coroutines.user.Coroutine}. To run your coroutine, use {@link com.offbynull.coroutines.user.CoroutineRunner}.
- * <p/>
+ * <p>
  * A simple example of a coroutine:
  * <pre>
  * import com.offbynull.coroutines.user.Continuation;
@@ -28,7 +28,7 @@
  * 
  *     public void run(Continuation c) {
  *         System.out.println("started");
- *         for (int i = 0; i < 10; i++) {
+ *         for (int i = 0; i &lt; 10; i++) {
  *             echo(c, i);
  *         }
  *     }

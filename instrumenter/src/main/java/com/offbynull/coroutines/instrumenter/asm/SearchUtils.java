@@ -178,7 +178,7 @@ public final class SearchUtils {
      * @param opcodes opcodes to search for
      * @return list of instructions that contain the opcodes being searched for
      * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if {@coed opcodes} is empty
+     * @throws IllegalArgumentException if {@code opcodes} is empty
      */
     public static List<AbstractInsnNode> searchForOpcodes(InsnList insnList, int ... opcodes) {
         Validate.notNull(insnList);

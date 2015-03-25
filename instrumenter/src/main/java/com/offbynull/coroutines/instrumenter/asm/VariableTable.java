@@ -72,7 +72,7 @@ public final class VariableTable {
      * local variables table. If it isn't static, they start at 1 (0th would be "this").
      * <p>
      * Values returned by this method must never be passed in to
-     * {@link #releaseExtra(com.offbynull.coroutines.instrumenter.VariableTable.Variable) }.
+     * {@link #releaseExtra(com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable) }.
      * @param index index of argument
      * @return {@link Variable} object that represents the argument
      * @throws IllegalArgumentException if {@code index} is not the index of an argument
