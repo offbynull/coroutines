@@ -1,8 +1,8 @@
 # Coroutines
 
-Inspired by the [Apache Commons Javaflow](http://commons.apache.org/sandbox/commons-javaflow/) project, the Coroutines project is a Java toolkit that allows you to write coroutines in Java. Coroutines allow you to suspend the execution your Java method at will, save its state, and resume executing it from that saved state at a later point in time.
+Inspired by the [Apache Commons Javaflow](http://commons.apache.org/sandbox/commons-javaflow/) project, the Coroutines project is a Java toolkit that allows you to write coroutines in Java. Coroutines allows you to suspend the execution your Java method at will, save its state, and resume executing it from that saved state at a later point in time.
 
-Why not just use Javaflow? Unfortunately, Javaflow seems to be largely unmaintained at this point. The Couroutines project is a new Java coroutines implementation written from scratch that aims to solve some of the issues that Javaflow has. The Coroutines project provides several distinct advantages:
+Why use Coroutines over Javaflow? The Couroutines project is a new Java coroutines implementation written from scratch that aims to solve some of the issues that Javaflow has. The Coroutines project provides several distinct advantages:
 
 * Roughly 25% to 50% faster than Javaflow <sub>1</sub>
 * Provides both a Maven plugin and an Ant plugin <sub>2</sub>
@@ -10,27 +10,24 @@ Why not just use Javaflow? Unfortunately, Javaflow seems to be largely unmaintai
 * Proper support for synchronized blocks <sub>4</sub>
 * Modular project structure and the code is readable, tested, and well commented <sub>5</sub>
 
+In addition, Javaflow appears to be largely unmaintained at present.
+
 More information on the topic of coroutines and their advantages can be found on the following pages:
 
 * [Wikipedia: Coroutine](http://en.wikipedia.org/wiki/Coroutine)
 * [Stackoverflow: Difference between a "coroutine" and a "thread"?](http://stackoverflow.com/a/23436125)
 
-## Getting Started
+## Example
 
-### Setting up your environment
+### Setup
 
-Setting up your environment should be fairly simple. The Coroutines project provides both a Maven plugin and an Ant plugin. Gradle users can make use of the Ant plugin through Gradle's Ant interface.
+The project relies on bytecode instrumentation to make your coroutines work. Both Maven and Ant plugins are provided to instrument your code. Although your code can target any version of Java from Java 1.4 to Java 8, the Ant and Maven plugins that instrument your code will require Java 8 to run.
 
-You'll need to set up your environment such that
+**Maven Instructions**
 
-1. your code makes use of the "user" module 
-1. your build system calls the instrumenter on your classes when you compile
+In your POM...
 
-#### Running Maven as your build system?
-
-If you're using Maven, setting up should be fairly straight forward.
-
-First, add a dependency to the "user" module.
+First, add the "user" module as a dependency.
 ```xml
 <dependency>
     <groupId>com.offbynull.coroutines</groupId>
@@ -39,7 +36,7 @@ First, add a dependency to the "user" module.
 </dependency>
 ```
 
-Then, add the plugin so that your classes get instrumented when you build.
+Then, add the Maven plugin so that your classes get instrumented when you build.
 ```xml
 <plugin>
     <groupId>com.offbynull.coroutines</groupId>
@@ -55,8 +52,9 @@ Then, add the plugin so that your classes get instrumented when you build.
 </plugin>
 ```
 
-#### Running Ant as your build system?
+**Ant Instructions**
 
+In your build script...
 
 First, define the Ant Task.
 ```xml
@@ -74,17 +72,10 @@ Then, bind it to the target of your choice.
     <InstrumentTask classpath="" sourceDirectory="build" targetDirectory="build"/>
 </target>
 ```
+
 You'll also need to include the "user" module's JAR in your classpath as a part of your build.
 
-### Writing a coroutine
-
-The entry-point for your coroutine must implement the *Coroutine* interface.
-
-Call *CoroutineRunner.execute()* to start or resume execution of your coroutine. Call *Continuation.suspend()* when you want your coroutine to suspend it's execution. Any method that takes in a *Continuation* type as a parameter will be instrumented by the plugin to work as part of a coroutine. 
-
-It's as simple as that.
-
-#### A quick example
+### Code
 
 First, declare your coroutine...
 ```java
@@ -104,8 +95,6 @@ public static final class MyCoroutine implements Coroutine {
 }
 ```
 
-
-
 Then, execute your coroutine...
 ```java
 CoroutineRunner r = new CoroutineRunner(new MyCoroutine());
@@ -114,8 +103,6 @@ r.execute();
 r.execute();
 r.execute();
 ```
-
-
 
 This is what your output should look like...
 ```
@@ -127,11 +114,18 @@ started
 ```
 
 
-#### Important things to be aware of
+### Explanation
 
-1. Although your code can target any version of Java down to version 1.4, the Ant and Maven plugins that instrument your code will require Java8 to run.
-1. Only use the *Continuation* object supplied via method argument. Never set this object as a field or otherwise pass it to methods that aren't intended to run as part of a coroutine.
-1. The only methods on *Continuation* that you should be calling are *suspend()*, *getContext()*, and *setContext()*. All other methods are for internal use only.
+The entry-point for your coroutine must implement the *Coroutine* interface.
+
+* *CoroutineRunner.execute()* starts or resumes execution of your coroutine.
+* *Continuation.suspend()* suspends the execution of your coroutine.
+* Any method that takes in a *Continuation* type as a parameter will be instrumented by the plugin to work as part of a coroutine. 
+
+Aside from that, some important things to be aware of:
+
+* The *Continuation* object is not meant to be retained. Never set it to a field or otherwise pass it to methods that aren't intended to run as part of a coroutine.
+* The only methods on *Continuation* that you should be calling are *suspend()*, *getContext()*, and *setContext()*. All other methods are for internal use only.
 
 
 ##Footnotes
