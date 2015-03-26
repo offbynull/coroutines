@@ -62,4 +62,21 @@ public final class CoroutineRunner {
             return true;
         }
     }
+
+    /**
+     * Get the context. Accessible via the {@link Continuation} object that gets used by this coroutine.
+     * @return context context
+     */
+    public Object getContext() {
+        return continuation.getContext();
+    }
+
+    /**
+     * Set the context. Accessible via the {@link Continuation} object that gets used by this coroutine.
+     * @param context context
+     */
+    public void setContext(Object context) {
+        continuation.setContext(context);
+    }
+    
 }
