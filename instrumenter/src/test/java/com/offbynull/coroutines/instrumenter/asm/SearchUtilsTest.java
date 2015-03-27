@@ -93,7 +93,7 @@ public final class SearchUtilsTest {
     public void mustFindCallToPrintlnThroughMethodMatching() {
         MethodNode methodNode = findMethodsWithName(classNode.methods, "syncTest").get(0);
         List<AbstractInsnNode> insns = findInvocationsOf(methodNode.instructions,
-                Type.getType(MethodUtils.getAccessibleMethod(PrintStream.class, "println", String.class)));
+                MethodUtils.getAccessibleMethod(PrintStream.class, "println", String.class));
         
         assertEquals(1, insns.size());
         assertEquals("println", ((MethodInsnNode) insns.get(0)).name);

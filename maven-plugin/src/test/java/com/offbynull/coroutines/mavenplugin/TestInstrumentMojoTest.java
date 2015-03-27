@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.file.Files;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,15 +22,15 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-public final class InstrumentMojoTest {
+public final class TestInstrumentMojoTest {
     
     private MavenProject mavenProject;
     
-    private InstrumentMojo fixture;
+    private TestInstrumentMojo fixture;
     
     @Before
     public void setUp() throws Exception {
-        fixture = new InstrumentMojo();
+        fixture = new TestInstrumentMojo();
         
         mavenProject = Mockito.mock(MavenProject.class);
         Log log = Mockito.mock(Log.class);
@@ -45,39 +44,28 @@ public final class InstrumentMojoTest {
     public void mustInstrumentClasses() throws Exception {
         byte[] classContent = readZipFromResource("NormalInvokeTest.zip").get("NormalInvokeTest.class");
         
-        File mainDir = null;
         File testDir = null;
         try {
             // write out
-            mainDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
             testDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
-            File mainClass = new File(mainDir, "NormalInvokeTest.class");
-            File testClass = new File(mainDir, "NormalInvokeTest.class");
-            FileUtils.writeByteArrayToFile(mainClass, classContent);
+            File testClass = new File(testDir, "NormalInvokeTest.class");
             FileUtils.writeByteArrayToFile(testClass, classContent);
             
             // mock
             Mockito.when(mavenProject.getCompileClasspathElements()).thenReturn(Collections.emptyList());
             Build build = Mockito.mock(Build.class);
             Mockito.when(mavenProject.getBuild()).thenReturn(build);
-            Mockito.when(build.getOutputDirectory()).thenReturn(mainDir.getAbsolutePath());
             Mockito.when(build.getTestOutputDirectory()).thenReturn(testDir.getAbsolutePath());
             
             // execute plugin
             fixture.execute();
             
             // read back in
-            byte[] modifiedMainClassContent = FileUtils.readFileToByteArray(mainClass);
             byte[] modifiedTestClassContent = FileUtils.readFileToByteArray(testClass);
             
             // test
-            Assert.assertTrue(modifiedMainClassContent.length > classContent.length);
             Assert.assertTrue(modifiedTestClassContent.length > classContent.length);
         } finally {
-            if (mainDir != null) {
-                FileUtils.deleteDirectory(mainDir);
-            }
-            
             if (testDir != null) {
                 FileUtils.deleteDirectory(testDir);
             }

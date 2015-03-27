@@ -16,6 +16,7 @@
  */
 package com.offbynull.coroutines.instrumenter.asm;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -70,34 +71,38 @@ public final class SearchUtils {
     /**
      * Find invocations of a certain method.
      * @param insnList instruction list to search through
-     * @param expectedMethodType type of method being invoked
+     * @param expectedMethod type of method being invoked
      * @return list of invocations (may be nodes of type {@link MethodInsnNode} or {@link InvokeDynamicInsnNode})
      * @throws NullPointerException if any argument is {@code null}
      * @throws NullPointerException if {@code expectedMethodType} isn't of sort {@link Type#METHOD}
      */
-    public static List<AbstractInsnNode> findInvocationsOf(InsnList insnList, Type expectedMethodType) {
+    public static List<AbstractInsnNode> findInvocationsOf(InsnList insnList, Method expectedMethod) {
         Validate.notNull(insnList);
-        Validate.notNull(expectedMethodType);
-        Validate.isTrue(expectedMethodType.getSort() == Type.METHOD);
+        Validate.notNull(expectedMethod);
 
         List<AbstractInsnNode> ret = new ArrayList<>();
+        
+        Type expectedMethodDesc = Type.getType(expectedMethod);
+        Type expectedMethodOwner = Type.getType(expectedMethod.getDeclaringClass());
+        String expectedMethodName = expectedMethod.getName();
         
         Iterator<AbstractInsnNode> it = insnList.iterator();
         while (it.hasNext()) {
             AbstractInsnNode instructionNode = it.next();
             
-            Type methodType;
+            Type methodDesc;
+            Type methodOwner;
+            String methodName;
             if (instructionNode instanceof MethodInsnNode) {
                 MethodInsnNode methodInsnNode = (MethodInsnNode) instructionNode;
-                methodType = Type.getType(methodInsnNode.desc);
-            } else if (instructionNode instanceof InvokeDynamicInsnNode) {
-                InvokeDynamicInsnNode invokeDynamicInsnNode = (InvokeDynamicInsnNode) instructionNode;
-                methodType = Type.getType(invokeDynamicInsnNode.desc);
+                methodDesc = Type.getType(methodInsnNode.desc);
+                methodOwner = Type.getObjectType(methodInsnNode.owner);
+                methodName = expectedMethod.getName();
             } else {
                 continue;
             }
 
-            if (methodType.equals(expectedMethodType)) {
+            if (methodDesc.equals(expectedMethodDesc) && methodOwner.equals(expectedMethodOwner) && methodName.equals(expectedMethodName)) {
                 ret.add(instructionNode);
             }
         }

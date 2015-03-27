@@ -27,19 +27,22 @@ import org.apache.commons.lang3.Validate;
 public final class ClassInformation {
     private final String superClassName;
     private final List<String> interfaces;
+    private final boolean interfaceMarker;
 
     /**
      * Construct a {@link ClassInformation} object.
      * @param superClassName name of parent class (can be {@code null})
      * @param interfaces interface names
+     * @param interfaceMarker {@code true} if class is an interface, {@code false} otherwise
      * @throws NullPointerException if {@code interfaces} is {@code null} or contains {@code null}
      */
-    public ClassInformation(String superClassName, List<String> interfaces) {
+    public ClassInformation(String superClassName, List<String> interfaces, boolean interfaceMarker) {
         Validate.notNull(interfaces);
         Validate.noNullElements(interfaces);
         
         this.superClassName = superClassName;
         this.interfaces = new ArrayList<>(interfaces);
+        this.interfaceMarker = interfaceMarker;
     }
 
     /**
@@ -56,6 +59,14 @@ public final class ClassInformation {
      */
     public List<String> getInterfaces() {
         return new ArrayList<>(interfaces);
+    }
+
+    /**
+     * Whether or not this class is an interface.
+     * @return {@code true} if this class is an interface, {@code false} otherwise
+     */
+    public boolean isInterface() {
+        return interfaceMarker;
     }
     
 }

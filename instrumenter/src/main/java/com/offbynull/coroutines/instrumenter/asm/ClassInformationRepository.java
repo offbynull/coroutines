@@ -30,6 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
 
 /**
  * Scans JARs and folders to grab information about the classes contained within. Used by {@link SimpleClassWriter} to avoid the default
@@ -162,8 +163,9 @@ public final class ClassInformationRepository {
         
         String superName = classReader.getSuperName();
         String[] interfaces = classReader.getInterfaces();
+        boolean interfaceMarker = (classReader.getAccess() & Opcodes.ACC_INTERFACE) != 0;
 
-        hierarchyMap.put(name, new ClassInformation(superName, Arrays.asList(interfaces)));
+        hierarchyMap.put(name, new ClassInformation(superName, Arrays.asList(interfaces), interfaceMarker));
     }
     
 }

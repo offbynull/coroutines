@@ -49,6 +49,7 @@ import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findInvocati
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithParameter;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.searchForOpcodes;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
+import com.offbynull.coroutines.instrumenter.asm.SimpleVerifier;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import com.offbynull.coroutines.user.Continuation;
 import static com.offbynull.coroutines.user.Continuation.MODE_NORMAL;
@@ -83,7 +84,6 @@ import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
-import org.objectweb.asm.tree.analysis.SimpleVerifier;
 
 /**
  * Instruments methods in Java classes that are intended to be run as coroutines. Tested with Java 1.2 and Java 8, so hopefully thing should
@@ -94,8 +94,8 @@ public final class Instrumenter {
 
     private static final Type INSTRUMENTED_CLASS_TYPE = Type.getType(Instrumented.class);
     private static final Type CONTINUATION_CLASS_TYPE = Type.getType(Continuation.class);
-    private static final Type CONTINUATION_SUSPEND_METHOD_TYPE
-            = Type.getType(MethodUtils.getAccessibleMethod(Continuation.class, "suspend"));
+    private static final Method CONTINUATION_SUSPEND_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "suspend");
     private static final Method CONTINUATION_GETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
     private static final Method CONTINUATION_SETMODE_METHOD
@@ -186,7 +186,12 @@ public final class Instrumenter {
                     "JSR instructions not allowed");
             
             // Analyze method
-            Frame<BasicValue>[] frames = analyzeFrames(classNode.name, methodNode);
+            Frame<BasicValue>[] frames;
+            try {
+                frames = new Analyzer<>(new SimpleVerifier(classRepo)).analyze(classNode.name, methodNode);
+            } catch (AnalyzerException ae) {
+                throw new IllegalArgumentException("Analyzer failed to analyze method", ae);
+            }
             
             // Manage arguments and additional local variables that we need for instrumentation
             int contArgIdx = getLocalVariableIndexOfContinuationParameter(methodNode);
@@ -373,7 +378,7 @@ public final class Instrumenter {
         
         // Find invocations of continuation points
         List<AbstractInsnNode> suspendInvocationInsnNodes
-                = findInvocationsOf(methodNode.instructions, CONTINUATION_SUSPEND_METHOD_TYPE);
+                = findInvocationsOf(methodNode.instructions, CONTINUATION_SUSPEND_METHOD);
         List<AbstractInsnNode> saveInvocationInsnNodes
                 = findInvocationsWithParameter(methodNode.instructions, CONTINUATION_CLASS_TYPE);
 
@@ -634,14 +639,6 @@ public final class Instrumenter {
             
             methodNode.instructions.insertBefore(nodeToReplace, insnsToReplaceWith);
             methodNode.instructions.remove(nodeToReplace);
-        }
-    }
-
-    private Frame[] analyzeFrames(String className, MethodNode methodNode) {
-        try {
-            return new Analyzer<>(new SimpleVerifier()).analyze(className, methodNode);
-        } catch (AnalyzerException ae) {
-            throw new IllegalArgumentException("Analyzer failed to analyze method", ae);
         }
     }
 

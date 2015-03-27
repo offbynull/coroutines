@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -42,6 +43,8 @@ public final class InstrumenterTest {
     private static final String JSR_EXCEPTION_SUSPEND_TEST = "JsrExceptionSuspendTest";
     private static final String EXCEPTION_THROW_TEST = "ExceptionThrowTest";
     private static final String MONITOR_INVOKE_TEST = "MonitorInvokeTest";
+    private static final String UNINITIALIZED_VARIABLE_INVOKE_TEST = "UninitializedVariableInvokeTest";
+    private static final String PEERNETIC_FAILURE_TEST = "PeerneticFailureTest";
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
@@ -60,7 +63,38 @@ public final class InstrumenterTest {
     public void mustProperlySuspendWithInterfaceMethods() throws Exception {
         performCountTest(INTERFACE_INVOKE_TEST);
     }
+    
+    @Test
+    public void mustProperlySuspendWithUninitializedLocalVariables() throws Exception {
+        StringBuilder builder = new StringBuilder();
 
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(UNINITIALIZED_VARIABLE_INVOKE_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(UNINITIALIZED_VARIABLE_INVOKE_TEST);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+        }
+    }
+
+    @Test
+    public void mustNotFailWithVerifierErrorWhenRunningAsPerOfAnActor() throws Exception {
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(PEERNETIC_FAILURE_TEST + ".zip")) {
+            Class<?> cls = classLoader.loadClass(PEERNETIC_FAILURE_TEST);
+            MethodUtils.invokeStaticMethod(cls, "main", new Object[] { new String[0] });
+        }
+    }
+    
     @Test
     public void mustRejectLambdas() throws Exception {
         thrown.expect(IllegalArgumentException.class);
@@ -229,9 +263,7 @@ public final class InstrumenterTest {
             Assert.assertEquals(Arrays.asList(), tracker);
             Assert.assertArrayEquals(new Object[] { }, continuation.getSaved(0).getLockState().toArray());
             
-            Assert.assertFalse(runner.execute()); // coroutine finished executing here
-
-            
+            Assert.assertFalse(runner.execute()); // coroutine finished executing here            
         }
     }
 }

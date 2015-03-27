@@ -32,7 +32,7 @@ First, add the "user" module as a dependency.
 <dependency>
     <groupId>com.offbynull.coroutines</groupId>
     <artifactId>user</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
@@ -41,11 +41,12 @@ Then, add the Maven plugin so that your classes get instrumented when you build.
 <plugin>
     <groupId>com.offbynull.coroutines</groupId>
     <artifactId>maven-plugin</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <executions>
         <execution>
             <goals>
                 <goal>instrument</goal>
+                <goal>test-instrument</goal>
             </goals>
         </execution>
     </executions>
@@ -56,11 +57,11 @@ Then, add the Maven plugin so that your classes get instrumented when you build.
 
 In your build script...
 
-First, define the Ant Task. It's available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/ant-plugin/1.0.0/ant-plugin-1.0.0-shaded.jar).
+First, define the Ant Task. It's available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/ant-plugin/1.0.1/ant-plugin-1.0.1-shaded.jar).
 ```xml
 <taskdef name="InstrumentTask" classname="com.offbynull.coroutines.anttask.InstrumentTask">
     <classpath>
-        <pathelement location="ant-task-1.0.0-shaded.jar"/>
+        <pathelement location="ant-task-1.0.1-shaded.jar"/>
     </classpath>
 </taskdef>
 ```
@@ -73,7 +74,7 @@ Then, bind it to the target of your choice.
 </target>
 ```
 
-You'll also need to include the "user" module's JAR in your classpath as a part of your build. It's also available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/user/1.0.0/user-1.0.0.jar).
+You'll also need to include the "user" module's JAR in your classpath as a part of your build. It's also available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/user/1.0.1/user-1.0.1.jar).
 
 ### Code
 
