@@ -4,11 +4,11 @@ Inspired by the [Apache Commons Javaflow](http://commons.apache.org/sandbox/comm
 
 Why use Coroutines over Javaflow? The Couroutines project is a new Java coroutines implementation written from scratch that aims to solve some of the issues that Javaflow has. The Coroutines project provides several distinct advantages:
 
-* Roughly 25% to 50% faster than Javaflow <sub>1</sub>
-* Provides both a Maven plugin and an Ant plugin <sub>2</sub>
-* Proper support for Java 8 bytecode <sub>3</sub>
-* Proper support for synchronized blocks <sub>4</sub>
-* Modular project structure and the code is readable, tested, and well commented <sub>5</sub>
+* Roughly 25% to 50% faster than Javaflow <sub>[1]</sub>
+* Provides both a Maven plugin and an Ant plugin <sub>[2]</sub>
+* Proper support for Java 8 bytecode <sub>[3]</sub>
+* Proper support for synchronized blocks <sub>[4]</sub>
+* Modular project structure and the code is readable, tested, and well commented <sub>[5]</sub>
 
 In addition, Javaflow appears to be largely unmaintained at present.
 
@@ -129,8 +129,29 @@ Aside from that, some important things to be aware of:
 * The only methods on *Continuation* that you should be calling are *suspend()*, *getContext()*, and *setContext()*. All other methods are for internal use only.
 
 
+## FAQ
+
+#### How much overhead am I adding?
+
+It depends. Instrumentation adds loading and saving code to each method that's intended to run as part of a coroutine, so your class files will become larger and that extra code will take time to execute. I personally haven't noticed any drastic slowdowns in my own projects, but be aware that highly recursive coroutines / heavy call depths may end up consuming a lot of resources thereby causing noticeable performance loss.
+
+#### Can I use this with an IDE?
+
+If your IDE delegates to Maven or Ant, you can use this with an IDE. In some cases, your IDE may try to optimize by prematurely compiling classes internally, skipping any instrumentation that should be taking place as a part of your build. You'll have to turn this feature off.
+
+For example, if you're using Maven through Netbeans, you must turn off the "Compile On Save" feature that's enabled by default. Otherwise, as soon as you make a change to your coroutine and save, Netbeans will compile your Java file without instrumentation. IntelliJ and Eclipse probably have similar options available. Unfortunately I don't have much experience with those IDEs (... if someone does please let me know and I'll update this section).
+
+#### Can I serialize/deserialize my Coroutine?
+
+Technically possible, but highly not recommended. Why? The issue is that you don't really know what's on the operand stack/local variables table.
+
+1. If you're doing any kind of IO at any point at all in your Coroutine (writing to System.out, a file, a socket, etc..), it'll likely either fail to serialize properly or deserialize to an inconsistent state.
+1. If you recompile your class using a different version of the JDK than the one you originally used (even without any code changes), the instructions that make up the method may change, and you'll likely fail to continue execution after you deserialize.
+
+There are likely other reasons as well.
+
 ##Footnotes
-1. Javaflow has a reliance on thread local storage and other threading constructs. The Coroutines project avoids anything to do with threads.
+1. Javaflow has a reliance on thread local storage and other threading constructs. The Coroutines project avoids anything to do with threads. A quick benchmark performing 10,000,000 iterations of Javaflow's echo sample vs this project's echo example (System.out's removed in both) resulted in Javaflow executing in 46,518ms while Coroutines executed in 19,141ms. Setup used for this benchmark was a Intel i7 960 CPU with 12GB of RAM running Windows 7 and Java 8.
 2. Javaflow only provides an Ant plugin.
 3. Javaflow has [issues](https://issues.apache.org/jira/browse/SANDBOX-476?page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel&focusedCommentId=14133339#comment-14133339) dealing with stackmap frames due to it's reliance on ASM's default behaviour for deriving common superclasses. The Coroutines project works around this behaviour by implementing custom logic.
 4. Javaflow attempts to use static analysis to determine which monitors need to be exitted and reentered, which may not be valid in certain cases (e.g. if your class file was built with a JVM language other than Java). The Coroutines project keeps track of monitors at runtime.
