@@ -21,7 +21,7 @@ More information on the topic of coroutines and their advantages can be found on
 
 ### Setup
 
-The project relies on bytecode instrumentation to make your coroutines work. Both Maven and Ant plugins are provided to instrument your code. Although your code can target any version of Java from Java 1.4 to Java 8, the Ant and Maven plugins that instrument your code will require Java 8 to run.
+The Coroutines project relies on bytecode instrumentation to make your coroutines work. Both Maven and Ant plugins are provided to instrument your code. Although your code can target any version of Java from Java 1.4 to Java 8, the Ant and Maven plugins that instrument your code will require Java 8 to run.
 
 **Maven Instructions**
 
@@ -135,6 +135,136 @@ Aside from that, some important things to be aware of:
 
 It depends. Instrumentation adds loading and saving code to each method that's intended to run as part of a coroutine, so your class files will become larger and that extra code will take time to execute. I personally haven't noticed any drastic slowdowns in my own projects, but be aware that highly recursive coroutines / heavy call depths may end up consuming a lot of resources thereby causing noticeable performance loss.
 
+#### What restrictions are there?
+
+1. Your coroutine won't get properly instrumented if you any part of your invocation chain is done through Java's reflection API. The example below uses Java's reflection API to invoke echo. The instrumentation logic isn't able to recognize that reflections are being used to call echo and as such it will not instrument around the call to load and save the execution state  of the method.
+
+```java
+public static final class MyCoroutine implements Coroutine {
+    @Override
+    public void run(Continuation c) {
+        System.out.println("started");
+        for (int i = 0; i < 10; i++) {
+            // THIS WILL NOT BE INSTRUMENTED PROPERLY
+            Method method = getClass().getDeclaredMethod(methodName);
+            method.setAccessible(true);
+            method.invoke(this, c, i);
+        }
+    }
+
+    private void echo(Continuation c, int x) {
+        System.out.println(x);
+        c.suspend();
+    }
+}
+```
+
+2. Instrumentation will fail if it detects that you're passing the Continuation object in to a lambda (or any INVOKEDYNAMIC instruction).
+
+tl;dr: If you make use of a Continuation object in a lambda, it's equivalent to converting that lambda to a class and setting the Continuation object as a field in that class. Remember that you must always pass in a Continuation object as an argument to a method that's explicitly expecting it -- that's now the instrumentation logic figures out where to add extra code to save and load the execution state.
+
+So ...
+
+```java
+    public void run(Continuation c) {
+        for (int i = 0; i < 10; i++) {
+            Consumer<Integer> consumer = (x) -> {
+                c.suspend();
+            }
+            consumer.accept(i);
+        }
+    }
+```
+
+would be equivalent to
+
+```java
+    public void run(Continuation c) {
+        for (int i = 0; i < 10; i++) {
+            Consumer<Integer> consumer = new CustomConsumer(c);
+            consumer.accept(i);
+        }
+    }
+    
+    private static final class CustomConsumer implements Consumer<Integer> {
+        private final Continuation c;
+        
+        public CustomConsumer(Continuation c) {
+            this.c = c;
+        }
+        
+        public void accept(Integer o) {
+            c.suspend();    // WILL NOT WORK FOR REASONS DESCRIBED ABOVE.
+        }
+    }
+```
+
+A more indepth explanation on why this happens can be found as a comment in the Instrumenter class:
+```java
+        // Why is invokedynamic not allowed? because apparently invokedynamic can map to anything... which means that we can't reliably
+        // determine if what is being called by invokedynamic is going to be a method we expect to be instrumented to handle Continuations.
+        //
+        // In Java8, this is the case for lambdas. Lambdas get translated to invokedynamic calls when they're created. Take the following
+        // Java code as an example...
+        //
+        // public void run(Continuation c) {
+        //     String temp = "hi";
+        //     builder.append("started\n");
+        //     for (int i = 0; i < 10; i++) {
+        //         Consumer<Integer> consumer = (x) -> {
+        //             temp.length(); // pulls in temp as an arg, which causes c (the Continuation object) to go in as a the second argument
+        //             builder.append(x).append('\n');
+        //             System.out.println("XXXXXXX");
+        //             c.suspend();
+        //         }
+        //         consumer.accept(i);
+        //     }
+        // }
+        //
+        // This for loop in the above code maps out to...
+        //    L5
+        //     LINENUMBER 18 L5
+        //     ALOAD 0: this
+        //     ALOAD 2: temp
+        //     ALOAD 1: c
+        //     INVOKEDYNAMIC accept(LambdaInvokeTest, String, Continuation) : Consumer [
+        //       // handle kind 0x6 : INVOKESTATIC
+        //       LambdaMetafactory.metafactory(MethodHandles$Lookup, String, MethodType, MethodType, MethodHandle, MethodType) : CallSite
+        //       // arguments:
+        //       (Object) : void, 
+        //       // handle kind 0x7 : INVOKESPECIAL
+        //       LambdaInvokeTest.lambda$0(String, Continuation, Integer) : void, 
+        //       (Integer) : void
+        //     ]
+        //     ASTORE 4
+        //    L6
+        //     LINENUMBER 24 L6
+        //     ALOAD 4: consumer
+        //     ILOAD 3: i
+        //     INVOKESTATIC Integer.valueOf (int) : Integer
+        //     INVOKEINTERFACE Consumer.accept (Object) : void
+        //    L7
+        //     LINENUMBER 17 L7
+        //     IINC 3: i 1
+        //    L4
+        //     ILOAD 3: i
+        //     BIPUSH 10
+        //     IF_ICMPLT L5
+        //
+        // Even though the invokedynamic instruction is calling a method called "accept", it doesn't actually call Consumer.accept().
+        // Instead it just creates the Consumer object that accept() is eventually called on. This means that it makes no sense to add
+        // instrumentation around invokedynamic because it isn't calling what we expected it to call. When accept() does eventually get
+        // called, it doesn't take in a Continuation object as a parameter so instrumentation won't be added in around it.
+        //
+        // There's no way to reliably instrument around the accept() method because we don't know if an accept() invocation will be to a
+        // Consumer that we've instrumented.
+        //
+        // The instrumenter identifies which methods to instrument and which method invocations to instrument by checking to see if they
+        // explicitly take in a Continuation as a parameter. Using lambdas like this is essentially like creating an implementation of
+        // Consumer as a class and setting the Continuation object as a field in that class. Cases like that cannot be reliably
+        // identified for instrumentation.
+```
+
 #### Can I use this with an IDE?
 
 If your IDE delegates to Maven or Ant, you can use this with an IDE. In some cases, your IDE may try to optimize by prematurely compiling classes internally, skipping any instrumentation that should be taking place as a part of your build. You'll have to turn this feature off.
@@ -150,8 +280,16 @@ Technically possible, but highly not recommended. Why? The issue is that you don
 
 There are likely other reasons as well.
 
-##Footnotes
-1. Javaflow has a reliance on thread local storage and other threading constructs. The Coroutines project avoids anything to do with threads. A quick benchmark performing 10,000,000 iterations of Javaflow's echo sample vs this project's echo example (System.out's removed in both) resulted in Javaflow executing in 46,518ms while Coroutines executed in 19,141ms. Setup used for this benchmark was a Intel i7 960 CPU with 12GB of RAM running Windows 7 and Java 8.
+#### Is there a Gradle plugin?
+
+A Gradle plugin is on the backburner. In the mean time, Gradle users can make use of the Ant plugin through [Gradle's Ant integration](http://gradle.org/docs/current/userguide/ant.html). The major issue here is that the Gradle plugin APIs aren't made available on Maven Central. From Maven's [Guide to uploading artifacts to the Central Repository](http://maven.apache.org/guides/mini/guide-central-repository-upload.html):
+
+>I have other repositories or pluginRepositories listed in my POM, is that a problem?
+>
+>At present, this won't preclude your project from being included, but we do strongly encourage making sure all your dependencies are included in Central. If you rely on sketchy repositories that have junk in them or disappear, it just creates havok for downstream users. Try to keep your dependencies among reliable repos like Central, Jboss, etc.
+
+## Footnotes
+1. Javaflow has a reliance on thread local storage and other threading constructs. The Coroutines project avoids anything to do with threads. A quick benchmark performing 10,000,000 iterations of Javaflow's echo sample vs this project's echo example (System.out's removed in both) resulted in Javaflow executing in 46,518ms while Coroutines executed in 19,141ms. Setup used for this benchmark was an Intel i7 960 CPU with 12GB of RAM running Windows 7 and Java 8.
 2. Javaflow only provides an Ant plugin.
 3. Javaflow has [issues](https://issues.apache.org/jira/browse/SANDBOX-476?page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel&focusedCommentId=14133339#comment-14133339) dealing with stackmap frames due to it's reliance on ASM's default behaviour for deriving common superclasses. The Coroutines project works around this behaviour by implementing custom logic.
 4. Javaflow attempts to use static analysis to determine which monitors need to be exitted and reentered, which may not be valid in certain cases (e.g. if your class file was built with a JVM language other than Java). The Coroutines project keeps track of monitors at runtime.
