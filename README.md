@@ -137,7 +137,7 @@ It depends. Instrumentation adds loading and saving code to each method that's i
 
 #### What restrictions are there?
 
-##### Java's Reflection API
+##### Reflection API
 
 Your coroutine won't get properly instrumented if you any part of your invocation chain is done through Java's reflection API. The example below uses Java's reflection API to invoke echo. The instrumentation logic isn't able to recognize that reflections are being used to call echo and as such it will not instrument around the call to load and save the execution state  of the method.
 
