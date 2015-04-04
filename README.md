@@ -137,7 +137,9 @@ It depends. Instrumentation adds loading and saving code to each method that's i
 
 #### What restrictions are there?
 
-* Your coroutine won't get properly instrumented if you any part of your invocation chain is done through Java's reflection API. The example below uses Java's reflection API to invoke echo. The instrumentation logic isn't able to recognize that reflections are being used to call echo and as such it will not instrument around the call to load and save the execution state  of the method.
+##### Java's Reflection API
+
+Your coroutine won't get properly instrumented if you any part of your invocation chain is done through Java's reflection API. The example below uses Java's reflection API to invoke echo. The instrumentation logic isn't able to recognize that reflections are being used to call echo and as such it will not instrument around the call to load and save the execution state  of the method.
 
 ```java
 public static final class MyCoroutine implements Coroutine {
@@ -159,7 +161,10 @@ public static final class MyCoroutine implements Coroutine {
 }
 ```
 
-* Instrumentation will fail if it detects that you're passing the Continuation object in to a lambda (or any INVOKEDYNAMIC instruction).
+
+##### Lambdas and INVOKEDYNAMIC
+
+Instrumentation will fail if it detects that you're passing the Continuation object in to a lambda (or any INVOKEDYNAMIC instruction).
 
 tl;dr: If you make use of a Continuation object in a lambda, it's equivalent to converting that lambda to a class and setting the Continuation object as a field in that class. Remember that you must always pass in a Continuation object as an argument to a method that's explicitly expecting it -- that's now the instrumentation logic figures out where to add extra code to save and load the execution state.
 
