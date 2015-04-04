@@ -200,70 +200,70 @@ would be equivalent to
 ```
 
 A more indepth explanation on why this happens can be found as a comment in the Instrumenter class:
-```java
-        // Why is invokedynamic not allowed? because apparently invokedynamic can map to anything... which means that we can't reliably
-        // determine if what is being called by invokedynamic is going to be a method we expect to be instrumented to handle Continuations.
-        //
-        // In Java8, this is the case for lambdas. Lambdas get translated to invokedynamic calls when they're created. Take the following
-        // Java code as an example...
-        //
-        // public void run(Continuation c) {
-        //     String temp = "hi";
-        //     builder.append("started\n");
-        //     for (int i = 0; i < 10; i++) {
-        //         Consumer<Integer> consumer = (x) -> {
-        //             temp.length(); // pulls in temp as an arg, which causes c (the Continuation object) to go in as a the second argument
-        //             builder.append(x).append('\n');
-        //             System.out.println("XXXXXXX");
-        //             c.suspend();
-        //         }
-        //         consumer.accept(i);
-        //     }
-        // }
-        //
-        // This for loop in the above code maps out to...
-        //    L5
-        //     LINENUMBER 18 L5
-        //     ALOAD 0: this
-        //     ALOAD 2: temp
-        //     ALOAD 1: c
-        //     INVOKEDYNAMIC accept(LambdaInvokeTest, String, Continuation) : Consumer [
-        //       // handle kind 0x6 : INVOKESTATIC
-        //       LambdaMetafactory.metafactory(MethodHandles$Lookup, String, MethodType, MethodType, MethodHandle, MethodType) : CallSite
-        //       // arguments:
-        //       (Object) : void, 
-        //       // handle kind 0x7 : INVOKESPECIAL
-        //       LambdaInvokeTest.lambda$0(String, Continuation, Integer) : void, 
-        //       (Integer) : void
-        //     ]
-        //     ASTORE 4
-        //    L6
-        //     LINENUMBER 24 L6
-        //     ALOAD 4: consumer
-        //     ILOAD 3: i
-        //     INVOKESTATIC Integer.valueOf (int) : Integer
-        //     INVOKEINTERFACE Consumer.accept (Object) : void
-        //    L7
-        //     LINENUMBER 17 L7
-        //     IINC 3: i 1
-        //    L4
-        //     ILOAD 3: i
-        //     BIPUSH 10
-        //     IF_ICMPLT L5
-        //
-        // Even though the invokedynamic instruction is calling a method called "accept", it doesn't actually call Consumer.accept().
-        // Instead it just creates the Consumer object that accept() is eventually called on. This means that it makes no sense to add
-        // instrumentation around invokedynamic because it isn't calling what we expected it to call. When accept() does eventually get
-        // called, it doesn't take in a Continuation object as a parameter so instrumentation won't be added in around it.
-        //
-        // There's no way to reliably instrument around the accept() method because we don't know if an accept() invocation will be to a
-        // Consumer that we've instrumented.
-        //
-        // The instrumenter identifies which methods to instrument and which method invocations to instrument by checking to see if they
-        // explicitly take in a Continuation as a parameter. Using lambdas like this is essentially like creating an implementation of
-        // Consumer as a class and setting the Continuation object as a field in that class. Cases like that cannot be reliably
-        // identified for instrumentation.
-```
+`
+Why is invokedynamic not allowed? because apparently invokedynamic can map to anything... which means that we can't reliably
+determine if what is being called by invokedynamic is going to be a method we expect to be instrumented to handle Continuations.
+
+In Java8, this is the case for lambdas. Lambdas get translated to invokedynamic calls when they're created. Take the following
+Java code as an example...
+
+public void run(Continuation c) {
+    String temp = "hi";
+    builder.append("started\n");
+    for (int i = 0; i < 10; i++) {
+        Consumer<Integer> consumer = (x) -> {
+            temp.length(); // pulls in temp as an arg, which causes c (the Continuation object) to go in as a the second argument
+            builder.append(x).append('\n');
+            System.out.println("XXXXXXX");
+            c.suspend();
+        }
+        consumer.accept(i);
+    }
+}
+
+This for loop in the above code maps out to...
+   L5
+    LINENUMBER 18 L5
+    ALOAD 0: this
+    ALOAD 2: temp
+    ALOAD 1: c
+    INVOKEDYNAMIC accept(LambdaInvokeTest, String, Continuation) : Consumer [
+      // handle kind 0x6 : INVOKESTATIC
+      LambdaMetafactory.metafactory(MethodHandles$Lookup, String, MethodType, MethodType, MethodHandle, MethodType) : CallSite
+      // arguments:
+      (Object) : void, 
+      // handle kind 0x7 : INVOKESPECIAL
+      LambdaInvokeTest.lambda$0(String, Continuation, Integer) : void, 
+      (Integer) : void
+    ]
+    ASTORE 4
+   L6
+    LINENUMBER 24 L6
+    ALOAD 4: consumer
+    ILOAD 3: i
+    INVOKESTATIC Integer.valueOf (int) : Integer
+    INVOKEINTERFACE Consumer.accept (Object) : void
+   L7
+    LINENUMBER 17 L7
+    IINC 3: i 1
+   L4
+    ILOAD 3: i
+    BIPUSH 10
+    IF_ICMPLT L5
+
+Even though the invokedynamic instruction is calling a method called "accept", it doesn't actually call Consumer.accept().
+Instead it just creates the Consumer object that accept() is eventually called on. This means that it makes no sense to add
+instrumentation around invokedynamic because it isn't calling what we expected it to call. When accept() does eventually get
+called, it doesn't take in a Continuation object as a parameter so instrumentation won't be added in around it.
+
+There's no way to reliably instrument around the accept() method because we don't know if an accept() invocation will be to a
+Consumer that we've instrumented.
+
+The instrumenter identifies which methods to instrument and which method invocations to instrument by checking to see if they
+explicitly take in a Continuation as a parameter. Using lambdas like this is essentially like creating an implementation of
+Consumer as a class and setting the Continuation object as a field in that class. Cases like that cannot be reliably
+identified for instrumentation.
+`
 
 #### Can I use this with an IDE?
 
