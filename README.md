@@ -289,6 +289,18 @@ A Gradle plugin is on the backburner. In the mean time, Gradle users can make us
 >
 >At present, this won't preclude your project from being included, but we do strongly encourage making sure all your dependencies are included in Central. If you rely on sketchy repositories that have junk in them or disappear, it just creates havok for downstream users. Try to keep your dependencies among reliable repos like Central, Jboss, etc.
 
+#### What alternatives are available?
+
+Alternatives to the Coroutines project include:
+
+* [Javaflow](http://commons.apache.org/sandbox/commons-javaflow/)
+* [Coroutines](https://code.google.com/p/coroutines/)
+* [Continuations Library](http://www.matthiasmann.de/content/view/24/26/)
+* [Kilim](https://github.com/kilim/kilim)
+
+If you know of any other projects please let me know and I'll update this section.
+
+
 ## Footnotes
 1. Javaflow has a reliance on thread local storage and other threading constructs. The Coroutines project avoids anything to do with threads. A quick benchmark performing 10,000,000 iterations of Javaflow's echo sample vs this project's echo example (System.out's removed in both) resulted in Javaflow executing in 46,518ms while Coroutines executed in 19,141ms. Setup used for this benchmark was an Intel i7 960 CPU with 12GB of RAM running Windows 7 and Java 8.
 2. Javaflow only provides an Ant plugin.
