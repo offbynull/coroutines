@@ -199,7 +199,7 @@ would be equivalent to
     }
 ```
 
-A more indepth explanation on why this happens can be found as a comment in the Instrumenter class:
+A more indepth explanation on why this happens is available in the code. Replicated here:
 ```
 Why is invokedynamic not allowed? because apparently invokedynamic can map to anything... which means that we can't reliably
 determine if what is being called by invokedynamic is going to be a method we expect to be instrumented to handle Continuations.
