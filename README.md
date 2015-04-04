@@ -200,7 +200,7 @@ would be equivalent to
 ```
 
 A more indepth explanation on why this happens can be found as a comment in the Instrumenter class:
-`
+```
 Why is invokedynamic not allowed? because apparently invokedynamic can map to anything... which means that we can't reliably
 determine if what is being called by invokedynamic is going to be a method we expect to be instrumented to handle Continuations.
 
@@ -263,7 +263,7 @@ The instrumenter identifies which methods to instrument and which method invocat
 explicitly take in a Continuation as a parameter. Using lambdas like this is essentially like creating an implementation of
 Consumer as a class and setting the Continuation object as a field in that class. Cases like that cannot be reliably
 identified for instrumentation.
-`
+```
 
 #### Can I use this with an IDE?
 
