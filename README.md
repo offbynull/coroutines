@@ -137,7 +137,7 @@ It depends. Instrumentation adds loading and saving code to each method that's i
 
 #### What restrictions are there?
 
-1. Your coroutine won't get properly instrumented if you any part of your invocation chain is done through Java's reflection API. The example below uses Java's reflection API to invoke echo. The instrumentation logic isn't able to recognize that reflections are being used to call echo and as such it will not instrument around the call to load and save the execution state  of the method.
+* Your coroutine won't get properly instrumented if you any part of your invocation chain is done through Java's reflection API. The example below uses Java's reflection API to invoke echo. The instrumentation logic isn't able to recognize that reflections are being used to call echo and as such it will not instrument around the call to load and save the execution state  of the method.
 
 ```java
 public static final class MyCoroutine implements Coroutine {
@@ -159,7 +159,7 @@ public static final class MyCoroutine implements Coroutine {
 }
 ```
 
-2. Instrumentation will fail if it detects that you're passing the Continuation object in to a lambda (or any INVOKEDYNAMIC instruction).
+* Instrumentation will fail if it detects that you're passing the Continuation object in to a lambda (or any INVOKEDYNAMIC instruction).
 
 tl;dr: If you make use of a Continuation object in a lambda, it's equivalent to converting that lambda to a class and setting the Continuation object as a field in that class. Remember that you must always pass in a Continuation object as an argument to a method that's explicitly expecting it -- that's now the instrumentation logic figures out where to add extra code to save and load the execution state.
 
@@ -277,6 +277,7 @@ Technically possible, but highly not recommended. Why? The issue is that you don
 
 1. If you're doing any kind of IO at any point at all in your Coroutine (writing to System.out, a file, a socket, etc..), it'll likely either fail to serialize properly or deserialize to an inconsistent state.
 1. If you recompile your class using a different version of the JDK than the one you originally used (even without any code changes), the instructions that make up the method may change, and you'll likely fail to continue execution after you deserialize.
+1. Static fields that are objects won't be handled properly if they've been put on the operand stack or the local variable table. Those objects will end up being serialized and re-created on deserialization, meaning that the object on the operand stack / local variable table will no longer refer to the object set on the static field.
 
 There are likely other reasons as well.
 
