@@ -305,6 +305,27 @@ Alternatives to the Coroutines project include:
 
 If you know of any other projects please let me know and I'll update this section.
 
+## Change Log
+<sub>Template adapted from http://keepachangelog.com/</sub>
+
+All notable changes to this project will be documented in this file.
+This project adheres to [Semantic Versioning](http://semver.org/).
+
+### [Unreleased][unreleased]
+
+### [1.0.2] - 2015-04-06
+#### Fixed
+- Maven plugin test-instrument goal would crash if test source folder did not exist.
+#### Changed
+- Increased test coverage.
+
+### [1.0.1] - 2015-03-26
+#### Fixed
+- Incorrectly identified any 0 parameter method as a call to suspend().
+
+### [1.0.0] - 2015-03-24
+#### Changed
+- Improve argument against commit logs.
 
 ## Footnotes
 1. Javaflow has a reliance on thread local storage and other threading constructs. The Coroutines project avoids anything to do with threads. A quick benchmark performing 10,000,000 iterations of Javaflow's echo sample vs this project's echo example (System.out's removed in both) resulted in Javaflow executing in 46,518ms while Coroutines executed in 19,141ms. Setup used for this benchmark was an Intel i7 960 CPU with 12GB of RAM running Windows 7 and Java 8.
