@@ -52,7 +52,7 @@ public final class TestInstrumentMojoTest {
             FileUtils.writeByteArrayToFile(testClass, classContent);
             
             // mock
-            Mockito.when(mavenProject.getCompileClasspathElements()).thenReturn(Collections.emptyList());
+            Mockito.when(mavenProject.getTestClasspathElements()).thenReturn(Collections.emptyList());
             Build build = Mockito.mock(Build.class);
             Mockito.when(mavenProject.getBuild()).thenReturn(build);
             Mockito.when(build.getTestOutputDirectory()).thenReturn(testDir.getAbsolutePath());
@@ -65,6 +65,29 @@ public final class TestInstrumentMojoTest {
             
             // test
             Assert.assertTrue(modifiedTestClassContent.length > classContent.length);
+        } finally {
+            if (testDir != null) {
+                FileUtils.deleteDirectory(testDir);
+            }
+        }
+    }
+    
+    @Test
+    public void mustNotThrowExceptionWhenDirectoryDoesntExist() throws Exception {
+        File testDir = null;
+        try {
+            // create a folder and delete it right away
+            testDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
+            File fakeFolder = new File(testDir, "DOESNOTEXIST");
+            
+            // mock
+            Mockito.when(mavenProject.getTestClasspathElements()).thenReturn(Collections.emptyList());
+            Build build = Mockito.mock(Build.class);
+            Mockito.when(mavenProject.getBuild()).thenReturn(build);
+            Mockito.when(build.getTestOutputDirectory()).thenReturn(fakeFolder.getAbsolutePath());
+            
+            // execute plugin
+            fixture.execute();
         } finally {
             if (testDir != null) {
                 FileUtils.deleteDirectory(testDir);

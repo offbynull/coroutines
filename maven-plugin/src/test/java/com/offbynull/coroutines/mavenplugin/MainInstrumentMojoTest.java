@@ -71,6 +71,29 @@ public final class MainInstrumentMojoTest {
             }
         }
     }
+
+    @Test
+    public void mustNotThrowExceptionWhenDirectoryDoesntExist() throws Exception {
+        File mainDir = null;
+        try {
+            // create a folder and delete it right away
+            mainDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
+            File fakeFolder = new File(mainDir, "DOESNOTEXIST");
+            
+            // mock
+            Mockito.when(mavenProject.getCompileClasspathElements()).thenReturn(Collections.emptyList());
+            Build build = Mockito.mock(Build.class);
+            Mockito.when(mavenProject.getBuild()).thenReturn(build);
+            Mockito.when(build.getOutputDirectory()).thenReturn(fakeFolder.getAbsolutePath());
+            
+            // execute plugin
+            fixture.execute();
+        } finally {
+            if (mainDir != null) {
+                FileUtils.deleteDirectory(mainDir);
+            }
+        }
+    }
     
     private Map<String, byte[]> readZipFromResource(String path) throws IOException {
         ClassLoader cl = ClassLoader.getSystemClassLoader();
