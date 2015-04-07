@@ -319,6 +319,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 #### Changed
 - Increased test coverage.
+- Made relevant classes in user module implement Serializable. Now if you really wanted to, you can serialize a CoroutineRunner.
 
 ### [1.0.1] - 2015-03-26
 #### Fixed
