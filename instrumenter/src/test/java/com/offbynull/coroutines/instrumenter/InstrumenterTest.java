@@ -46,6 +46,7 @@ public final class InstrumenterTest {
     private static final String INTERFACE_INVOKE_TEST = "InterfaceInvokeTest";
     private static final String RECURSIVE_INVOKE_TEST = "RecursiveInvokeTest";
     private static final String INHERITANCE_INVOKE_TEST = "InheritanceInvokeTest";
+    private static final String RETURN_INVOKE_TEST = "ReturnInvokeTest";
     private static final String LAMBDA_INVOKE_TEST = "LambdaInvokeTest";
     private static final String CONSTRUCTOR_INVOKE_TEST = "ConstructorInvokeTest";
     private static final String EXCEPTION_SUSPEND_TEST = "ExceptionSuspendTest";
@@ -82,6 +83,11 @@ public final class InstrumenterTest {
     @Test
     public void mustProperlySuspendWithInheritedMethods() throws Exception {
         performCountTest(INHERITANCE_INVOKE_TEST);
+    }
+
+    @Test
+    public void mustProperlySuspendWithMethodsThatReturnValues() throws Exception {
+        performCountTest(RETURN_INVOKE_TEST);
     }
     
     @Test
