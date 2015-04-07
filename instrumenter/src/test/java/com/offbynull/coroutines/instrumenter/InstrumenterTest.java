@@ -44,6 +44,7 @@ public final class InstrumenterTest {
     private static final String NORMAL_INVOKE_TEST = "NormalInvokeTest";
     private static final String STATIC_INVOKE_TEST = "StaticInvokeTest";
     private static final String INTERFACE_INVOKE_TEST = "InterfaceInvokeTest";
+    private static final String RECURSIVE_INVOKE_TEST = "RecursiveInvokeTest";
     private static final String LAMBDA_INVOKE_TEST = "LambdaInvokeTest";
     private static final String CONSTRUCTOR_INVOKE_TEST = "ConstructorInvokeTest";
     private static final String EXCEPTION_SUSPEND_TEST = "ExceptionSuspendTest";
@@ -70,6 +71,11 @@ public final class InstrumenterTest {
     @Test
     public void mustProperlySuspendWithInterfaceMethods() throws Exception {
         performCountTest(INTERFACE_INVOKE_TEST);
+    }
+
+    @Test
+    public void mustProperlySuspendWithRecursiveMethods() throws Exception {
+        performCountTest(RECURSIVE_INVOKE_TEST);
     }
     
     @Test
