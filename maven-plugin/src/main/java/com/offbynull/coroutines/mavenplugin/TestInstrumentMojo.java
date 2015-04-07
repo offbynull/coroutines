@@ -61,6 +61,12 @@ public final class TestInstrumentMojo extends AbstractInstrumentMojo {
     public void execute() throws MojoExecutionException, MojoFailureException {
         Log log = getLog();
 
+        File testOutputFolder = new File(getProject().getBuild().getTestOutputDirectory());
+        if (!testOutputFolder.isDirectory()) {
+            log.warn("Test folder doesn't exist -- nothing to instrument");
+            return;
+        }
+        
         List<String> classpath;
         try {
             classpath = getProject().getTestClasspathElements();
@@ -69,12 +75,7 @@ public final class TestInstrumentMojo extends AbstractInstrumentMojo {
         }
         
         Instrumenter instrumenter = getInstrumenter(log, classpath);
-        File testOutputFolder = new File(getProject().getBuild().getTestOutputDirectory());
-        if (testOutputFolder.isDirectory()) {
-            log.info("Processing test output folder ... ");
-            instrumentPath(log, instrumenter, testOutputFolder);
-        } else {
-            throw new MojoExecutionException("Test directory doesn't exist");
-        }
+        log.info("Processing test output folder ... ");
+        instrumentPath(log, instrumenter, testOutputFolder);
     }
 }
