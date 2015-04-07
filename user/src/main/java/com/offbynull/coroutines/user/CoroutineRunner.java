@@ -16,11 +16,15 @@
  */
 package com.offbynull.coroutines.user;
 
+import java.io.Serializable;
+
 /**
  * Used to execute a {@link Coroutine}. All {@link Coroutine}s must be executed through this class.
  * @author Kasra Faghihi
  */
-public final class CoroutineRunner {
+public final class CoroutineRunner implements Serializable {
+    private static final long serialVersionUID = 1L;
+    
     private Coroutine coroutine;
     private Continuation continuation = new Continuation();
 

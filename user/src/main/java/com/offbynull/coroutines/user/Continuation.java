@@ -16,6 +16,7 @@
  */
 package com.offbynull.coroutines.user;
 
+import java.io.Serializable;
 import java.util.LinkedList;
 
 /**
@@ -27,7 +28,9 @@ import java.util.LinkedList;
  * internal use by the instrumentation logic and should not be used directly.</b>.
  * @author Kasra Faghihi
  */
-public final class Continuation {
+public final class Continuation implements Serializable {
+    private static final long serialVersionUID = 1L;
+    
     /**
      * Do not use -- for internal use only.
      */

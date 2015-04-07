@@ -16,13 +16,17 @@
  */
 package com.offbynull.coroutines.user;
 
+import java.io.Serializable;
+
 /**
  * Do not use -- for internal use only.
  * <p>
  * Holds on to the state of a method frame.
  * @author Kasra Faghihi
  */
-public final class MethodState {
+public final class MethodState implements Serializable {
+    private static final long serialVersionUID = 1L;
+    
     private final int continuationPoint;
     private final Object[] stack;
     private final Object[] localTable;

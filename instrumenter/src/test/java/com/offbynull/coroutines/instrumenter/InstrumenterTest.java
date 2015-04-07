@@ -20,10 +20,17 @@ import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.loadCl
 import com.offbynull.coroutines.user.Continuation;
 import com.offbynull.coroutines.user.Coroutine;
 import com.offbynull.coroutines.user.CoroutineRunner;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamClass;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
@@ -45,6 +52,7 @@ public final class InstrumenterTest {
     private static final String MONITOR_INVOKE_TEST = "MonitorInvokeTest";
     private static final String UNINITIALIZED_VARIABLE_INVOKE_TEST = "UninitializedVariableInvokeTest";
     private static final String PEERNETIC_FAILURE_TEST = "PeerneticFailureTest";
+    private static final String SERIALIZABLE_INVOKE_TEST = "SerializableInvokeTest";
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
@@ -62,6 +70,78 @@ public final class InstrumenterTest {
     @Test
     public void mustProperlySuspendWithInterfaceMethods() throws Exception {
         performCountTest(INTERFACE_INVOKE_TEST);
+    }
+    
+    @Test
+    public void mustProperlySuspendWithSerialization() throws Exception {
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(SERIALIZABLE_INVOKE_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(SERIALIZABLE_INVOKE_TEST);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, new StringBuilder());
+
+            // Create and run original for a few cycles
+            CoroutineRunner originalRunner = new CoroutineRunner(coroutine);
+
+            Assert.assertTrue(originalRunner.execute());
+            Assert.assertTrue(originalRunner.execute());
+            Assert.assertTrue(originalRunner.execute());
+            Assert.assertTrue(originalRunner.execute());
+            Assert.assertTrue(originalRunner.execute());
+            Assert.assertTrue(originalRunner.execute());
+            
+            // Serialize
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ObjectOutputStream oos = new ObjectOutputStream(baos);
+            oos.writeObject(originalRunner);
+            oos.close();
+            baos.close();
+            byte[] serializedCoroutine = baos.toByteArray();
+            
+            // Deserialize
+            ByteArrayInputStream bais = new ByteArrayInputStream(serializedCoroutine);
+            ObjectInputStream ois = new ObjectInputStream(bais) {
+
+                @Override
+                protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
+                    try {
+                        return super.resolveClass(desc);
+                    } catch (ClassNotFoundException cnfe) {
+                        return classLoader.loadClass(desc.getName());
+                    }
+                }
+                
+            };
+            CoroutineRunner deserializedRunner = (CoroutineRunner) ois.readObject();
+            
+            // Continue running deserialized
+            Assert.assertTrue(deserializedRunner.execute());
+            Assert.assertTrue(deserializedRunner.execute());
+            Assert.assertTrue(deserializedRunner.execute());
+            Assert.assertTrue(deserializedRunner.execute());
+            Assert.assertFalse(deserializedRunner.execute()); // coroutine finished executing here
+            Assert.assertTrue(deserializedRunner.execute());
+            Assert.assertTrue(deserializedRunner.execute());
+            Assert.assertTrue(deserializedRunner.execute());
+
+            // Assert everything continued fine with deserialized version
+            Object deserializedCoroutine = FieldUtils.readField(deserializedRunner, "coroutine", true);
+            StringBuilder deserializedBuilder = (StringBuilder) FieldUtils.readField(deserializedCoroutine, "builder", true);
+            
+            Assert.assertEquals("started\n"
+                    + "0\n"
+                    + "1\n"
+                    + "2\n"
+                    + "3\n"
+                    + "4\n"
+                    + "5\n"
+                    + "6\n"
+                    + "7\n"
+                    + "8\n"
+                    + "9\n"
+                    + "started\n"
+                    + "0\n"
+                    + "1\n"
+                    + "2\n", deserializedBuilder.toString());
+        }
     }
     
     @Test
