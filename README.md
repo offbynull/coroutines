@@ -316,6 +316,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### [1.0.2] - 2015-04-06
 #### Fixed
 - Maven plugin test-instrument goal would crash if test source folder did not exist.
+
 #### Changed
 - Increased test coverage.
 
