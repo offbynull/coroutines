@@ -328,19 +328,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### [Unreleased][unreleased]
 
 ### [1.0.2] - 2015-04-06
-#### Fixed
 - Maven plugin test-instrument goal would crash if test source folder did not exist.
-
-#### Changed
 - Increased test coverage.
 - Made relevant classes in user module implement Serializable. Now if you really wanted to, you can serialize a CoroutineRunner.
 
 ### [1.0.1] - 2015-03-26
-#### Fixed
 - Incorrectly identified any 0 parameter method as a call to suspend().
 
 ### [1.0.0] - 2015-03-24
-#### Changed
 - Improve argument against commit logs.
 
 ## Footnotes
