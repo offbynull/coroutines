@@ -282,9 +282,23 @@ Technically possible, but highly not recommended. Why? The issue is that you don
 
 1. If you're doing any kind of IO at any point at all in your Coroutine (writing to System.out, a file, a socket, etc..), it'll likely either fail to serialize properly or deserialize to an inconsistent state.
 1. If you recompile your class using a different version of the JDK than the one you originally used (even without any code changes), the instructions that make up the method may change, and you'll likely fail to continue execution after you deserialize.
-1. Static fields that are objects won't be handled properly if they've been put on the operand stack or the local variable table. Those objects will end up being serialized and re-created on deserialization, meaning that the object on the operand stack / local variable table will no longer refer to the object set on the static field.
+1. Objects on the operand stack / local variable table will be recreated when you deserialize. That means that in certain cases you may be performing an operation on/with the wrong object. For example, in certain cases reference equality tests (== operator) on an object may fail after serialization. Imagine the following scenario...
 
-There are likely other reasons as well.
+```java
+public static final class MyCoroutine implements Coroutine, Serializable {
+    private static final Object OBJECT = new Object();
+    @Override
+    public void run(Continuation c) {
+        Object testObj = OBJECT;
+        c.suspend(); // SERIALIZE AT THIS SUSPEND, THEN DESERIALIZE AND CONTINUE
+        System.out.println(testObj == OBJECT);
+    }
+}
+```
+
+The code above will print out false rather than true. Why? testObj is recreated on deserialization, meaning that it's no longer referring to the same object that's in the static final field. The objects may be equal based on value (the equals() method may return true), but they're referring to different objects after deserialization.
+
+There are likely other reasons as well. Deserialization issues may cause subtle problems that aren't always obvious. It's best to avoid serializing coroutines unless you're absolutely sure you know what you're doing.
 
 #### Is there a Gradle plugin?
 
