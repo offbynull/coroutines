@@ -296,7 +296,7 @@ public static final class MyCoroutine implements Coroutine, Serializable {
 }
 ```
 
-The code above will print out false rather than true. Why? testObj is recreated on deserialization, meaning that it's no longer referring to the same object that's in the static final field. The objects may be equal based on value (the equals() method may return true), but they're referring to different objects after deserialization.
+If you run the coroutine, serialize it after suspend(), then deserialize it and continue running it from the deserialized version, the code above will print out false. Why? testObj is recreated on deserialization, meaning that it's no longer referring to the same object that's in the static final field. The objects may be equal based on value (the equals() method may return true), but they're referring to different objects after deserialization.
 
 There are likely other reasons as well. Deserialization issues may cause subtle problems that aren't always obvious. It's best to avoid serializing coroutines unless you're absolutely sure you know what you're doing.
 
