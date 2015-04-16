@@ -56,6 +56,7 @@ public final class InstrumenterTest {
     private static final String UNINITIALIZED_VARIABLE_INVOKE_TEST = "UninitializedVariableInvokeTest";
     private static final String PEERNETIC_FAILURE_TEST = "PeerneticFailureTest";
     private static final String SERIALIZABLE_INVOKE_TEST = "SerializableInvokeTest";
+    private static final String NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST = "NullTypeInLocalVariableTableInvokeTest";
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
@@ -88,6 +89,11 @@ public final class InstrumenterTest {
     @Test
     public void mustProperlySuspendWithMethodsThatReturnValues() throws Exception {
         performCountTest(RETURN_INVOKE_TEST);
+    }
+
+    @Test
+    public void mustProperlySuspendWithNullTypeInLocalVariableTable() throws Exception {
+        performCountTest(NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST);
     }
     
     @Test

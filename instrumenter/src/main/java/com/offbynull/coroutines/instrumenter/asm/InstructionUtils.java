@@ -880,7 +880,11 @@ public final class InstructionUtils {
             BasicValue basicValue = frame.getLocal(i);
             Type type = basicValue.getType();
 
-            if (type == null) {
+            // if type == null, basicValue is pointing to uninitialized var (basicValue.toString will return ".")
+            // if type is "Lnull;", this means that the slot has been assigned 'null' and that there has been no merge yet that would
+            // "raise" the type toward some class or interface type. -- from ASM mailing list
+            // skip if either
+            if (type == null || "Lnull;".equals(type.getDescriptor())) {
                 continue;
             }
             
@@ -976,7 +980,11 @@ public final class InstructionUtils {
             BasicValue basicValue = frame.getLocal(i);
             Type type = basicValue.getType();
 
-            if (type == null) {
+            // if type == null, basicValue is pointing to uninitialized var (basicValue.toString will return ".")
+            // if type is "Lnull;", this means that the slot has been assigned 'null' and that there has been no merge yet that would
+            // "raise" the type toward some class or interface type. -- from ASM mailing list
+            // skip if either
+            if (type == null || "Lnull;".equals(type.getDescriptor())) {
                 continue;
             }
 

@@ -82,5 +82,13 @@ public final class CoroutineRunner implements Serializable {
     public void setContext(Object context) {
         continuation.setContext(context);
     }
+
+    /**
+     * Get the coroutine assigned to this runner.
+     * @return coroutine assigned to this runner
+     */
+    public Coroutine getCoroutine() {
+        return coroutine;
+    }
     
 }

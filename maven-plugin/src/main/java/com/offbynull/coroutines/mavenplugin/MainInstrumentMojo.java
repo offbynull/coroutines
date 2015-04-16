@@ -71,7 +71,7 @@ public final class MainInstrumentMojo extends AbstractInstrumentMojo {
         try {
             classpath = getProject().getCompileClasspathElements();
         } catch (DependencyResolutionRequiredException ex) {
-            throw new MojoExecutionException("Dependenct resolution problem", ex);
+            throw new MojoExecutionException("Dependency resolution problem", ex);
         }
         
         Instrumenter instrumenter = getInstrumenter(log, classpath);

@@ -326,6 +326,9 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
+- Fixed typo in Maven plugin exception message
+- Proper handling of type Lnull; in local variable table saving/loading code
+- Added CoroutineRunner.getCoroutine()
 
 ### [1.0.2] - 2015-04-06
 - Maven plugin test-instrument goal would crash if test source folder did not exist.
