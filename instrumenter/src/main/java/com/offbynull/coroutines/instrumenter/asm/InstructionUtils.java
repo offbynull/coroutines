@@ -662,6 +662,16 @@ public final class InstructionUtils {
         for (int i = 0; i < frame.getStackSize(); i++) {
             BasicValue basicValue = frame.getStack(i);
             Type type = basicValue.getType();
+            
+            // If type is 'Lnull;', this means that the slot has been assigned null and that "there has been no merge yet that would 'raise'
+            // the type toward some class or interface type" (from ASM mailing list). We know this slot will always contain null at this
+            // point in the code so there's no specific value to load up from the array. Instead we push a null in to that slot, thereby
+            // keeping the same 'Lnull;' type originally assigned to that slot (it doesn't make sense to do a CHECKCAST because 'null' is
+            // not a real class and can never be a real class -- null is a reserved word in Java).
+            if (type.getSort() == Type.OBJECT && "Lnull;".equals(type.getDescriptor())) {
+                ret.add(new InsnNode(Opcodes.ACONST_NULL));
+                continue;
+            }
 
             // Load item from stack storage array
             ret.add(new VarInsnNode(Opcodes.ALOAD, arrayStackVar.getIndex()));
@@ -745,6 +755,15 @@ public final class InstructionUtils {
         for (int i = frame.getStackSize() - 1; i >= 0; i--) {
             BasicValue basicValue = frame.getStack(i);
             Type type = basicValue.getType();
+            
+            // If type is 'Lnull;', this means that the slot has been assigned null and that "there has been no merge yet that would 'raise'
+            // the type toward some class or interface type" (from ASM mailing list). We know this slot will always contain null at this
+            // point in the code so we can avoid saving it (but we still need to do a POP to get rid of it). When we load it back up, we can
+            // simply push a null in to that slot, thereby keeping the same 'Lnull;' type.
+            if ("Lnull;".equals(type.getDescriptor())) {
+                ret.add(new InsnNode(Opcodes.POP));
+                continue;
+            }
 
             // Convert the item to an object (if not already an object) and stores it in local vars table. Item removed from stack.
             switch (type.getSort()) {
@@ -801,6 +820,16 @@ public final class InstructionUtils {
         for (int i = 0; i < frame.getStackSize(); i++) {
             BasicValue basicValue = frame.getStack(i);
             Type type = basicValue.getType();
+            
+            // If type is 'Lnull;', this means that the slot has been assigned null and that "there has been no merge yet that would 'raise'
+            // the type toward some class or interface type" (from ASM mailing list). We know this slot will always contain null at this
+            // point in the code so there's no specific value to load up from the array. Instead we push a null in to that slot, thereby
+            // keeping the same 'Lnull;' type originally assigned to that slot (it doesn't make sense to do a CHECKCAST because 'null' is
+            // not a real class and can never be a real class -- null is a reserved word in Java).
+            if (type.getSort() == Type.OBJECT && "Lnull;".equals(type.getDescriptor())) {
+                ret.add(new InsnNode(Opcodes.ACONST_NULL));
+                continue;
+            }
 
             // Load item from stack storage array
             ret.add(new VarInsnNode(Opcodes.ALOAD, arrayStackVar.getIndex()));
@@ -880,11 +909,20 @@ public final class InstructionUtils {
             BasicValue basicValue = frame.getLocal(i);
             Type type = basicValue.getType();
 
-            // if type == null, basicValue is pointing to uninitialized var (basicValue.toString will return ".")
-            // if type is "Lnull;", this means that the slot has been assigned 'null' and that there has been no merge yet that would
-            // "raise" the type toward some class or interface type. -- from ASM mailing list
-            // skip if either
-            if (type == null || "Lnull;".equals(type.getDescriptor())) {
+            // If type == null, basicValue is pointing to uninitialized var -- basicValue.toString() will return ".". This means that this
+            // slot contains nothing to load. So, skip this slot if we encounter it (such that it will remain uninitialized).
+            if (type == null) {
+                continue;
+            }
+            
+            // If type is 'Lnull;', this means that the slot has been assigned null and that "there has been no merge yet that would 'raise'
+            // the type toward some class or interface type" (from ASM mailing list). We know this slot will always contain null at this
+            // point in the code so there's no specific value to load up from the array. Instead we push a null in to that slot, thereby
+            // keeping the same 'Lnull;' type originally assigned to that slot (it doesn't make sense to do a CHECKCAST because 'null' is
+            // not a real class and can never be a real class -- null is a reserved word in Java).
+            if (type.getSort() == Type.OBJECT && "Lnull;".equals(type.getDescriptor())) {
+                ret.add(new InsnNode(Opcodes.ACONST_NULL));
+                ret.add(new VarInsnNode(Opcodes.ASTORE, i));
                 continue;
             }
             
@@ -980,11 +1018,17 @@ public final class InstructionUtils {
             BasicValue basicValue = frame.getLocal(i);
             Type type = basicValue.getType();
 
-            // if type == null, basicValue is pointing to uninitialized var (basicValue.toString will return ".")
-            // if type is "Lnull;", this means that the slot has been assigned 'null' and that there has been no merge yet that would
-            // "raise" the type toward some class or interface type. -- from ASM mailing list
-            // skip if either
-            if (type == null || "Lnull;".equals(type.getDescriptor())) {
+            // If type == null, basicValue is pointing to uninitialized var -- basicValue.toString() will return '.'. This means that this
+            // slot contains nothing to save. So, skip this slot if we encounter it.
+            if (type == null) {
+                continue;
+            }
+            
+            // If type is 'Lnull;', this means that the slot has been assigned null and that "there has been no merge yet that would 'raise'
+            // the type toward some class or interface type" (from ASM mailing list). We know this slot will always contain null at this
+            // point in the code so we can avoid saving it. When we load it back up, we can simply push a null in to that slot, thereby
+            // keeping the same 'Lnull;' type.
+            if ("Lnull;".equals(type.getDescriptor())) {
                 continue;
             }
 
