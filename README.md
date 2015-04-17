@@ -32,7 +32,7 @@ First, add the "user" module as a dependency.
 <dependency>
     <groupId>com.offbynull.coroutines</groupId>
     <artifactId>user</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 </dependency>
 ```
 
@@ -41,7 +41,7 @@ Then, add the Maven plugin so that your classes get instrumented when you build.
 <plugin>
     <groupId>com.offbynull.coroutines</groupId>
     <artifactId>maven-plugin</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
     <executions>
         <execution>
             <goals>
@@ -57,11 +57,11 @@ Then, add the Maven plugin so that your classes get instrumented when you build.
 
 In your build script...
 
-First, define the Ant Task. It's available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/ant-plugin/1.0.2/ant-plugin-1.0.2-shaded.jar).
+First, define the Ant Task. It's available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/ant-plugin/1.0.3/ant-plugin-1.0.3-shaded.jar).
 ```xml
 <taskdef name="InstrumentTask" classname="com.offbynull.coroutines.anttask.InstrumentTask">
     <classpath>
-        <pathelement location="ant-task-1.0.2-shaded.jar"/>
+        <pathelement location="ant-task-1.0.3-shaded.jar"/>
     </classpath>
 </taskdef>
 ```
@@ -74,7 +74,7 @@ Then, bind it to the target of your choice.
 </target>
 ```
 
-You'll also need to include the "user" module's JAR in your classpath as a part of your build. It's also available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/user/1.0.2/user-1.0.2.jar).
+You'll also need to include the "user" module's JAR in your classpath as a part of your build. It's also available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/user/1.0.3/user-1.0.3.jar).
 
 ### Code
 
@@ -325,9 +325,9 @@ If you know of any other projects please let me know and I'll update this sectio
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-### [Unreleased][unreleased]
+### [1.0.3] - 2015-04-16
 - Fixed typo in Maven plugin exception message
-- Proper handling of type Lnull; in local variable table saving/loading code
+- Proper handling of type Lnull; in local variable table and operand stack saving/loading code
 - Added CoroutineRunner.getCoroutine()
 
 ### [1.0.2] - 2015-04-06
