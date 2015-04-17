@@ -57,6 +57,7 @@ public final class InstrumenterTest {
     private static final String PEERNETIC_FAILURE_TEST = "PeerneticFailureTest";
     private static final String SERIALIZABLE_INVOKE_TEST = "SerializableInvokeTest";
     private static final String NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST = "NullTypeInLocalVariableTableInvokeTest";
+    private static final String NULL_TYPE_IN_OPERAND_STACK_INVOKE_TEST = "NullTypeInOperandStackInvokeTest";
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
@@ -94,6 +95,22 @@ public final class InstrumenterTest {
     @Test
     public void mustProperlySuspendWithNullTypeInLocalVariableTable() throws Exception {
         performCountTest(NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST);
+    }
+    
+    @Test
+    public void mustProperlySuspendWithNullTypeInOperandStackTable() throws Exception {
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(NULL_TYPE_IN_OPERAND_STACK_INVOKE_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(NULL_TYPE_IN_OPERAND_STACK_INVOKE_TEST);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+
+            Assert.assertTrue(runner.execute());
+            Assert.assertFalse(runner.execute());
+            
+            // There's nothing to check. By virtue of it not failing, we know that it worked. Also, it should print out null but we can't
+            // check to see what got dumped to stdout.
+        }
     }
     
     @Test
