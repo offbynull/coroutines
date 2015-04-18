@@ -58,6 +58,7 @@ public final class InstrumenterTest {
     private static final String SERIALIZABLE_INVOKE_TEST = "SerializableInvokeTest";
     private static final String NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST = "NullTypeInLocalVariableTableInvokeTest";
     private static final String NULL_TYPE_IN_OPERAND_STACK_INVOKE_TEST = "NullTypeInOperandStackInvokeTest";
+    private static final String BASIC_TYPE_INVOKE_TEST = "BasicTypeInvokeTest";
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
@@ -95,6 +96,11 @@ public final class InstrumenterTest {
     @Test
     public void mustProperlySuspendWithNullTypeInLocalVariableTable() throws Exception {
         performCountTest(NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST);
+    }
+    
+    @Test
+    public void mustProperlySuspendWithBasicTypesInLocalVariableTableAndOperandStack() throws Exception {
+        performCountTest(BASIC_TYPE_INVOKE_TEST);
     }
     
     @Test

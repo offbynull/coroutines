@@ -1066,7 +1066,7 @@ public final class InstructionUtils {
                     break;
                 case Type.LONG:
                     ret.add(new VarInsnNode(Opcodes.LLOAD, i));
-                    ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false));
+                    ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false));
                     ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.DOUBLE:

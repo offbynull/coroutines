@@ -325,10 +325,15 @@ If you know of any other projects please let me know and I'll update this sectio
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+### [Unreleased][unreleased]
+- Incorrect attempt to convert long to Double saving local variable table
+- Increased test coverage.
+
 ### [1.0.3] - 2015-04-16
 - Fixed typo in Maven plugin exception message
 - Proper handling of type Lnull; in local variable table and operand stack saving/loading code
 - Added CoroutineRunner.getCoroutine()
+- Increased test coverage.
 
 ### [1.0.2] - 2015-04-06
 - Maven plugin test-instrument goal would crash if test source folder did not exist.
