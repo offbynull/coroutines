@@ -4,7 +4,7 @@ Inspired by the [Apache Commons Javaflow](http://commons.apache.org/sandbox/comm
 
 Why use Coroutines over Javaflow? The Couroutines project is a new Java coroutines implementation written from scratch that aims to solve some of the issues that Javaflow has. The Coroutines project provides several distinct advantages:
 
-* Roughly 25% to 50% faster than Javaflow <sub>[1]</sub>
+* Faster than Javaflow <sub>[1]</sub>
 * Provides both a Maven plugin and an Ant plugin <sub>[2]</sub>
 * Proper support for Java 8 bytecode <sub>[3]</sub>
 * Proper support for synchronized blocks <sub>[4]</sub>
@@ -139,7 +139,7 @@ It depends. Instrumentation adds loading and saving code to each method that's i
 
 ##### Reflection API
 
-Your coroutine won't get properly instrumented if you any part of your invocation chain is done through Java's reflection API. The example below uses Java's reflection API to invoke echo. The instrumentation logic isn't able to recognize that reflections are being used to call echo and as such it will not instrument around the call to load and save the execution state  of the method.
+Your coroutine won't get properly instrumented if any part of your invocation chain is done through Java's reflection API. The example below uses Java's reflection API to invoke echo. The instrumentation logic isn't able to recognize that reflections are being used to call echo and as such it will not instrument around the call to load and save the execution state of the method.
 
 ```java
 public static final class MyCoroutine implements Coroutine {
