@@ -326,22 +326,23 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
-- Incorrect attempt to convert long to Double saving local variable table
-- Increased test coverage.
+- FIXED: Incorrect attempt to convert long to Double saving local variable table
+- FIXED: Gracefully ignores when continuation point doesn't invoke other continuation points
+- ADDED: Increased test coverage.
 
 ### [1.0.3] - 2015-04-16
-- Fixed typo in Maven plugin exception message
-- Proper handling of type Lnull; in local variable table and operand stack saving/loading code
-- Added CoroutineRunner.getCoroutine()
-- Increased test coverage.
+- FIXED: Fixed typo in Maven plugin exception message
+- FIXED: Proper handling of type Lnull; in local variable table and operand stack saving/loading code
+- ADDED: Added CoroutineRunner.getCoroutine()
+- ADDED: Increased test coverage.
 
 ### [1.0.2] - 2015-04-06
-- Maven plugin test-instrument goal would crash if test source folder did not exist.
-- Increased test coverage.
-- Made relevant classes in user module implement Serializable. Now if you really wanted to, you can serialize a CoroutineRunner.
+- FIXED: Maven plugin test-instrument goal would crash if test source folder did not exist.
+- ADDED: Increased test coverage.
+- ADDED: Made relevant classes in user module implement Serializable. Now if you really wanted to, you can serialize a CoroutineRunner.
 
 ### [1.0.1] - 2015-03-26
-- Incorrectly identified any 0 parameter method as a call to suspend().
+- FIXED: Incorrectly identified any 0 parameter method as a call to suspend().
 
 ### [1.0.0] - 2015-03-24
 - Initial release.
