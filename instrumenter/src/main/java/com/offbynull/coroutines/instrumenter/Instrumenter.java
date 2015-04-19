@@ -100,6 +100,10 @@ public final class Instrumenter {
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
     private static final Method CONTINUATION_SETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "setMode", Integer.TYPE);
+    private static final Method CONTINUATION_GETPENDINGSIZE_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "getPendingSize");
+    private static final Method CONTINUATION_CLEAREXCESSPENDING_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "clearExcessPending", Integer.TYPE);
     private static final Method CONTINUATION_ADDPENDING_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "addPending", MethodState.class);
     private static final Method CONTINUATION_REMOVELASTPENDING_METHOD
@@ -214,23 +218,21 @@ public final class Instrumenter {
             int contArgIdx = getLocalVariableIndexOfContinuationParameter(methodNode);
             
             VariableTable varTable = new VariableTable(classNode, methodNode);
-            Variable contArg = varTable.getArgument(contArgIdx);
-            Variable methodStateVar = varTable.acquireExtra(MethodState.class);
-            Variable savedLocalsVar = varTable.acquireExtra(Object[].class);
-            Variable savedStackVar = varTable.acquireExtra(Object[].class);
-            Variable tempObjVar = varTable.acquireExtra(Object.class);
-            Variable lockStateVar = varTable.acquireExtra(LockState.class);
-            Variable counterVar = varTable.acquireExtra(Type.INT_TYPE);
-            Variable arrayLenVar = varTable.acquireExtra(Type.INT_TYPE);
+            Variable contArg = varTable.getArgument(contArgIdx); // Continuation argument
+            Variable methodStateVar = varTable.acquireExtra(MethodState.class); // var shared between monitor and flow instrumentation
+            Variable tempObjVar = varTable.acquireExtra(Object.class); // var shared between monitor and flow instrumentation
                    
             // Generate code to deal with suspending around synchronized blocks
+            MonitorInstrumentationVariables monitorInstrumentationVariables
+                    = new MonitorInstrumentationVariables(varTable, methodStateVar, tempObjVar);
             MonitorInstrumentationLogic monitorInstrumentationLogic = generateMonitorInstrumentationLogic(
-                    methodNode, tempObjVar, counterVar, arrayLenVar, lockStateVar, methodStateVar);
+                    methodNode, monitorInstrumentationVariables);
             
             // Generate code to deal with flow control (makes use of some of the code generated in monitorInstrumentationLogic)
+            FlowInstrumentationVariables flowInstrumentationVariables
+                    = new FlowInstrumentationVariables(varTable, contArg, methodStateVar, tempObjVar);
             FlowInstrumentationLogic flowInstrumentationLogic = generateFlowInstrumentationLogic(methodNode, suspendInvocationInsnNodes,
-                    saveInvocationInsnNodes, frames, monitorInstrumentationLogic, contArg, methodStateVar, savedLocalsVar, savedStackVar,
-                    tempObjVar);
+                    saveInvocationInsnNodes, frames, monitorInstrumentationLogic, flowInstrumentationVariables);
             
             // Apply generated code
             applyInstrumentationLogic(methodNode, flowInstrumentationLogic, monitorInstrumentationLogic);
@@ -243,12 +245,13 @@ public final class Instrumenter {
     }
     
     private MonitorInstrumentationLogic generateMonitorInstrumentationLogic(MethodNode methodNode,
-            Variable tempObjVar,
-            Variable counterVar,
-            Variable arrayLenVar,
-            Variable lockStateVar,
-            Variable methodStateVar) {
+            MonitorInstrumentationVariables monitorInstrumentationVariables) {
 
+        Variable tempObjVar = monitorInstrumentationVariables.getTempObjectVar();
+        Variable counterVar = monitorInstrumentationVariables.getCounterVar();
+        Variable arrayLenVar = monitorInstrumentationVariables.getArrayLenVar();
+        Variable lockStateVar = monitorInstrumentationVariables.getLockStateVar();
+        Variable methodStateVar = monitorInstrumentationVariables.getMethodStateVar();
         
         // Find monitorenter/monitorexit and create replacement instructions that keep track of which objects were entered/exited.
         //
@@ -386,13 +389,16 @@ public final class Instrumenter {
     private FlowInstrumentationLogic generateFlowInstrumentationLogic(MethodNode methodNode,
             List<AbstractInsnNode> suspendInvocationInsnNodes,
             List<AbstractInsnNode> saveInvocationInsnNodes,
-            Frame[] frames,
+            Frame<BasicValue>[] frames,
             MonitorInstrumentationLogic monitorInstrumentationLogic,
-            Variable contArg,
-            Variable methodStateVar,
-            Variable savedLocalsVar,
-            Variable savedStackVar,
-            Variable tempObjVar) {
+            FlowInstrumentationVariables flowInstrumentationVariables) {
+
+        Variable contArg = flowInstrumentationVariables.getContArg();
+        Variable pendingCountVar = flowInstrumentationVariables.getPendingCountVar();
+        Variable methodStateVar = flowInstrumentationVariables.getMethodStateVar();
+        Variable savedLocalsVar = flowInstrumentationVariables.getSavedLocalsVar();
+        Variable savedStackVar = flowInstrumentationVariables.getSavedStackVar();
+        Variable tempObjVar = flowInstrumentationVariables.getTempObjectVar();
 
         // Get return type
         Type returnType = Type.getMethodType(methodNode.desc).getReturnType();
@@ -421,6 +427,7 @@ public final class Instrumenter {
         // Generate entrypoint instructions...
         //
         //    LockState lockState;
+        //    int pendingCount = continuation.getPendingSize();
         //    switch(continuation.getMode()) {
         //        case NORMAL:
         //        {
@@ -458,6 +465,9 @@ public final class Instrumenter {
         LabelNode startOfMethodLabelNode = new LabelNode();
         InsnList entryPointInsnList
                 = merge(
+                        // debugPrint("calling get pending size" + methodNode.name),
+                        call(CONTINUATION_GETPENDINGSIZE_METHOD, loadVar(contArg)),
+                        saveVar(pendingCountVar),
                         tableSwitch(
                                 call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                                 throwException("Unrecognized state"),
@@ -505,6 +515,11 @@ public final class Instrumenter {
         
         // Generates store logic and restore addLabel for each continuation point
         //
+        //      // Clear any excess pending MethodStates that may be lingering. We need to do this because we may have pending method states
+        //      // sitting around from methods that threw an exception. When a method that takes in a Continuation throws an exception it
+        //      // means that that method won't clear out its pending method state.
+        //      continuation.clearExcessPending(pendingCount);
+        //
         //      #IFDEF suspend
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocalsStackHere();
@@ -531,6 +546,12 @@ public final class Instrumenter {
         InsnList loadLockStateToStackInsnList = monitorInstrumentationLogic.getLoadLockStateToStackInsnList();
         Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements = new HashMap<>();
         continuationPoints.forEach((cp) -> {
+            InsnList clearExcessPendingInsnList
+                    = merge(
+                            //debugPrint("clearing potential excess" + methodNode.name),
+                            call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar))
+                    );
+            
             InsnList saveBeforeInvokeInsnList
                     = merge(
                             // debugPrint("saving operand stack" + methodNode.name),
@@ -562,6 +583,7 @@ public final class Instrumenter {
                 // immediately (see else block below)
                 insnList
                         = merge(
+                                clearExcessPendingInsnList, // clear excess pendingstates
                                 saveBeforeInvokeInsnList, // save
                                 // set saving mode
                                 // debugPrint("setting mode to saving" + methodNode.name),
@@ -594,6 +616,7 @@ public final class Instrumenter {
                 // normal flow of execution and return immediately.
                 insnList
                         = merge(
+                                clearExcessPendingInsnList, // clear excess pendingstates
                                 addLabel(cp.getRestoreLabelNode()), // addIndividual restore point for when in loading mode
                                 saveBeforeInvokeInsnList, // save
                                 // debugPrint("invoking" + methodNode.name),

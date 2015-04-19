@@ -71,7 +71,51 @@ public final class Continuation implements Serializable {
         }
         this.mode = mode;
     }
-    
+
+    /**
+     * Do not use -- for internal use only.
+     * @param max n/a
+     */
+    public void clearExcessPending(int max) {
+        // This is for handling cases where the pendingMethodStates list has more items in it than it should. This happens when you call in
+        // to a method that throws an exception. Because that exception is thrown, removeLastPending() is never called when it leaves the
+        // method, which means that pendingMethodStates will contain extra MethodState objects that should have been removed.
+        //
+        // Imagine the following scenario
+        //
+        //    public void run(Continuation c) {
+        //
+        //        try {
+        //            new InnerClass1().run(c); // THROWS AN EXCEPTION
+        //        } catch (RuntimeException re) {
+        //            System.out.println("Caught exception and continuing " + re);
+        //        }
+        //
+        //      // AT THIS POINT, pendingMethodStates WILL CONTAIN EXTRA ITEMS BECAUSE THE InnerClass1.run() THREW AN EXCEPTION AND
+        //        new InnerClass2().run(c);
+        //    }
+        //
+        //    private final class InnerClass1 {
+        //        public void run(Continuation c) {
+        //            c.suspend();
+        //            throw expectedException;
+        //        }
+        //    }
+        //
+        //    private static final class InnerClass2 {
+        //        public void run(Continuation c) {
+        //            c.suspend();
+        //        }
+        //    }
+        if (max < 0) {
+            throw new IllegalArgumentException();
+        }
+        
+        for (int i = pendingMethodStates.size() - max; i > 0; i--) {
+            pendingMethodStates.removeLast();
+        }
+    }
+
     /**
      * Do not use -- for internal use only.
      * @param methodState n/a
@@ -79,8 +123,16 @@ public final class Continuation implements Serializable {
     public void addPending(MethodState methodState) {
         if (methodState == null) {
             throw new NullPointerException();
-        }
+        }        
         pendingMethodStates.addLast(methodState);
+    }
+
+    /**
+     * Do not use -- for internal use only.
+     * @return n/a
+     */
+    public int getPendingSize() {
+        return pendingMethodStates.size();
     }
 
     /**

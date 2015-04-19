@@ -27,7 +27,7 @@ final class ContinuationPoint {
     private int id;
     private AbstractInsnNode invokeInsnNode;
     private LabelNode restoreLabelNode;
-    private Frame frame;
+    private Frame<BasicValue> frame;
 
     ContinuationPoint(boolean suspend, int id, AbstractInsnNode invokeInsnNode, Frame<BasicValue> frame) {
         this.suspend = suspend;
@@ -53,7 +53,7 @@ final class ContinuationPoint {
         return restoreLabelNode;
     }
 
-    Frame getFrame() {
+    Frame<BasicValue> getFrame() {
         return frame;
     }
 

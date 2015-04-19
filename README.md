@@ -326,6 +326,7 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
+- FIXED: Proper handling of caught exceptions -- pending method states are now being properly rolled back on exception
 - FIXED: Incorrect attempt to convert long to Double saving local variable table
 - FIXED: Gracefully ignores when continuation point doesn't invoke other continuation points
 - ADDED: Increased test coverage.
