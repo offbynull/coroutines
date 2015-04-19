@@ -479,7 +479,7 @@ public final class Instrumenter {
                                         monitorInstrumentationLogic.getLoadAndStoreLockStateFromMethodStateInsnList(),
                                         tableSwitch(
                                                 call(METHODSTATE_GETCONTINUATIONPOINT_METHOD, loadVar(methodStateVar)),
-                                                throwException("Unrecognized restore id" + methodNode.name),
+                                                throwException("Unrecognized restore id " + methodNode.name),
                                                 0,
                                                 continuationPoints.stream().map((cp) -> {
                                                     InsnList ret

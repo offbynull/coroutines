@@ -106,14 +106,26 @@ public final class InstrumenterTest {
     }
 
     @Test
-    public void mustProperlySuspendWhenContinuationPointDoesNotInvokeOtherContinuationPoints() throws Exception {
+    public void mustGracefullyIgnoreWhenContinuationPointDoesNotInvokeOtherContinuationPoints() throws Exception {
         performCountTest(EMPTY_CONTINUATION_POINT_INVOKE_TEST);
     }
     
-//    @Test
-//    public void mustProperlySuspendThenContinueWhenExceptionOccursButIsCaughtBeforeReturningFromRunner() throws Exception {
-//        performCountTest(EXCEPTION_THEN_CONTINUE_INVOKE_TEST);
-//    }
+    @Test
+    public void mustProperlyContinueWhenExceptionOccursButIsCaughtBeforeReachingRunner() throws Exception {
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(EXCEPTION_THEN_CONTINUE_INVOKE_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(EXCEPTION_THEN_CONTINUE_INVOKE_TEST);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertFalse(runner.execute());
+            
+            // There's nothing to check. By virtue of it not failing, we know that it worked. Also, it should print out some messages but we
+            // can't check to see what got dumped to stdout.
+        }
+    }
     
     @Test
     public void mustProperlySuspendWithNullTypeInOperandStackTable() throws Exception {
