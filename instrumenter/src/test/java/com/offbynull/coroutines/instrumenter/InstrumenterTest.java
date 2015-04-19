@@ -59,6 +59,8 @@ public final class InstrumenterTest {
     private static final String NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST = "NullTypeInLocalVariableTableInvokeTest";
     private static final String NULL_TYPE_IN_OPERAND_STACK_INVOKE_TEST = "NullTypeInOperandStackInvokeTest";
     private static final String BASIC_TYPE_INVOKE_TEST = "BasicTypeInvokeTest";
+    private static final String EXCEPTION_THEN_CONTINUE_INVOKE_TEST = "ExceptionThenContinueInvokeTest";
+    private static final String EMPTY_CONTINUATION_POINT_INVOKE_TEST = "EmptyContinuationPointInvokeTest";
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
@@ -102,6 +104,16 @@ public final class InstrumenterTest {
     public void mustProperlySuspendWithBasicTypesInLocalVariableTableAndOperandStack() throws Exception {
         performCountTest(BASIC_TYPE_INVOKE_TEST);
     }
+
+    @Test
+    public void mustProperlySuspendWhenContinuationPointDoesNotInvokeOtherContinuationPoints() throws Exception {
+        performCountTest(EMPTY_CONTINUATION_POINT_INVOKE_TEST);
+    }
+    
+//    @Test
+//    public void mustProperlySuspendThenContinueWhenExceptionOccursButIsCaughtBeforeReturningFromRunner() throws Exception {
+//        performCountTest(EXCEPTION_THEN_CONTINUE_INVOKE_TEST);
+//    }
     
     @Test
     public void mustProperlySuspendWithNullTypeInOperandStackTable() throws Exception {

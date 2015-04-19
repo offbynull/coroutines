@@ -185,6 +185,23 @@ public final class Instrumenter {
             Validate.isTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR).isEmpty(),
                     "JSR instructions not allowed");
             
+            // Find invocations of continuation points
+            List<AbstractInsnNode> suspendInvocationInsnNodes
+                    = findInvocationsOf(methodNode.instructions, CONTINUATION_SUSPEND_METHOD);
+            List<AbstractInsnNode> saveInvocationInsnNodes
+                    = findInvocationsWithParameter(methodNode.instructions, CONTINUATION_CLASS_TYPE);
+            
+            // If there are no continuation points, we don't need to instrument this method. It'll be like any other normal method
+            // invocation because it won't have the potential to pause or call in to another method that may potentially pause.
+            if (suspendInvocationInsnNodes.isEmpty() && saveInvocationInsnNodes.isEmpty()) {
+                continue;
+            }
+            
+            // Check for continuation points that use invokedynamic instruction, which are currently only used by lambdas. See comments in
+            // validateNoInvokeDynamic to see why we need to do this.
+            validateNoInvokeDynamic(suspendInvocationInsnNodes);
+            validateNoInvokeDynamic(saveInvocationInsnNodes);
+            
             // Analyze method
             Frame<BasicValue>[] frames;
             try {
@@ -211,8 +228,9 @@ public final class Instrumenter {
                     methodNode, tempObjVar, counterVar, arrayLenVar, lockStateVar, methodStateVar);
             
             // Generate code to deal with flow control (makes use of some of the code generated in monitorInstrumentationLogic)
-            FlowInstrumentationLogic flowInstrumentationLogic = generateFlowInstrumentationLogic(
-                    methodNode, frames, monitorInstrumentationLogic, contArg, methodStateVar, savedLocalsVar, savedStackVar, tempObjVar);
+            FlowInstrumentationLogic flowInstrumentationLogic = generateFlowInstrumentationLogic(methodNode, suspendInvocationInsnNodes,
+                    saveInvocationInsnNodes, frames, monitorInstrumentationLogic, contArg, methodStateVar, savedLocalsVar, savedStackVar,
+                    tempObjVar);
             
             // Apply generated code
             applyInstrumentationLogic(methodNode, flowInstrumentationLogic, monitorInstrumentationLogic);
@@ -365,7 +383,10 @@ public final class Instrumenter {
                 exitMonitorsInLockStateInsnList);
     }
     
-    private FlowInstrumentationLogic generateFlowInstrumentationLogic(MethodNode methodNode, Frame[] frames,
+    private FlowInstrumentationLogic generateFlowInstrumentationLogic(MethodNode methodNode,
+            List<AbstractInsnNode> suspendInvocationInsnNodes,
+            List<AbstractInsnNode> saveInvocationInsnNodes,
+            Frame[] frames,
             MonitorInstrumentationLogic monitorInstrumentationLogic,
             Variable contArg,
             Variable methodStateVar,
@@ -375,17 +396,6 @@ public final class Instrumenter {
 
         // Get return type
         Type returnType = Type.getMethodType(methodNode.desc).getReturnType();
-        
-        // Find invocations of continuation points
-        List<AbstractInsnNode> suspendInvocationInsnNodes
-                = findInvocationsOf(methodNode.instructions, CONTINUATION_SUSPEND_METHOD);
-        List<AbstractInsnNode> saveInvocationInsnNodes
-                = findInvocationsWithParameter(methodNode.instructions, CONTINUATION_CLASS_TYPE);
-
-        // Check for invokedynamic instructions, which are currently only used by lambdas. See comments in validateNoInvokeDynamic to
-        // see why we need to do this.
-        validateNoInvokeDynamic(suspendInvocationInsnNodes);
-        validateNoInvokeDynamic(saveInvocationInsnNodes);
 
         // Generate instructions for continuation points
         int nextId = 0;
