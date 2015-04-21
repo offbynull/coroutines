@@ -26,6 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.Validate;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
@@ -204,5 +205,50 @@ public final class SearchUtils {
         }
         
         return ret;
+    }
+    
+    /**
+     * Get the number of items that need to be on the stack for an invocation of some method.
+     * @param invokeNode the invocation instruction (either normal invocation or invokedynamic)
+     * @return number of items required on the stack for this method
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code invokeNode} is neither of type {@link MethodInsnNode} nor {@link InvokeDynamicInsnNode},
+     * or if type of invocation ({@link MethodInsnNode}) cannot be determined
+     */
+    public static int getRequiredStackCountForInvocation(AbstractInsnNode invokeNode) {
+        Validate.notNull(invokeNode);
+
+        if (invokeNode instanceof MethodInsnNode) {
+            MethodInsnNode methodInsnNode = (MethodInsnNode) invokeNode;
+            int extra;
+            int paramCount;
+            
+            switch (methodInsnNode.getOpcode()) {
+                case Opcodes.INVOKEVIRTUAL:
+                case Opcodes.INVOKESPECIAL:
+                case Opcodes.INVOKEINTERFACE:
+                    extra = 1;
+                    break;
+                case Opcodes.INVOKESTATIC:
+                    extra = 0;
+                    break;
+                default:
+                    throw new IllegalArgumentException(); // unknown invocation type? probably badly generated instruction node
+            }
+            Type methodType = Type.getType(methodInsnNode.desc);
+            paramCount = methodType.getArgumentTypes().length;
+            
+            return paramCount + extra;
+        } else if (invokeNode instanceof InvokeDynamicInsnNode) {
+            InvokeDynamicInsnNode invokeDynamicInsnNode = (InvokeDynamicInsnNode) invokeNode;
+            int paramCount;
+            
+            Type methodType = Type.getType(invokeDynamicInsnNode.desc);
+            paramCount = methodType.getArgumentTypes().length;
+            
+            return paramCount;
+        } else {
+            throw new IllegalArgumentException();
+        }
     }
 }

@@ -161,9 +161,10 @@ public final class Instrumenter {
                     varTable,
                     methodStateVar,
                     tempObjVar);
-            MonitorInstrumentationLogic monitorInstrumentationLogic = MonitorInstrumentationLogic.generate(
+            MonitorInstrumentationInstructions monitorInstrumentationLogic = new MonitorInstrumentationGenerator(
                     methodNode,
-                    monitorInstrumentationVariables);
+                    monitorInstrumentationVariables)
+                    .generate();
             
             // Generate code to deal with flow control (makes use of some of the code generated in monitorInstrumentationLogic)
             FlowInstrumentationVariables flowInstrumentationVariables = new FlowInstrumentationVariables(
@@ -171,16 +172,17 @@ public final class Instrumenter {
                     contArg,
                     methodStateVar,
                     tempObjVar);
-            FlowInstrumentationLogic flowInstrumentationLogic = FlowInstrumentationLogic.generate(
+            FlowInstrumentationInstructions flowInstrumentationInstructions = new FlowInstrumentationGenerator(
                     methodNode,
                     suspendInvocationInsnNodes,
                     saveInvocationInsnNodes,
                     frames,
                     monitorInstrumentationLogic,
-                    flowInstrumentationVariables);
+                    flowInstrumentationVariables)
+                    .generate();
             
             // Apply generated code
-            applyInstrumentationLogic(methodNode, flowInstrumentationLogic, monitorInstrumentationLogic);
+            applyInstrumentationLogic(methodNode, flowInstrumentationInstructions, monitorInstrumentationLogic);
         }
 
         // Write tree model back out as class
@@ -190,8 +192,8 @@ public final class Instrumenter {
     }
     
     private void applyInstrumentationLogic(MethodNode methodNode,
-            FlowInstrumentationLogic flowInstrumentationLogic,
-            MonitorInstrumentationLogic monitorInstrumentationLogic) {
+            FlowInstrumentationInstructions flowInstrumentationLogic,
+            MonitorInstrumentationInstructions monitorInstrumentationLogic) {
         
         // Add loading code
         InsnList entryPointInsnList = flowInstrumentationLogic.getEntryPointInsnList();

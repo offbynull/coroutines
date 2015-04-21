@@ -26,7 +26,9 @@ final class ContinuationPoint {
     private boolean suspend;
     private int id;
     private AbstractInsnNode invokeInsnNode;
+    private LabelNode normalLabelNode;
     private LabelNode restoreLabelNode;
+    private LabelNode endLabelNode;
     private Frame<BasicValue> frame;
 
     ContinuationPoint(boolean suspend, int id, AbstractInsnNode invokeInsnNode, Frame<BasicValue> frame) {
@@ -34,7 +36,9 @@ final class ContinuationPoint {
         this.id = id;
         this.invokeInsnNode = invokeInsnNode;
         this.frame = frame;
+        normalLabelNode = new LabelNode();
         restoreLabelNode = new LabelNode();
+        endLabelNode = new LabelNode();
     }
 
     boolean isSuspend() {
@@ -49,8 +53,16 @@ final class ContinuationPoint {
         return invokeInsnNode;
     }
 
+    public LabelNode getNormalLabelNode() {
+        return normalLabelNode;
+    }
+
     LabelNode getRestoreLabelNode() {
         return restoreLabelNode;
+    }
+
+    public LabelNode getEndLabelNode() {
+        return endLabelNode;
     }
 
     Frame<BasicValue> getFrame() {
