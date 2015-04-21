@@ -169,6 +169,9 @@
                     </executions>
                     <configuration>
                         <printFailingErrors>true</printFailingErrors>
+                        <rulesets>
+                            <ruleset>../build-tools/src/main/resources/build-tools/ruleset.xml</ruleset>
+                        </rulesets>
                     </configuration>
                 </plugin>
                 <plugin>
