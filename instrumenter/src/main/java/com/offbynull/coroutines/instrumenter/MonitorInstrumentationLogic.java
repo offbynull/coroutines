@@ -28,7 +28,7 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.monitor
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.monitorExit;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.searchForOpcodes;
-import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable;
 import com.offbynull.coroutines.user.LockState;
 import com.offbynull.coroutines.user.MethodState;
 import java.lang.reflect.Constructor;
@@ -36,7 +36,6 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.objectweb.asm.Opcodes;
@@ -45,7 +44,7 @@ import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
-final class MonitorInstrumentationGenerator {
+final class MonitorInstrumentationLogic {
 
     private static final Method METHODSTATE_GETLOCKSTATE_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getLockState");
@@ -58,30 +57,22 @@ final class MonitorInstrumentationGenerator {
     private static final Method LOCKSTATE_TOARRAY_METHOD
             = MethodUtils.getAccessibleMethod(LockState.class, "toArray");
     
+    private final Map<AbstractInsnNode, InsnList> monitorInsnNodeReplacements;
+    private final InsnList createAndStoreLockStateInsnList;
+    private final InsnList loadAndStoreLockStateFromMethodStateInsnList;
+    private final InsnList loadLockStateToStackInsnList;
+    private final InsnList enterMonitorsInLockStateInsnList;
+    private final InsnList exitMonitorsInLockStateInsnList;
 
-    private final MethodNode methodNode;
-    private final Variable tempObjVar;
-    private final Variable counterVar;
-    private final Variable arrayLenVar;
-    private final Variable lockStateVar;
-    private final Variable methodStateVar;
-
-    
-    MonitorInstrumentationGenerator(MethodNode methodNode,
+    static MonitorInstrumentationLogic generate(MethodNode methodNode,
             MonitorInstrumentationVariables monitorInstrumentationVariables) {
-        Validate.notNull(methodNode);
-        Validate.notNull(monitorInstrumentationVariables);
 
-        this.methodNode = methodNode;
+        VariableTable.Variable tempObjVar = monitorInstrumentationVariables.getTempObjectVar();
+        VariableTable.Variable counterVar = monitorInstrumentationVariables.getCounterVar();
+        VariableTable.Variable arrayLenVar = monitorInstrumentationVariables.getArrayLenVar();
+        VariableTable.Variable lockStateVar = monitorInstrumentationVariables.getLockStateVar();
+        VariableTable.Variable methodStateVar = monitorInstrumentationVariables.getMethodStateVar();
         
-        tempObjVar = monitorInstrumentationVariables.getTempObjectVar();
-        counterVar = monitorInstrumentationVariables.getCounterVar();
-        arrayLenVar = monitorInstrumentationVariables.getArrayLenVar();
-        lockStateVar = monitorInstrumentationVariables.getLockStateVar();
-        methodStateVar = monitorInstrumentationVariables.getMethodStateVar();
-    }
-    
-    MonitorInstrumentationInstructions generate() {
         // Find monitorenter/monitorexit and create replacement instructions that keep track of which objects were entered/exited.
         //
         //
@@ -207,11 +198,52 @@ final class MonitorInstrumentationGenerator {
                     );
         }
         
-        return new MonitorInstrumentationInstructions(monitorInsnNodeReplacements,
+        return new MonitorInstrumentationLogic(monitorInsnNodeReplacements,
                 createAndStoreLockStateInsnList,
                 loadAndStoreLockStateFromMethodStateInsnList,
                 loadLockStateToStackInsnList,
                 enterMonitorsInLockStateInsnList,
                 exitMonitorsInLockStateInsnList);
     }
+        
+    private MonitorInstrumentationLogic(Map<AbstractInsnNode, InsnList> monitorInsnNodeReplacements,
+            InsnList createAndStoreLockStateInsnList, InsnList loadAndStoreLockStateFromMethodStateInsnList,
+            InsnList loadLockStateToStackInsnList, InsnList enterMonitorsInLockStateInsnList,
+            InsnList exitMonitorsInLockStateInsnList) {
+        this.monitorInsnNodeReplacements = monitorInsnNodeReplacements;
+        this.createAndStoreLockStateInsnList = createAndStoreLockStateInsnList;
+        this.loadAndStoreLockStateFromMethodStateInsnList = loadAndStoreLockStateFromMethodStateInsnList;
+        this.loadLockStateToStackInsnList = loadLockStateToStackInsnList;
+        this.enterMonitorsInLockStateInsnList = enterMonitorsInLockStateInsnList;
+        this.exitMonitorsInLockStateInsnList = exitMonitorsInLockStateInsnList;
+    }
+
+    // WARNING: Be careful with using these more than once. If you insert one InsnList in to another InsnList, it'll become empty. If you
+    // need to insert the instructions in an InsnList multiple times, make sure to CLONE IT FIRST!
+    
+    Map<AbstractInsnNode, InsnList> getMonitorInsnNodeReplacements() {
+        return monitorInsnNodeReplacements;
+    }
+
+    InsnList getCreateAndStoreLockStateInsnList() {
+        return createAndStoreLockStateInsnList;
+    }
+
+    InsnList getLoadAndStoreLockStateFromMethodStateInsnList() {
+        return loadAndStoreLockStateFromMethodStateInsnList;
+    }
+
+
+    InsnList getLoadLockStateToStackInsnList() {
+        return loadLockStateToStackInsnList;
+    }
+
+    InsnList getEnterMonitorsInLockStateInsnList() {
+        return enterMonitorsInLockStateInsnList;
+    }
+
+    InsnList getExitMonitorsInLockStateInsnList() {
+        return exitMonitorsInLockStateInsnList;
+    }
+
 }

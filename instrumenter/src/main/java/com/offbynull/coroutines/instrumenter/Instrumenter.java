@@ -46,7 +46,6 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
@@ -162,10 +161,9 @@ public final class Instrumenter {
                     varTable,
                     methodStateVar,
                     tempObjVar);
-            MonitorInstrumentationInstructions monitorInstrumentationLogic = new MonitorInstrumentationGenerator(
+            MonitorInstrumentationLogic monitorInstrumentationLogic = MonitorInstrumentationLogic.generate(
                     methodNode,
-                    monitorInstrumentationVariables)
-                    .generate();
+                    monitorInstrumentationVariables);
             
             // Generate code to deal with flow control (makes use of some of the code generated in monitorInstrumentationLogic)
             FlowInstrumentationVariables flowInstrumentationVariables = new FlowInstrumentationVariables(
@@ -173,17 +171,16 @@ public final class Instrumenter {
                     contArg,
                     methodStateVar,
                     tempObjVar);
-            FlowInstrumentationInstructions flowInstrumentationInstructions = new FlowInstrumentationGenerator(
+            FlowInstrumentationLogic flowInstrumentationLogic = FlowInstrumentationLogic.generate(
                     methodNode,
                     suspendInvocationInsnNodes,
                     saveInvocationInsnNodes,
                     frames,
                     monitorInstrumentationLogic,
-                    flowInstrumentationVariables)
-                    .generate();
+                    flowInstrumentationVariables);
             
             // Apply generated code
-            applyInstrumentationLogic(methodNode, flowInstrumentationInstructions, monitorInstrumentationLogic);
+            applyInstrumentationLogic(methodNode, flowInstrumentationLogic, monitorInstrumentationLogic);
         }
 
         // Write tree model back out as class
@@ -193,13 +190,8 @@ public final class Instrumenter {
     }
     
     private void applyInstrumentationLogic(MethodNode methodNode,
-            FlowInstrumentationInstructions flowInstrumentationLogic,
-            MonitorInstrumentationInstructions monitorInstrumentationLogic) {
-        
-        // Add trycatch nodes
-        for (TryCatchBlockNode tryCatchBlockNode : flowInstrumentationLogic.getInvokeTryCatchBlockNodes()) {
-            methodNode.tryCatchBlocks.add(tryCatchBlockNode);
-        }
+            FlowInstrumentationLogic flowInstrumentationLogic,
+            MonitorInstrumentationLogic monitorInstrumentationLogic) {
         
         // Add loading code
         InsnList entryPointInsnList = flowInstrumentationLogic.getEntryPointInsnList();

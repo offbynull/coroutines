@@ -31,7 +31,6 @@ final class FlowInstrumentationVariables {
     private final Variable pendingCountVar;
     private final Variable savedLocalsVar;
     private final Variable savedStackVar;
-    private final Variable returnValObjectVar;
 
     public FlowInstrumentationVariables(VariableTable varTable, Variable contArg, Variable methodStateVar, Variable tempObjectVar) {
         Validate.notNull(varTable);
@@ -48,7 +47,6 @@ final class FlowInstrumentationVariables {
         this.pendingCountVar = varTable.acquireExtra(Type.INT_TYPE);
         this.savedLocalsVar = varTable.acquireExtra(Object[].class);
         this.savedStackVar = varTable.acquireExtra(Object[].class);
-        this.returnValObjectVar = varTable.acquireExtra(Object.class);
     }
 
     public Variable getContArg() {
@@ -73,10 +71,6 @@ final class FlowInstrumentationVariables {
 
     public Variable getSavedStackVar() {
         return savedStackVar;
-    }
-
-    public Variable getTempObjVar2() {
-        return returnValObjectVar;
     }
 
 }

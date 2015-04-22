@@ -41,7 +41,6 @@ import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.TableSwitchInsnNode;
-import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
@@ -246,22 +245,6 @@ public final class InstructionUtils {
     }
 
     /**
-     * Generates instructions to pop {@code count} items off the stack.
-     * @param count number of items to pop
-     * @return instructions for a pop
-     * @throws IllegalArgumentException if any numeric argument is negative
-     */
-    public static InsnList pop(int count) {
-        Validate.isTrue(count >= 0);
-        InsnList ret = new InsnList();
-        for (int i = 0; i < count; i++) {
-            ret.add(new InsnNode(Opcodes.POP));
-        }
-
-        return ret;
-    }
-
-    /**
      * Generates a MONITORENTER instruction, which consumes an Object from the top of the stack.
      * @return instructions for a pop
      */
@@ -316,7 +299,7 @@ public final class InstructionUtils {
         ret.add(new InsnNode(Opcodes.ACONST_NULL));
         return ret;
     }
-    
+
     /**
      * Copies a local variable on to the stack.
      * @param variable variable within the local variable table to load from
@@ -656,46 +639,6 @@ public final class InstructionUtils {
     }
 
     /**
-     * Generates instructions for a try-catch block.
-     * @param tryCatchBlockNode try catch block node to populate to with label with relevant information
-     * @param exceptionType exception type to catch ({@code null} means catch any exception)
-     * @param tryInsnList instructions to execute for try block
-     * @param catchInsnList instructions to execute for catch block
-     * @return instructions for a try catch block
-     * @throws NullPointerException if any argument other than {@code exceptionType} is {@code null} or contains {@code null}
-     * @throws IllegalArgumentException if {@code exceptionType} is not an object type (technically must inherit from {@link Throwable},
-     * but no way to check this)
-     */
-    public static InsnList tryCatchBlock(TryCatchBlockNode tryCatchBlockNode, Type exceptionType, InsnList tryInsnList,
-            InsnList catchInsnList) {
-        Validate.notNull(tryInsnList);
-        // exceptionType can be null
-        Validate.notNull(catchInsnList);
-        if (exceptionType != null) {
-            Validate.isTrue(exceptionType.getSort() == Type.OBJECT);
-        }
-        
-        InsnList ret = new InsnList();
-
-        LabelNode tryLabelNode = new LabelNode();
-        LabelNode catchLabelNode = new LabelNode();
-        LabelNode endLabelNode = new LabelNode();
-        
-        tryCatchBlockNode.start = tryLabelNode;
-        tryCatchBlockNode.end = catchLabelNode;
-        tryCatchBlockNode.handler = catchLabelNode;
-        tryCatchBlockNode.type = exceptionType == null ? null : exceptionType.getInternalName();
-
-        ret.add(tryLabelNode);
-        ret.add(tryInsnList);
-        ret.add(new JumpInsnNode(Opcodes.GOTO, endLabelNode));
-        ret.add(catchLabelNode);
-        ret.add(catchInsnList);
-        ret.add(endLabelNode);
-        return ret;
-    }
-
-    /**
      * Generates instructions to load the operand stack from an object array.
      * @param arrayStackVar variable that the object array containing operand stack is stored
      * @param tempObjectVar variable to use for temporary objects
@@ -706,62 +649,17 @@ public final class InstructionUtils {
      * type
      */
     public static InsnList loadOperandStack(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame) {
-        return loadOperandStack(arrayStackVar, tempObjectVar, frame, 0, frame.getStackSize());
-    }
-
-    /**
-     * Generates instructions to load the last {@code count} items of the operand stack from an object array. The object array contains all
-     * items for the stack, but only the tail {@code count} items will be loaded on to the stack.
-     * @param arrayStackVar variable that the object array containing operand stack is stored
-     * @param tempObjectVar variable to use for temporary objects
-     * @param frame execution frame at the instruction for which the operand stack is to be restored
-     * @param count number of items to load to the bottom of the stack.
-     * @return instructions to load the relevant portion of the operand stack from an array
-     * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
-     * type, or if there aren't {@link count} items on the stack
-     */
-    public static InsnList loadOperandStackSuffix(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame, int count) {
-        int start = frame.getStackSize() - count;
-        int end = frame.getStackSize();
-        Validate.isTrue(start >= 0);
-        return loadOperandStack(arrayStackVar, tempObjectVar, frame, start, end);
-    }
-
-    /**
-     * Generates instructions to load the first {@code count} items of the operand stack from an object array. The object array contains all
-     * items for the stack, but only the beginning {@code count} items will be loaded on to the stack.
-     * @param arrayStackVar variable that the object array containing operand stack is stored
-     * @param tempObjectVar variable to use for temporary objects
-     * @param frame execution frame at the instruction for which the operand stack is to be restored
-     * @param count number of items to load to the bottom of the stack.
-     * @return instructions to load the relevant portion of operand stack from an array
-     * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
-     * type, or if there aren't {@link count} items on the stack
-     */
-    public static InsnList loadOperandStackPrefix(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame, int count) {
-        int start = 0;
-        int end = count;
-        Validate.isTrue(end <= frame.getStackSize());
-        return loadOperandStack(arrayStackVar, tempObjectVar, frame, start, end);
-    }
-    
-    private static InsnList loadOperandStack(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame, int start, int end) {
         Validate.notNull(arrayStackVar);
         Validate.notNull(tempObjectVar);
         Validate.notNull(frame);
         Validate.isTrue(arrayStackVar.getType().equals(Type.getType(Object[].class)));
         Validate.isTrue(tempObjectVar.getType().equals(Type.getType(Object.class)));
         validateLocalIndicies(arrayStackVar.getIndex(), tempObjectVar.getIndex());
-        Validate.isTrue(start >= 0);
-        Validate.isTrue(end >= start); // end is exclusive
-        Validate.isTrue(end <= frame.getStackSize());
         
         InsnList ret = new InsnList();
         
         // Restore the stack
-        for (int i = 0; i < end; i++) {
+        for (int i = 0; i < frame.getStackSize(); i++) {
             BasicValue basicValue = frame.getStack(i);
             Type type = basicValue.getType();
             
