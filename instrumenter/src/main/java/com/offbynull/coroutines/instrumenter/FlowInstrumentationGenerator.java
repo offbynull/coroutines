@@ -37,7 +37,9 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOpe
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tableSwitch;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.throwException;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tryCatchBlock;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getRequiredStackCountForInvocation;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getReturnTypeOfInvocation;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import com.offbynull.coroutines.user.Continuation;
 import static com.offbynull.coroutines.user.Continuation.MODE_NORMAL;
@@ -46,6 +48,7 @@ import com.offbynull.coroutines.user.LockState;
 import com.offbynull.coroutines.user.MethodState;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -53,11 +56,16 @@ import java.util.Map;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TryCatchBlockNode;
+import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 
@@ -97,6 +105,7 @@ final class FlowInstrumentationGenerator {
     private final Variable savedLocalsVar;
     private final Variable savedStackVar;
     private final Variable tempObjVar;
+    private final Variable tempObjVar2;
     
     private final InsnList createAndStoreLockStateInsnList;
     private final InsnList loadLockStateToStackInsnList;
@@ -129,6 +138,7 @@ final class FlowInstrumentationGenerator {
         savedLocalsVar = flowInstrumentationVariables.getSavedLocalsVar();
         savedStackVar = flowInstrumentationVariables.getSavedStackVar();
         tempObjVar = flowInstrumentationVariables.getTempObjectVar();
+        tempObjVar2 = flowInstrumentationVariables.getTempObjVar2();
         
         createAndStoreLockStateInsnList = monitorInstrumentationLogic.getCreateAndStoreLockStateInsnList();
         loadLockStateToStackInsnList = monitorInstrumentationLogic.getLoadLockStateToStackInsnList();
@@ -230,17 +240,13 @@ final class FlowInstrumentationGenerator {
                                                 throwException("Unrecognized restore id " + methodNode.name),
                                                 0,
                                                 continuationPoints.stream().map((cp) -> {
-                                                    // WE MUST RE-ENTER MONITORS HERE! Because the entire method will implicitly be wrapped
-                                                    // in a try-catch-finally block for handling exiting monitors if the method throws an
-                                                    // exception
                                                     return merge(
-                                                            // debugPrint("entering monitors" + methodNode.name),
-                                                            cloneInsnList(enterMonitorsInLockStateInsnList),
+                                                            // debugPrint("jumping to restore point" + methodNode.name),
                                                             jumpTo(cp.getRestoreLabelNode())
                                                     );
                                                 }).toArray((x) -> new InsnList[x])
                                         )
-                                // jump to not required here, switch above either throws exception or jumps to restore point
+                                        // jump to not required here, switch above either throws exception or jumps to restore point
                                 )
                         ),
                         addLabel(startOfMethodLabelNode)
@@ -251,25 +257,36 @@ final class FlowInstrumentationGenerator {
         // MONITORENTER/MONITOREXIT. See comments in monitor instrumentation code for more information.
         
         // Generates store logic and restore addLabel for each continuation point
+        List<TryCatchBlockNode> invokeTryCatchBlockNodes = new ArrayList<>();
         Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements = new HashMap<>();
         continuationPoints.forEach((cp) -> {
             InsnList insnList;
             if (cp.isSuspend()) {
-                insnList = generateSuspendContinuationPointInstructions(cp, returnType);
+                insnList = merge(
+                        generateNormalSuspendPointInstructions(cp, returnType),
+                        generateRestoreSuspendPointInstructions(cp, returnType),
+                        addLabel(cp.getEndLabelNode())
+                );
             } else {
+                TryCatchBlockNode restoreInvokeTryCatchBlockNode = new TryCatchBlockNode(null, null, null, null);
                 int methodStackCount = getRequiredStackCountForInvocation(cp.getInvokeInsnNode());
-                insnList = generateInvokeContinuationPointInstructions(cp, returnType, methodStackCount);
+                insnList = merge(
+                        generateNormalInvokePointInstructions(cp, returnType),
+                        generateRestoreInvokePointInstructions(cp, returnType, methodStackCount, restoreInvokeTryCatchBlockNode),
+                        addLabel(cp.getEndLabelNode())
+                );
+                invokeTryCatchBlockNodes.add(restoreInvokeTryCatchBlockNode);
             }
-
 
             invokeInsnNodeReplacements.put(cp.getInvokeInsnNode(), insnList);
         });
         
         // We don't want labels to continuationPoints to be remapped when FlowInstrumentationInstructions returns them
-        return new FlowInstrumentationInstructions(entryPointInsnList, invokeInsnNodeReplacements);
+        return new FlowInstrumentationInstructions(entryPointInsnList, invokeInsnNodeReplacements, invokeTryCatchBlockNodes);
     }
     
-    private InsnList generateInvokeContinuationPointInstructions(ContinuationPoint cp, Type returnType, int methodStackCount) {
+    private InsnList generateNormalInvokePointInstructions(ContinuationPoint cp, Type selfReturnType) {
+        //
         //          restorePoint_<number>_normalExecute: // at this label: normal exec stack / normal exec var table
         //             // Clear any excess pending MethodStates that may be lingering. We need to do this because we may have pending method
         //             // states sitting around from methods that threw an exception. When a method that takes in a Continuation throws an
@@ -286,19 +303,6 @@ final class FlowInstrumentationGenerator {
         //          continuation.removeLastPending();
         //          goto restorePoint_<number>_end;
         //
-        //          restorePoint_<number>_loadExecute: // at this label: empty exec stack / uninit exec var table
-        //          exitLocks(lockState);
-        //          continuation.addPending(methodState); // method state should be loaded from Continuation.saved
-        //          restoreStackSuffix(stack, <number of items required for method invocation below>);
-        //          <method invocation>
-        //          if (continuation.getMode() == MODE_SAVING) {
-        //              exitLocks(lockState);
-        //              return <dummy>;
-        //          }
-        //          restoreOperandStack(stack);
-        //          restoreLocalsStack(localVars);
-        //
-        //          restorePoint_<number>_end:
         return merge(
                 addLabel(cp.getNormalLabelNode()),
                 // debugPrint("clear excess pending" + methodNode.name),
@@ -326,33 +330,65 @@ final class FlowInstrumentationGenerator {
                                 // debugPrint("exiting monitors" + methodNode.name),
                                 cloneInsnList(exitMonitorsInLockStateInsnList), // inserted many times, must be cloned
                                 // debugPrint("returning dummy value" + methodNode.name),
-                                returnDummy(returnType)
+                                returnDummy(selfReturnType)
                         )
                 ),
                 // debugPrint("calling remove last pending" + methodNode.name),
                 call(CONTINUATION_REMOVELASTPENDING_METHOD, loadVar(contArg)), // otherwise assume we're normal, and
                                                                                // remove the state we added on to
-                                                                               // pending
-                // debugPrint("jumping to end" + methodNode.name),
-                jumpTo(cp.getEndLabelNode()),
-                
-                
+                                                                               // pending                
+                // debugPrint("finished" + methodNode.name),
+                jumpTo(cp.getEndLabelNode())
+        );
+    }
+    
+    private InsnList generateRestoreInvokePointInstructions(ContinuationPoint cp, Type selfReturnType, int methodStackCount,
+            TryCatchBlockNode restoreInvokeTryCatchBlockNode) {
+        Type invokeMethodReturnType = getReturnTypeOfInvocation(cp.getInvokeInsnNode());
+        
+        //          restorePoint_<number>_loadExecute: // at this label: empty exec stack / uninit exec var table
+        //          enterLocks(lockState);
+        //          continuation.addPending(methodState); // method state should be loaded from Continuation.saved
+        //          restoreStackSuffix(stack, <number of items required for method invocation below>);
+        //          <method invocation>
+        //          if (continuation.getMode() == MODE_SAVING) {
+        //              exitLocks(lockState);
+        //              return <dummy>;
+        //          }
+        //          restoreOperandStack(stack);
+        //          restoreLocalsStack(localVars);
+        //          restorePoint_<number>_end;
+        //          goto restorePoint_<number>_end;
+        return merge(
                 addLabel(cp.getRestoreLabelNode()),
-                // RESTORING CODE NEEDS TO GO IN TO SWITCH STATEMENT THAT CURRENTLY JUMPS HERE. THIS IS BECAUSE OF SYNCHRONIZED BLOCKS. THE
-                // METHOD IS WRAPPED IN A GIANT TRY-CATCH-FINALLY WHERE MONITOREXITS ARE PERFORMED ON LOCAL VARIABLES; THOSE MONITOREXITS CAN'T
-                // BE EXECUTED IF THE LOCAL VARIABLE TABLE HASN'T INITALIZED THE OBJECTS THEY'RE SUPPOSED TO BE CALLED ON (VERIFIER WONT EVEN
-                // LET THE CODE THROUGH). WE JUMP HERE FROM THE SWITCH WITH ESSENTIALLY A BLANK LOCAL VARIABLES TABLE AND OPERAND STACK.
-                // AN EXCEPTION CAN OCCUR BEFORE THE LOCAL VARIABLES TABLE HAS BEEN RECONSTRUCTED. AS SUCH, MONITOREXITS MAY BE REFERRING TO
-                // EMPTY SLOTS. WHICH IS WHY WE NEED TO DO THIS CODE IN THE SWITCH.
-                MOVERESTORECODETOSWITCHBEINGADDEDATTOPOFMETHOD,
+                // debugPrint("entering monitors" + methodNode.name),
+                cloneInsnList(enterMonitorsInLockStateInsnList),
                 // debugPrint("calling addPending" + methodNode.name),
                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg), loadVar(methodStateVar)),
-                // debugPrint("loading portion of operand stack required to invoke continuation point method (last "
-                //        + methodStackCount + " items off operand stack are loaded on to stack)" + methodNode.name),
-                loadOperandStackSuffix(savedStackVar, tempObjVar, cp.getFrame(), methodStackCount),
-                // debugPrint("invoking with loaded items " + methodNode.name),
-                cloneInvokeNode(cp.getInvokeInsnNode()), // invoke method
-                POPRESULT_AND_SAVE(IFANY),
+                tryCatchBlock(
+                        restoreInvokeTryCatchBlockNode,
+                        null,
+                        merge(
+                                // debugPrint("loading portion of operand stack required to invoke continuation point method (last "
+                                //        + methodStackCount + " items off operand stack are loaded on to stack)" + methodNode.name),
+                                loadOperandStackSuffix(savedStackVar, tempObjVar, cp.getFrame(), methodStackCount),
+                                // debugPrint("invoking with loaded items " + methodNode.name),
+                                cloneInvokeNode(cp.getInvokeInsnNode()) // invoke method                        
+                        ),
+                        merge(
+                                // debugPrint("exception encountered " + methodNode.name),
+                                saveVar(tempObjVar2),
+                                // debugPrint("loading stack and local vars " + methodNode.name),
+                                loadOperandStackPrefix(savedStackVar, tempObjVar, cp.getFrame(),
+                                        cp.getFrame().getStackSize() - methodStackCount),
+                                loadLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
+                                // debugPrint("rethrowing " + methodNode.name),
+                                throwThrowableInVariable(tempObjVar2) // do not exit monitors here, the code already there as a part of the
+                                                                      // raw uninstrumented class should have cleanup logic
+                        )
+                ),
+                // debugPrint("saving return type of invocation" + methodNode.name),
+                castToObjectAndSave(invokeMethodReturnType, tempObjVar2), // save return (does nothing if void)
                 // debugPrint("testing if in saving mode" + methodNode.name),
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
@@ -361,7 +397,7 @@ final class FlowInstrumentationGenerator {
                                 // debugPrint("exiting monitors" + methodNode.name),
                                 cloneInsnList(exitMonitorsInLockStateInsnList), // inserted many times, must be cloned
                                 // debugPrint("returning dummy value" + methodNode.name),
-                                returnDummy(returnType)
+                                returnDummy(selfReturnType)
                         )
                 ),
                 // debugPrint("loading portion of operand stack that skips items required to invoke continuation point method (last "
@@ -369,15 +405,14 @@ final class FlowInstrumentationGenerator {
                 loadOperandStackPrefix(savedStackVar, tempObjVar, cp.getFrame(), cp.getFrame().getStackSize() - methodStackCount),
                 // debugPrint("loading locals" + methodNode.name),
                 loadLocalVariableTable(savedLocalsVar, tempObjVar, cp.getFrame()),
-                // debugPrint("restored" + methodNode.name),
-                LOAD_AND_PUSHRESULT(IFANY)
-                
-                
-                addLabel(cp.getEndLabelNode())
+                // debugPrint("loading return type of invocation" + methodNode.name),
+                loadAndCastToOriginal(invokeMethodReturnType, tempObjVar2),
+                // debugPrint("restored" + methodNode.name)
+                jumpTo(cp.getEndLabelNode())
         );
     }
     
-    private InsnList generateSuspendContinuationPointInstructions(ContinuationPoint cp, Type returnType) {
+    private InsnList generateNormalSuspendPointInstructions(ContinuationPoint cp, Type returnType) {
         //          restorePoint_<number>_normalExecute: // at this label: normal exec stack / normal exec var table
         //             // Clear any excess pending MethodStates that may be lingering. We need to do this because we may have pending method
         //             // states sitting around from methods that threw an exception. When a method that takes in a Continuation throws an
@@ -389,14 +424,6 @@ final class FlowInstrumentationGenerator {
         //          continuation.setMode(MODE_SAVING);
         //          exitLocks(lockState);
         //          return <dummy>;
-        //
-        //          restorePoint_<number>_loadExecute: // at this label: empty exec stack / uninit exec var table
-        //          enterLocks(lockState);
-        //          restoreOperandStack(stack);
-        //          restoreLocalsStack(localVars);
-        //          continuation.setMode(MODE_NORMAL);
-        //
-        //          restorePoint_<number>_end:
         return merge(
                 addLabel(cp.getNormalLabelNode()),
                 // debugPrint("clear excess pending" + methodNode.name),
@@ -418,18 +445,21 @@ final class FlowInstrumentationGenerator {
                 // debugPrint("exiting monitors" + methodNode.name),
                 cloneInsnList(exitMonitorsInLockStateInsnList), // used several times, must be cloned
                 // debugPrint("returning dummy value" + methodNode.name),
-                returnDummy(returnType), // return dummy value
-                jumpTo(cp.getEndLabelNode()),
-                
-                
+                returnDummy(returnType) // return dummy value
+        );
+    }
+    
+    private InsnList generateRestoreSuspendPointInstructions(ContinuationPoint cp, Type returnType) {
+        //          restorePoint_<number>_loadExecute: // at this label: empty exec stack / uninit exec var table
+        //          enterLocks(lockState);
+        //          restoreOperandStack(stack);
+        //          restoreLocalsStack(localVars);
+        //          continuation.setMode(MODE_NORMAL);
+        //          goto restorePoint_<number>_end;
+        return merge(
                 addLabel(cp.getRestoreLabelNode()),
-                // RESTORING CODE NEEDS TO GO IN TO SWITCH STATEMENT THAT CURRENTLY JUMPS HERE. THIS IS BECAUSE OF SYNCHRONIZED BLOCKS. THE
-                // METHOD IS WRAPPED IN A GIANT TRY-CATCH-FINALLY WHERE MONITOREXITS ARE PERFORMED ON LOCAL VARIABLES; THOSE MONITOREXITS CAN'T
-                // BE EXECUTED IF THE LOCAL VARIABLE TABLE HASN'T INITALIZED THE OBJECTS THEY'RE SUPPOSED TO BE CALLED ON (VERIFIER WONT EVEN
-                // LET THE CODE THROUGH). WE JUMP HERE FROM THE SWITCH WITH ESSENTIALLY A BLANK LOCAL VARIABLES TABLE AND OPERAND STACK.
-                // AN EXCEPTION CAN OCCUR BEFORE THE LOCAL VARIABLES TABLE HAS BEEN RECONSTRUCTED. AS SUCH, MONITOREXITS MAY BE REFERRING TO
-                // EMPTY SLOTS. WHICH IS WHY WE NEED TO DO THIS CODE IN THE SWITCH.
-                MOVERESTORECODETOSWITCHBEINGADDEDATTOPOFMETHOD,
+                // debugPrint("entering monitors" + methodNode.name),
+                cloneInsnList(enterMonitorsInLockStateInsnList),
                 // debugPrint("loading operand stack" + methodNode.name),
                 loadOperandStack(savedStackVar, tempObjVar, cp.getFrame()),
                 // debugPrint("loading locals" + methodNode.name),
@@ -443,9 +473,134 @@ final class FlowInstrumentationGenerator {
                 // debugPrint("going back in to normal mode" + methodNode.name),
                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_NORMAL)),
                 // debugPrint("restored" + methodNode.name),
-                
-                
-                addLabel(cp.getEndLabelNode())
+                jumpTo(cp.getEndLabelNode())
         );
+    }
+    
+    private static InsnList castToObjectAndSave(Type originalType, Variable variable) {
+        Validate.notNull(originalType);
+        Validate.notNull(variable);
+        Validate.isTrue(variable.getType().equals(Type.getType(Object.class)));
+
+        InsnList ret = new InsnList();
+        switch (originalType.getSort()) {
+            case Type.BOOLEAN:
+                ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;"));
+                ret.add(saveVar(variable)); // save it in to the returnValObj
+                break;
+            case Type.BYTE:
+                ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;", false));
+                ret.add(saveVar(variable)); // save it in to the returnValObj
+                break;
+            case Type.SHORT:
+                ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;", false));
+                ret.add(saveVar(variable)); // save it in to the returnValObj
+                break;
+            case Type.CHAR:
+                ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;", false));
+                ret.add(saveVar(variable)); // save it in to the returnValObj
+                break;
+            case Type.INT:
+                ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false));
+                ret.add(saveVar(variable)); // save it in to the returnValObj
+                break;
+            case Type.FLOAT:
+                ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;", false));
+                ret.add(saveVar(variable)); // save it in to the returnValObj
+                break;
+            case Type.LONG:
+                ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false));
+                ret.add(saveVar(variable)); // save it in to the returnValObj
+                break;
+            case Type.DOUBLE:
+                ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false));
+                ret.add(saveVar(variable)); // save it in to the returnValObj
+                break;
+            case Type.ARRAY:
+            case Type.OBJECT:
+            case Type.VOID:
+                break;
+            case Type.METHOD:
+            default:
+                throw new IllegalArgumentException();
+        }
+        
+        return ret;
+    }
+
+    private static InsnList loadAndCastToOriginal(Type originalType, Variable variable) {
+        Validate.notNull(originalType);
+        Validate.notNull(variable);
+        Validate.isTrue(variable.getType().equals(Type.getType(Object.class)));
+
+        InsnList ret = new InsnList();
+        
+        switch (originalType.getSort()) {
+            case Type.BOOLEAN:
+                ret.add(loadVar(variable)); // load it in to the returnValObj
+                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Boolean"));
+                ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false));
+                break;
+            case Type.BYTE:
+                ret.add(loadVar(variable)); // load it in to the returnValObj
+                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Byte"));
+                ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Byte", "byteValue", "()B", false));
+                break;
+            case Type.SHORT:
+                ret.add(loadVar(variable)); // load it in to the returnValObj
+                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Short"));
+                ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Short", "shortValue", "()S", false));
+                break;
+            case Type.CHAR:
+                ret.add(loadVar(variable)); // load it in to the returnValObj
+                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Character"));
+                ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Character", "charValue", "()C", false));
+                break;
+            case Type.INT:
+                ret.add(loadVar(variable)); // load it in to the returnValObj
+                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Integer"));
+                ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false));
+                break;
+            case Type.FLOAT:
+                ret.add(loadVar(variable)); // load it in to the returnValObj
+                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Float"));
+                ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F", false));
+                break;
+            case Type.LONG:
+                ret.add(loadVar(variable)); // load it in to the returnValObj
+                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Long"));
+                ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false));
+                break;
+            case Type.DOUBLE:
+                ret.add(loadVar(variable)); // load it in to the returnValObj
+                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Double"));
+                ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D", false));
+                break;
+            case Type.ARRAY:
+            case Type.OBJECT:
+                ret.add(loadVar(variable)); // load it in to the returnValObj
+                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, originalType.getInternalName()));
+                break;
+            case Type.VOID:
+                break;
+            case Type.METHOD:
+            default:
+                throw new IllegalArgumentException();
+        }
+
+        return ret;
+    }
+
+    private static InsnList throwThrowableInVariable(Variable variable) {
+        Validate.notNull(variable);
+        Validate.isTrue(variable.getType().equals(Type.getType(Object.class)));
+
+        InsnList ret = new InsnList();
+        
+        ret.add(loadVar(variable)); // load it in to the returnValObj
+        ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Throwable"));
+        ret.add(new InsnNode(Opcodes.ATHROW));
+        
+        return ret;
     }
 }

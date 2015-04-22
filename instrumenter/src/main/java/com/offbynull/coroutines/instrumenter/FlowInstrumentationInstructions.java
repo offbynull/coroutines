@@ -16,19 +16,24 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
+import java.util.List;
 import java.util.Map;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.TryCatchBlockNode;
 
 final class FlowInstrumentationInstructions {
     private final InsnList entryPointInsnList;
     private final Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements;
+    private final List<TryCatchBlockNode> invokeTryCatchBlockNodes;
 
-    FlowInstrumentationInstructions(InsnList entryPointInsnList, Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements) {
+    FlowInstrumentationInstructions(InsnList entryPointInsnList, Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements,
+            List<TryCatchBlockNode> invokeTryCatchBlockNodes) {
         this.entryPointInsnList = entryPointInsnList;
         this.invokeInsnNodeReplacements = invokeInsnNodeReplacements;
+        this.invokeTryCatchBlockNodes = invokeTryCatchBlockNodes;
     }
-    
+
     // WARNING: Be careful with using these more than once. If you insert one InsnList in to another InsnList, it'll become empty. If you
     // need to insert the instructions in an InsnList multiple times, make sure to CLONE IT FIRST!
     
@@ -39,4 +44,9 @@ final class FlowInstrumentationInstructions {
     Map<AbstractInsnNode, InsnList> getInvokeInsnNodeReplacements() {
         return invokeInsnNodeReplacements;
     }
+
+    public List<TryCatchBlockNode> getInvokeTryCatchBlockNodes() {
+        return invokeTryCatchBlockNodes;
+    }
+
 }

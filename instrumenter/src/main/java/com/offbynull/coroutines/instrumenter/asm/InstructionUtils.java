@@ -41,6 +41,7 @@ import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.TableSwitchInsnNode;
+import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
@@ -315,7 +316,7 @@ public final class InstructionUtils {
         ret.add(new InsnNode(Opcodes.ACONST_NULL));
         return ret;
     }
-
+    
     /**
      * Copies a local variable on to the stack.
      * @param variable variable within the local variable table to load from
@@ -651,6 +652,46 @@ public final class InstructionUtils {
             ret.add(defaultInsnList);
         }
         
+        return ret;
+    }
+
+    /**
+     * Generates instructions for a try-catch block.
+     * @param tryCatchBlockNode try catch block node to populate to with label with relevant information
+     * @param exceptionType exception type to catch ({@code null} means catch any exception)
+     * @param tryInsnList instructions to execute for try block
+     * @param catchInsnList instructions to execute for catch block
+     * @return instructions for a try catch block
+     * @throws NullPointerException if any argument other than {@code exceptionType} is {@code null} or contains {@code null}
+     * @throws IllegalArgumentException if {@code exceptionType} is not an object type (technically must inherit from {@link Throwable},
+     * but no way to check this)
+     */
+    public static InsnList tryCatchBlock(TryCatchBlockNode tryCatchBlockNode, Type exceptionType, InsnList tryInsnList,
+            InsnList catchInsnList) {
+        Validate.notNull(tryInsnList);
+        // exceptionType can be null
+        Validate.notNull(catchInsnList);
+        if (exceptionType != null) {
+            Validate.isTrue(exceptionType.getSort() == Type.OBJECT);
+        }
+        
+        InsnList ret = new InsnList();
+
+        LabelNode tryLabelNode = new LabelNode();
+        LabelNode catchLabelNode = new LabelNode();
+        LabelNode endLabelNode = new LabelNode();
+        
+        tryCatchBlockNode.start = tryLabelNode;
+        tryCatchBlockNode.end = catchLabelNode;
+        tryCatchBlockNode.handler = catchLabelNode;
+        tryCatchBlockNode.type = exceptionType == null ? null : exceptionType.getInternalName();
+
+        ret.add(tryLabelNode);
+        ret.add(tryInsnList);
+        ret.add(new JumpInsnNode(Opcodes.GOTO, endLabelNode));
+        ret.add(catchLabelNode);
+        ret.add(catchInsnList);
+        ret.add(endLabelNode);
         return ret;
     }
 

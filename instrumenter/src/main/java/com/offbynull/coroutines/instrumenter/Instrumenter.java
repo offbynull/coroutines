@@ -46,6 +46,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
@@ -194,6 +195,11 @@ public final class Instrumenter {
     private void applyInstrumentationLogic(MethodNode methodNode,
             FlowInstrumentationInstructions flowInstrumentationLogic,
             MonitorInstrumentationInstructions monitorInstrumentationLogic) {
+        
+        // Add trycatch nodes
+        for (TryCatchBlockNode tryCatchBlockNode : flowInstrumentationLogic.getInvokeTryCatchBlockNodes()) {
+            methodNode.tryCatchBlocks.add(tryCatchBlockNode);
+        }
         
         // Add loading code
         InsnList entryPointInsnList = flowInstrumentationLogic.getEntryPointInsnList();

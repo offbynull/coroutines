@@ -251,4 +251,28 @@ public final class SearchUtils {
             throw new IllegalArgumentException();
         }
     }
+
+    /**
+     * Get the return type of the method being invoked.
+     * @param invokeNode the invocation instruction (either normal invocation or invokedynamic)
+     * @return number of items required on the stack for this method
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code invokeNode} is neither of type {@link MethodInsnNode} nor {@link InvokeDynamicInsnNode},
+     * or if type of invocation ({@link MethodInsnNode}) cannot be determined
+     */
+    public static Type getReturnTypeOfInvocation(AbstractInsnNode invokeNode) {
+        Validate.notNull(invokeNode);
+
+        if (invokeNode instanceof MethodInsnNode) {
+            MethodInsnNode methodInsnNode = (MethodInsnNode) invokeNode;
+            Type methodType = Type.getType(methodInsnNode.desc);
+            return methodType.getReturnType();
+        } else if (invokeNode instanceof InvokeDynamicInsnNode) {
+            InvokeDynamicInsnNode invokeDynamicInsnNode = (InvokeDynamicInsnNode) invokeNode;
+            Type methodType = Type.getType(invokeDynamicInsnNode.desc);
+            return methodType.getReturnType();
+        } else {
+            throw new IllegalArgumentException();
+        }
+    }
 }
