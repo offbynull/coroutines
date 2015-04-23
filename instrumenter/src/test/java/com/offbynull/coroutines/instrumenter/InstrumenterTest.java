@@ -30,7 +30,6 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
@@ -371,7 +370,7 @@ public final class InstrumenterTest {
     
     @Test
     public void mustKeepTrackOfSynchronizedBlocks() throws Exception {
-        LinkedList<String> tracker = new LinkedList();
+        LinkedList<String> tracker = new LinkedList<>();
         
         // mon1/mon2/mon3 all point to different objects that are logically equivalent but different objects. Tracking should ignore logical
         // equivallence and instead focus on checking to make sure that they references are the same. We don't want to call MONITOREXIT on
@@ -411,7 +410,7 @@ public final class InstrumenterTest {
             Assert.assertArrayEquals(new Object[] { }, continuation.getSaved(1).getLockState().toArray());
             
             Assert.assertTrue(runner.execute());
-            Assert.assertEquals(Arrays.asList(), tracker);
+            Assert.assertEquals(Arrays.<String>asList(), tracker);
             Assert.assertArrayEquals(new Object[] { }, continuation.getSaved(0).getLockState().toArray());
             
             Assert.assertFalse(runner.execute()); // coroutine finished executing here            

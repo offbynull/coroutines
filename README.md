@@ -326,6 +326,7 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
+- ADDED: Major performance improvement: Deferred operand stack and local variable table loading. As a by product, code had to be refactored to be more modular / maintainable.
 
 ### [1.0.4] - 2015-04-20
 - FIXED: Proper handling of caught exceptions -- pending method states are now being properly rolled back on exception

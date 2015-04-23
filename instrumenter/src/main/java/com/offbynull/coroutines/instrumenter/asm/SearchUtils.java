@@ -20,18 +20,25 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.Validate;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
+import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TryCatchBlockNode;
 
 /**
  * Utility class to search Java bytecode. 
@@ -204,5 +211,166 @@ public final class SearchUtils {
         }
         
         return ret;
+    }
+    
+    /**
+     * Get the number of items that need to be on the stack for an invocation of some method.
+     * @param invokeNode the invocation instruction (either normal invocation or invokedynamic)
+     * @return number of items required on the stack for this method
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code invokeNode} is neither of type {@link MethodInsnNode} nor {@link InvokeDynamicInsnNode},
+     * or if type of invocation ({@link MethodInsnNode}) cannot be determined
+     */
+    public static int getRequiredStackCountForInvocation(AbstractInsnNode invokeNode) {
+        Validate.notNull(invokeNode);
+
+        if (invokeNode instanceof MethodInsnNode) {
+            MethodInsnNode methodInsnNode = (MethodInsnNode) invokeNode;
+            int extra;
+            int paramCount;
+            
+            switch (methodInsnNode.getOpcode()) {
+                case Opcodes.INVOKEVIRTUAL:
+                case Opcodes.INVOKESPECIAL:
+                case Opcodes.INVOKEINTERFACE:
+                    extra = 1;
+                    break;
+                case Opcodes.INVOKESTATIC:
+                    extra = 0;
+                    break;
+                default:
+                    throw new IllegalArgumentException(); // unknown invocation type? probably badly generated instruction node
+            }
+            Type methodType = Type.getType(methodInsnNode.desc);
+            paramCount = methodType.getArgumentTypes().length;
+            
+            return paramCount + extra;
+        } else if (invokeNode instanceof InvokeDynamicInsnNode) {
+            InvokeDynamicInsnNode invokeDynamicInsnNode = (InvokeDynamicInsnNode) invokeNode;
+            int paramCount;
+            
+            Type methodType = Type.getType(invokeDynamicInsnNode.desc);
+            paramCount = methodType.getArgumentTypes().length;
+            
+            return paramCount;
+        } else {
+            throw new IllegalArgumentException();
+        }
+    }
+
+    /**
+     * Get the return type of the method being invoked.
+     * @param invokeNode the invocation instruction (either normal invocation or invokedynamic)
+     * @return number of items required on the stack for this method
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code invokeNode} is neither of type {@link MethodInsnNode} nor {@link InvokeDynamicInsnNode},
+     * or if type of invocation ({@link MethodInsnNode}) cannot be determined
+     */
+    public static Type getReturnTypeOfInvocation(AbstractInsnNode invokeNode) {
+        Validate.notNull(invokeNode);
+
+        if (invokeNode instanceof MethodInsnNode) {
+            MethodInsnNode methodInsnNode = (MethodInsnNode) invokeNode;
+            Type methodType = Type.getType(methodInsnNode.desc);
+            return methodType.getReturnType();
+        } else if (invokeNode instanceof InvokeDynamicInsnNode) {
+            InvokeDynamicInsnNode invokeDynamicInsnNode = (InvokeDynamicInsnNode) invokeNode;
+            Type methodType = Type.getType(invokeDynamicInsnNode.desc);
+            return methodType.getReturnType();
+        } else {
+            throw new IllegalArgumentException();
+        }
+    }
+    
+    /**
+     * Find trycatch blocks within a method that an instruction is apart of. Only includes the try portion, not the catch (handler) portion.
+     * @param insnList instruction list for method
+     * @param tryCatchBlockNodes trycatch blocks in method
+     * @param insnNode instruction within method being searched against
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @throws IllegalArgumentException if arguments aren't all from the same method
+     * @return items from {@code tryCatchBlockNodes} that {@code insnNode} is a part of
+     */
+    public static List<TryCatchBlockNode> findTryCatchBlockNodesEncompassingInstruction(InsnList insnList,
+            List<TryCatchBlockNode> tryCatchBlockNodes, AbstractInsnNode insnNode) {
+        Validate.notNull(insnList);
+        Validate.notNull(tryCatchBlockNodes);
+        Validate.notNull(insnNode);
+        Validate.noNullElements(tryCatchBlockNodes);
+        
+        Map<LabelNode, Integer> labelPositions = new HashMap<>();
+        int insnNodeIdx = -1;
+        
+        // Get index of labels and insnNode within method
+        ListIterator<AbstractInsnNode> insnIt = insnList.iterator();
+        int insnCounter = 0;
+        while (insnIt.hasNext()) {
+            AbstractInsnNode node = insnIt.next();
+            
+            // If our instruction, save index
+            if (node == insnNode) {
+                if (insnNodeIdx == -1) {
+                    insnNodeIdx = insnCounter;
+                } else {
+                    throw new IllegalArgumentException(); // insnNode encountered multiple times in methodNode. Should not happen.
+                }
+            }
+            
+            // If label node, save position
+            if (node instanceof LabelNode) {
+                labelPositions.put((LabelNode) node, insnCounter);
+            }
+            
+            // Increment counter
+            insnCounter++;
+        }
+        
+        Validate.isTrue(insnNodeIdx != -1); //throw exception if node not in method list
+        
+        
+        
+        // Find out which trycatch blocks insnNode is within
+        List<TryCatchBlockNode> ret = new ArrayList<>();
+        for (TryCatchBlockNode tryCatchBlockNode : tryCatchBlockNodes) {
+            Integer startIdx = labelPositions.get(tryCatchBlockNode.start);
+            Integer endIdx = labelPositions.get(tryCatchBlockNode.end);
+            
+            Validate.isTrue(startIdx != null && endIdx != null); // throw exception if the labels in the trycatchblock node were never found
+                                                                 // in instruction list
+            
+            if (insnNodeIdx >= startIdx && insnNodeIdx < endIdx) {
+                ret.add(tryCatchBlockNode);
+            }
+        }
+        
+        return ret;
+    }
+
+    /**
+     * Find line number associated with an instruction.
+     * @param insnList instruction list for method
+     * @param insnNode instruction within method being searched against
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @throws IllegalArgumentException if arguments aren't all from the same method
+     * @return line number node associated with the instruction, or {@code null} if no line number exists
+     */
+    public static LineNumberNode findLineNumberForInstruction(InsnList insnList, AbstractInsnNode insnNode) {
+        Validate.notNull(insnList);
+        Validate.notNull(insnNode);
+        
+        int idx = insnList.indexOf(insnNode);
+        Validate.isTrue(idx != -1);
+        
+        // Get index of labels and insnNode within method
+        ListIterator<AbstractInsnNode> insnIt = insnList.iterator(idx);
+        while (insnIt.hasPrevious()) {
+            AbstractInsnNode node = insnIt.previous();
+            
+            if (node instanceof LineNumberNode) {
+                return (LineNumberNode) node;
+            }
+        }
+        
+        return null;
     }
 }

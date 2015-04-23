@@ -46,6 +46,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
@@ -126,19 +127,19 @@ public final class Instrumenter {
             // Find invocations of continuation points
             List<AbstractInsnNode> suspendInvocationInsnNodes
                     = findInvocationsOf(methodNode.instructions, CONTINUATION_SUSPEND_METHOD);
-            List<AbstractInsnNode> saveInvocationInsnNodes
+            List<AbstractInsnNode> invokeInvocationInsnNodes
                     = findInvocationsWithParameter(methodNode.instructions, CONTINUATION_CLASS_TYPE);
             
             // If there are no continuation points, we don't need to instrument this method. It'll be like any other normal method
             // invocation because it won't have the potential to pause or call in to another method that may potentially pause.
-            if (suspendInvocationInsnNodes.isEmpty() && saveInvocationInsnNodes.isEmpty()) {
+            if (suspendInvocationInsnNodes.isEmpty() && invokeInvocationInsnNodes.isEmpty()) {
                 continue;
             }
             
             // Check for continuation points that use invokedynamic instruction, which are currently only used by lambdas. See comments in
             // validateNoInvokeDynamic to see why we need to do this.
             validateNoInvokeDynamic(suspendInvocationInsnNodes);
-            validateNoInvokeDynamic(saveInvocationInsnNodes);
+            validateNoInvokeDynamic(invokeInvocationInsnNodes);
             
             // Analyze method
             Frame<BasicValue>[] frames;
@@ -161,9 +162,10 @@ public final class Instrumenter {
                     varTable,
                     methodStateVar,
                     tempObjVar);
-            MonitorInstrumentationLogic monitorInstrumentationLogic = MonitorInstrumentationLogic.generate(
+            MonitorInstrumentationInstructions monitorInstrumentationLogic = new MonitorInstrumentationGenerator(
                     methodNode,
-                    monitorInstrumentationVariables);
+                    monitorInstrumentationVariables)
+                    .generate();
             
             // Generate code to deal with flow control (makes use of some of the code generated in monitorInstrumentationLogic)
             FlowInstrumentationVariables flowInstrumentationVariables = new FlowInstrumentationVariables(
@@ -171,16 +173,17 @@ public final class Instrumenter {
                     contArg,
                     methodStateVar,
                     tempObjVar);
-            FlowInstrumentationLogic flowInstrumentationLogic = FlowInstrumentationLogic.generate(
+            FlowInstrumentationInstructions flowInstrumentationInstructions = new FlowInstrumentationGenerator(
                     methodNode,
                     suspendInvocationInsnNodes,
-                    saveInvocationInsnNodes,
+                    invokeInvocationInsnNodes,
                     frames,
                     monitorInstrumentationLogic,
-                    flowInstrumentationVariables);
+                    flowInstrumentationVariables)
+                    .generate();
             
             // Apply generated code
-            applyInstrumentationLogic(methodNode, flowInstrumentationLogic, monitorInstrumentationLogic);
+            applyInstrumentationLogic(methodNode, flowInstrumentationInstructions, monitorInstrumentationLogic);
         }
 
         // Write tree model back out as class
@@ -190,8 +193,13 @@ public final class Instrumenter {
     }
     
     private void applyInstrumentationLogic(MethodNode methodNode,
-            FlowInstrumentationLogic flowInstrumentationLogic,
-            MonitorInstrumentationLogic monitorInstrumentationLogic) {
+            FlowInstrumentationInstructions flowInstrumentationLogic,
+            MonitorInstrumentationInstructions monitorInstrumentationLogic) {
+        
+        // Add trycatch nodes
+        for (TryCatchBlockNode tryCatchBlockNode : flowInstrumentationLogic.getInvokeTryCatchBlockNodes()) {
+            methodNode.tryCatchBlocks.add(0, tryCatchBlockNode);
+        }
         
         // Add loading code
         InsnList entryPointInsnList = flowInstrumentationLogic.getEntryPointInsnList();
