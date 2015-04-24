@@ -17,6 +17,7 @@
 package com.offbynull.coroutines.instrumenter;
 
 import java.util.Map;
+import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 
@@ -33,6 +34,14 @@ final class MonitorInstrumentationInstructions {
             InsnList createAndStoreLockStateInsnList, InsnList loadAndStoreLockStateFromMethodStateInsnList,
             InsnList loadLockStateToStackInsnList, InsnList enterMonitorsInLockStateInsnList,
             InsnList exitMonitorsInLockStateInsnList) {
+        Validate.notNull(monitorInsnNodeReplacements);
+        Validate.notNull(createAndStoreLockStateInsnList);
+        Validate.notNull(loadAndStoreLockStateFromMethodStateInsnList);
+        Validate.notNull(loadLockStateToStackInsnList);
+        Validate.notNull(enterMonitorsInLockStateInsnList);
+        Validate.notNull(exitMonitorsInLockStateInsnList);
+        Validate.noNullElements(monitorInsnNodeReplacements.keySet());
+        Validate.noNullElements(monitorInsnNodeReplacements.values());
         this.monitorInsnNodeReplacements = monitorInsnNodeReplacements;
         this.createAndStoreLockStateInsnList = createAndStoreLockStateInsnList;
         this.loadAndStoreLockStateFromMethodStateInsnList = loadAndStoreLockStateFromMethodStateInsnList;

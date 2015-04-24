@@ -335,8 +335,8 @@ public final class SearchUtils {
             Integer startIdx = labelPositions.get(tryCatchBlockNode.start);
             Integer endIdx = labelPositions.get(tryCatchBlockNode.end);
             
-            Validate.isTrue(startIdx != null && endIdx != null); // throw exception if the labels in the trycatchblock node were never found
-                                                                 // in instruction list
+            Validate.isTrue(startIdx != null);
+            Validate.isTrue(endIdx != null);
             
             if (insnNodeIdx >= startIdx && insnNodeIdx < endIdx) {
                 ret.add(tryCatchBlockNode);

@@ -26,12 +26,11 @@ import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 
-abstract class ContinuationPoint {
+abstract class ContinuationPointGenerator {
 
     protected static final Method CONTINUATION_GETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
@@ -64,7 +63,7 @@ abstract class ContinuationPoint {
     private final FlowInstrumentationVariables flowInstrumentationVariables;
     private final MonitorInstrumentationInstructions monitorInstrumentationInstructions;
 
-    ContinuationPoint(int id, AbstractInsnNode invokeInsnNode, LineNumberNode invokeLineNumberNode, Frame<BasicValue> frame,
+    ContinuationPointGenerator(int id, AbstractInsnNode invokeInsnNode, LineNumberNode invokeLineNumberNode, Frame<BasicValue> frame,
             Type returnType,
             FlowInstrumentationVariables flowInstrumentationVariables,
             MonitorInstrumentationInstructions monitorInstrumentationInstructions) {
@@ -86,33 +85,29 @@ abstract class ContinuationPoint {
         return id;
     }
 
-    final AbstractInsnNode getInvokeInsnNode() {
+    protected final AbstractInsnNode getInvokeInsnNode() {
         return invokeInsnNode;
     }
 
-    final Integer getLineNumber() {
+    protected final Integer getLineNumber() {
         return lineNumber;
     }
 
-    final Frame<BasicValue> getFrame() {
+    protected final Frame<BasicValue> getFrame() {
         return frame;
     }
 
-    final Type getReturnType() {
+    protected final Type getReturnType() {
         return returnType;
     }
 
-    final FlowInstrumentationVariables getFlowInstrumentationVariables() {
+    protected final FlowInstrumentationVariables getFlowInstrumentationVariables() {
         return flowInstrumentationVariables;
     }
 
-    final MonitorInstrumentationInstructions getMonitorInstrumentationInstructions() {
+    protected final MonitorInstrumentationInstructions getMonitorInstrumentationInstructions() {
         return monitorInstrumentationInstructions;
     }
     
-    // the logic that gets executed when the switch statement at the top of the method determines that the method is being loaded
-    abstract InsnList generateLoadInstructions();
-    
-    // the logic that replaces invocation
-    abstract InsnList generateInvokeReplacementInstructions();
+    abstract ContinuationPointInstructions generate();
 }

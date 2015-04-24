@@ -35,6 +35,7 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOpe
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import static com.offbynull.coroutines.user.Continuation.MODE_NORMAL;
 import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
+import java.util.Collections;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
@@ -43,11 +44,13 @@ import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 
-final class SuspendContinuationPoint extends ContinuationPoint {
-    
-    private final LabelNode execContinueLabelNode = new LabelNode();
+final class SuspendContinuationPointGenerator extends ContinuationPointGenerator {
 
-    public SuspendContinuationPoint(int id, AbstractInsnNode invokeInsnNode, LineNumberNode invokeLineNumberNode, Frame<BasicValue> frame,
+    public SuspendContinuationPointGenerator(
+            int id,
+            AbstractInsnNode invokeInsnNode,
+            LineNumberNode invokeLineNumberNode,
+            Frame<BasicValue> frame,
             Type returnType,
             FlowInstrumentationVariables flowInstrumentationVariables,
             MonitorInstrumentationInstructions monitorInstrumentationInstructions) {
@@ -56,7 +59,16 @@ final class SuspendContinuationPoint extends ContinuationPoint {
     }
     
     @Override
-    InsnList generateLoadInstructions() {
+    ContinuationPointInstructions generate() {
+        LabelNode execContinueLabelNode = new LabelNode();
+        return new ContinuationPointInstructions(
+                getInvokeInsnNode(),
+                generateLoadInstructions(execContinueLabelNode),
+                generateInvokeReplacementInstructions(execContinueLabelNode),
+                Collections.emptyList());
+    }
+    
+    private InsnList generateLoadInstructions(LabelNode execContinueLabelNode) {
         FlowInstrumentationVariables vars = getFlowInstrumentationVariables();
         MonitorInstrumentationInstructions monInsts = getMonitorInstrumentationInstructions();
         
@@ -78,13 +90,9 @@ final class SuspendContinuationPoint extends ContinuationPoint {
         //          goto restorePoint_<number>_restore
         return merge(
                 lineNum == null ? empty() : lineNumber(lineNum),
-                // debugPrint("loading operand stack" + methodNode.name),
                 loadOperandStack(savedStackVar, tempObjVar, frame),
-                // debugPrint("loading locals" + methodNode.name),
                 loadLocalVariableTable(savedLocalsVar, tempObjVar, frame),
-                // debugPrint("entering monitors" + methodNode.name),
                 cloneInsnList(enterMonitorsInLockStateInsnList),
-                // debugPrint("popping continuation ref off stack" + methodNode.name),
                 pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
                        // stack that would have been consumed by that invocation... since we're removing that call, we
                        // also need to pop the Continuation reference from the stack... it's important that we
@@ -92,13 +100,12 @@ final class SuspendContinuationPoint extends ContinuationPoint {
                        // of stack pointing to that continuation object
                 // debugPrint("going back in to normal mode" + methodNode.name),
                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_NORMAL)),
-                // debugPrint("restored" + methodNode.name)
                 jumpTo(execContinueLabelNode)
         );
     }
 
-    @Override
-    InsnList generateInvokeReplacementInstructions() {
+    
+    private InsnList generateInvokeReplacementInstructions(LabelNode execContinueLabelNode) {
         FlowInstrumentationVariables vars = getFlowInstrumentationVariables();
         MonitorInstrumentationInstructions monInsts = getMonitorInstrumentationInstructions();
         
@@ -130,13 +137,9 @@ final class SuspendContinuationPoint extends ContinuationPoint {
         //
         //          restorePoint_<number>_restore: // at this label: empty exec stack / uninit exec var table
         return merge(
-                // debugPrint("clear excess pending" + methodNode.name),
                 call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
-                // debugPrint("saving operand stack" + methodNode.name),
                 saveOperandStack(savedStackVar, tempObjVar, frame),
-                // debugPrint("saving locals" + methodNode.name),
                 saveLocalVariableTable(savedLocalsVar, tempObjVar, frame),
-                // debugPrint("calling addIndividual pending" + methodNode.name),
                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                         construct(METHODSTATE_INIT_METHOD,
                                 loadIntConst(getId()),
@@ -146,9 +149,7 @@ final class SuspendContinuationPoint extends ContinuationPoint {
                         )
                 ),
                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_SAVING)),
-                // debugPrint("exiting monitors" + methodNode.name),
                 cloneInsnList(exitMonitorsInLockStateInsnList), // used several times, must be cloned
-                // debugPrint("returning dummy value" + methodNode.name),
                 returnDummy(returnType), // return dummy value
                 
                 

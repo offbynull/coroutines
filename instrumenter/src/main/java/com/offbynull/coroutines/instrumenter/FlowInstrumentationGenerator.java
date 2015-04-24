@@ -100,24 +100,24 @@ final class FlowInstrumentationGenerator {
 
         // Generate continuation point details
         int nextId = 0;
-        List<ContinuationPoint> continuationPoints = new LinkedList<>();
+        List<ContinuationPointInstructions> continuationPoints = new LinkedList<>();
 
         for (AbstractInsnNode suspendInvocationInsnNode : suspendInvocationInsnNodes) {
             int insnIdx = methodNode.instructions.indexOf(suspendInvocationInsnNode);
             LineNumberNode invokeLineNumberNode = findLineNumberForInstruction(methodNode.instructions, suspendInvocationInsnNode);
-            ContinuationPoint cp = new SuspendContinuationPoint(
+            ContinuationPointInstructions cp = new SuspendContinuationPointGenerator(
                     nextId,
                     suspendInvocationInsnNode,
                     invokeLineNumberNode,
                     frames[insnIdx],
                     returnType,
                     flowInstrumentationVariables,
-                    monitorInstrumentationInstructions);
+                    monitorInstrumentationInstructions)
+                    .generate();
             continuationPoints.add(cp);
             nextId++;
         }
 
-        List<TryCatchBlockNode> invokeTryCatchBlockNodes = new ArrayList<>(invokeInvocationInsnNodes.size());
         for (AbstractInsnNode invokeInvocationInsnNode : invokeInvocationInsnNodes) {
             boolean withinTryCatch = findTryCatchBlockNodesEncompassingInstruction(
                     methodNode.instructions,
@@ -126,29 +126,27 @@ final class FlowInstrumentationGenerator {
             LineNumberNode invokeLineNumberNode = findLineNumberForInstruction(methodNode.instructions, invokeInvocationInsnNode);
             
             int insnIdx = methodNode.instructions.indexOf(invokeInvocationInsnNode);
-            ContinuationPoint cp; // = new ContinuationPoint(type, nextId, invokeInvocationInsnNode, frames[insnIdx]);
+            ContinuationPointInstructions cp;
             if (withinTryCatch) {
-                TryCatchBlockNode newTryCatchBlockNode = new TryCatchBlockNode(null, null, null, null);
-                invokeTryCatchBlockNodes.add(newTryCatchBlockNode);
-                
-                cp = new InvokeWithinTryCatchContinuationPoint(
+                cp = new InvokeWithinTryCatchContinuationPointGenerator(
                         nextId,
                         invokeInvocationInsnNode,
                         invokeLineNumberNode,
                         frames[insnIdx],
                         returnType,
-                        newTryCatchBlockNode,
                         flowInstrumentationVariables,
-                        monitorInstrumentationInstructions);
+                        monitorInstrumentationInstructions)
+                        .generate();
             } else {
-                cp = new InvokeContinuationPoint(
+                cp = new InvokeContinuationPointGenerator(
                         nextId,
                         invokeInvocationInsnNode,
                         invokeLineNumberNode,
                         frames[insnIdx],
                         returnType,
                         flowInstrumentationVariables,
-                        monitorInstrumentationInstructions);
+                        monitorInstrumentationInstructions)
+                        .generate();
             }
             
             continuationPoints.add(cp);
@@ -210,21 +208,20 @@ final class FlowInstrumentationGenerator {
         LabelNode startOfMethodLabelNode = new LabelNode();
         InsnList entryPointInsnList
                 = merge(
-                        // debugPrint("calling get pending size" + methodNode.name),
-                        call(CONTINUATION_GETPENDINGSIZE_METHOD, loadVar(contArg)),
+                        call(CONTINUATION_GETPENDINGSIZE_METHOD, loadVar(contArg)), // call getPendingSize()
                         saveVar(pendingCountVar),
                         tableSwitch(
                                 call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                                 throwException("Unrecognized state"),
                                 0,
                                 merge(
-                                        // debugPrint("fresh invoke" + methodNode.name),
+                                        // fresh invoke
                                         createAndStoreLockStateInsnList,
                                         jumpTo(startOfMethodLabelNode)
                                 ),
                                 throwException("Unexpected state (saving not allowed at this point)"),
                                 merge(
-                                        // debugPrint("calling remove first saved" + methodNode.name),
+                                        // restore invoke
                                         call(CONTINUATION_REMOVEFIRSTSAVED_METHOD, loadVar(contArg)),
                                         saveVar(methodStateVar),
                                         call(METHODSTATE_GETLOCALTABLE_METHOD, loadVar(methodStateVar)),
@@ -237,7 +234,7 @@ final class FlowInstrumentationGenerator {
                                                 throwException("Unrecognized restore id " + methodNode.name),
                                                 0,
                                                 continuationPoints.stream()
-                                                        .map((cp) -> cp.generateLoadInstructions())
+                                                        .map((cp) -> cp.getRestoreInsnNodes())
                                                         .toArray((x) -> new InsnList[x])
                                         )
                                         // jump to not required here, switch above either throws exception or jumps to restore point
@@ -251,12 +248,14 @@ final class FlowInstrumentationGenerator {
         // MONITORENTER/MONITOREXIT. See comments in monitor instrumentation code for more information.
         
         // Generates store logic and restore addLabel for each continuation point
+        List<TryCatchBlockNode> addedTryCatchBlockNodes = new ArrayList<>(continuationPoints.size());
         Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements = new HashMap<>();
         continuationPoints.forEach((cp) -> {
-            invokeInsnNodeReplacements.put(cp.getInvokeInsnNode(), cp.generateInvokeReplacementInstructions());
+            invokeInsnNodeReplacements.put(cp.getOriginalInvokeInsnNode(), cp.getInvokeReplacementInsnNodes());
+            addedTryCatchBlockNodes.addAll(cp.getTryCatchBlockNodes());
         });
         
         // We don't want labels to continuationPoints to be remapped when FlowInstrumentationInstructions returns them
-        return new FlowInstrumentationInstructions(entryPointInsnList, invokeInsnNodeReplacements, invokeTryCatchBlockNodes);
+        return new FlowInstrumentationInstructions(entryPointInsnList, invokeInsnNodeReplacements, addedTryCatchBlockNodes);
     }
 }

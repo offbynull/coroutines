@@ -18,7 +18,6 @@ package com.offbynull.coroutines.instrumenter;
 
 import static com.offbynull.coroutines.instrumenter.ContinuationPointInstructionUtils.castToObjectAndSave;
 import static com.offbynull.coroutines.instrumenter.ContinuationPointInstructionUtils.loadAndCastToOriginal;
-import static com.offbynull.coroutines.instrumenter.ContinuationPointInstructionUtils.throwThrowableInVariable;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
@@ -37,46 +36,44 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveLocalVariableTable;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOperandStack;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tryCatchBlock;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getRequiredStackCountForInvocation;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getReturnTypeOfInvocation;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
-import org.apache.commons.lang3.Validate;
+import java.util.Collections;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LineNumberNode;
-import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 
-final class InvokeWithinTryCatchContinuationPoint extends ContinuationPoint {
-    
-    private final TryCatchBlockNode newTryCatchBlockNode;
-    private final LabelNode failedRestoreExecLabelNode = new LabelNode();
-    private final LabelNode continueExecLabelNode = new LabelNode();
-    private boolean loadGenerated;
+final class InvokeContinuationPointGenerator extends ContinuationPointGenerator {
 
-    public InvokeWithinTryCatchContinuationPoint(int id, AbstractInsnNode invokeInsnNode, LineNumberNode invokeLineNumberNode,
-            Frame<BasicValue> frame, Type returnType,
-            TryCatchBlockNode newTryCatchBlockNode,
+    public InvokeContinuationPointGenerator(
+            int id,
+            AbstractInsnNode invokeInsnNode,
+            LineNumberNode invokeLineNumberNode,
+            Frame<BasicValue> frame,
+            Type returnType,
             FlowInstrumentationVariables flowInstrumentationVariables,
             MonitorInstrumentationInstructions monitorInstrumentationInstructions) {
         super(id, invokeInsnNode, invokeLineNumberNode, frame, returnType, flowInstrumentationVariables,
                 monitorInstrumentationInstructions);
-        Validate.notNull(newTryCatchBlockNode);
-        this.newTryCatchBlockNode = newTryCatchBlockNode;
     }
     
     @Override
-    InsnList generateLoadInstructions() {
-        Validate.isTrue(!loadGenerated); // because of newTryCatchBlockNode, sanity check here to make sure we don't call this method twice,
-                                         // otherwise we'd be overwriting what we put in newTryCatchBlockNode from the first invoke
-        loadGenerated = true;
-        
+    ContinuationPointInstructions generate() {
+        LabelNode continueExecLabelNode = new LabelNode();
+        return new ContinuationPointInstructions(
+                getInvokeInsnNode(),
+                generateLoadInstructions(continueExecLabelNode),
+                generateInvokeReplacementInstructions(continueExecLabelNode),
+                Collections.emptyList());
+    }
+    
+    private InsnList generateLoadInstructions(LabelNode continueExecLabelNode) {
         FlowInstrumentationVariables vars = getFlowInstrumentationVariables();
         MonitorInstrumentationInstructions monInsts = getMonitorInstrumentationInstructions();
         
@@ -90,64 +87,35 @@ final class InvokeWithinTryCatchContinuationPoint extends ContinuationPoint {
         InsnList enterMonitorsInLockStateInsnList = monInsts.getEnterMonitorsInLockStateInsnList();
         InsnList exitMonitorsInLockStateInsnList = monInsts.getExitMonitorsInLockStateInsnList();
         
-        Type invokeMethodReturnType = getReturnTypeOfInvocation(getInvokeInsnNode());
+        Type invokeMethodReturnType = getReturnTypeOfInvocation(getInvokeInsnNode());        
         Type returnType = getReturnType();
-        int methodStackCount = getRequiredStackCountForInvocation(getInvokeInsnNode());
         Integer lineNum = getLineNumber();
+        int methodStackCount = getRequiredStackCountForInvocation(getInvokeInsnNode());
         
         Frame<BasicValue> frame = getFrame();
         
         return merge(lineNum == null ? empty() : lineNumber(lineNum),
-                // debugPrint("entering monitors" + methodNode.name),
                 cloneInsnList(enterMonitorsInLockStateInsnList),
-                // debugPrint("calling addPending" + methodNode.name),
                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg), loadVar(methodStateVar)),
-                tryCatchBlock(
-                        newTryCatchBlockNode,
-                        null,
-                        merge(
-                                // debugPrint("loading portion of operand stack required to invoke continuation point method (last "
-                                //        + methodStackCount + " items off operand stack are loaded on to stack)" + methodNode.name),
-                                loadOperandStackSuffix(savedStackVar, tempObjVar, frame, methodStackCount),
-                                // debugPrint("invoking with loaded items " + methodNode.name),
-                                cloneInvokeNode(getInvokeInsnNode()), // invoke method
-                                // debugPrint("saving return type of invocation" + methodNode.name),
-                                castToObjectAndSave(invokeMethodReturnType, tempObjVar2) // save return (does nothing if void)
-                        ),
-                        merge(
-                                // debugPrint("saving encountered throwable " + methodNode.name),
-                                saveVar(tempObjVar2),
-                                // debugPrint("loading stack and local vars " + methodNode.name),
-                                loadOperandStackPrefix(savedStackVar, tempObjVar, frame,
-                                        frame.getStackSize() - methodStackCount),
-                                loadLocalVariableTable(savedLocalsVar, tempObjVar, frame),
-                                // debugPrint("jumping in to real trycatch " + methodNode.name),
-                                jumpTo(failedRestoreExecLabelNode)
-                        )
-                ),
-                // debugPrint("testing if in saving mode" + methodNode.name),
+                loadOperandStackSuffix(savedStackVar, tempObjVar, frame, methodStackCount),
+                cloneInvokeNode(getInvokeInsnNode()), // invoke method  
+                castToObjectAndSave(invokeMethodReturnType, tempObjVar2), // save return (does nothing if void)
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                         loadIntConst(MODE_SAVING),
                         merge(
-                                // debugPrint("exiting monitors" + methodNode.name),
                                 cloneInsnList(exitMonitorsInLockStateInsnList), // inserted many times, must be cloned
-                                // debugPrint("returning dummy value" + methodNode.name),
                                 returnDummy(returnType)
                         )
                 ),
-                // debugPrint("loading stack and local vars " + methodNode.name),
                 loadOperandStackPrefix(savedStackVar, tempObjVar, frame, frame.getStackSize() - methodStackCount),
                 loadLocalVariableTable(savedLocalsVar, tempObjVar, frame),
-                // debugPrint("loading return type of invocation" + methodNode.name),
                 loadAndCastToOriginal(invokeMethodReturnType, tempObjVar2),
-                // debugPrint("jumping to successful point" + methodNode.name)
                 jumpTo(continueExecLabelNode)
         );
     }
 
-    @Override
-    InsnList generateInvokeReplacementInstructions() {
+    private InsnList generateInvokeReplacementInstructions(LabelNode continueExecLabelNode) {
         FlowInstrumentationVariables vars = getFlowInstrumentationVariables();
         MonitorInstrumentationInstructions monInsts = getMonitorInstrumentationInstructions();
         
@@ -156,11 +124,10 @@ final class InvokeWithinTryCatchContinuationPoint extends ContinuationPoint {
         Variable savedLocalsVar = vars.getSavedLocalsVar();
         Variable savedStackVar = vars.getSavedStackVar();
         Variable tempObjVar = vars.getTempObjectVar();
-        Variable tempObjVar2 = vars.getTempObjVar2();
         
         InsnList loadLockStateToStackInsnList = monInsts.getLoadLockStateToStackInsnList();
         InsnList exitMonitorsInLockStateInsnList = monInsts.getExitMonitorsInLockStateInsnList();
-        
+
         Type returnType = getReturnType();
         
         Frame<BasicValue> frame = getFrame();
@@ -196,13 +163,9 @@ final class InvokeWithinTryCatchContinuationPoint extends ContinuationPoint {
         //          restorePoint_<number>_end;
         //          goto restorePoint_<number>_end;
         return merge(
-                // debugPrint("clear excess pending" + methodNode.name),
                 call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
-                // debugPrint("saving operand stack" + methodNode.name),
                 saveOperandStack(savedStackVar, tempObjVar, frame),
-                // debugPrint("saving locals" + methodNode.name),
                 saveLocalVariableTable(savedLocalsVar, tempObjVar, frame),
-                // debugPrint("calling addPending" + methodNode.name),
                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                         construct(METHODSTATE_INIT_METHOD,
                                 loadIntConst(getId()),
@@ -211,9 +174,7 @@ final class InvokeWithinTryCatchContinuationPoint extends ContinuationPoint {
                                 cloneInsnList(loadLockStateToStackInsnList) // inserted many times, must be cloned
                         )
                 ),
-                // debugPrint("invoking" + methodNode.name),
                 cloneInvokeNode(getInvokeInsnNode()), // invoke method
-                // debugPrint("testing if in saving mode" + methodNode.name),
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                         loadIntConst(MODE_SAVING),
@@ -224,18 +185,10 @@ final class InvokeWithinTryCatchContinuationPoint extends ContinuationPoint {
                                 returnDummy(returnType)
                         )
                 ),
-                // debugPrint("calling remove last pending" + methodNode.name),
                 call(CONTINUATION_REMOVELASTPENDING_METHOD, loadVar(contArg)), // otherwise assume we're normal, and
                                                                                // remove the state we added on to
                                                                                // pending                
-                // debugPrint("finished" + methodNode.name),
-                jumpTo(continueExecLabelNode),
-                
-                
-                
-                addLabel(failedRestoreExecLabelNode),
-                // debugPrint("rethrowing exception inside actual trycatch block " + methodNode.name),
-                throwThrowableInVariable(tempObjVar2),
+
                 
                 
                 

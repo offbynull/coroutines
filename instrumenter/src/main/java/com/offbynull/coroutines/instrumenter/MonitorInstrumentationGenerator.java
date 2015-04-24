@@ -115,8 +115,7 @@ final class MonitorInstrumentationGenerator {
                 case Opcodes.MONITORENTER:
                     replacementLogic
                             = merge(
-                                    // debugPrint("enter monitor"),
-                                    saveVar(tempObjVar),
+                                    saveVar(tempObjVar), // enter monitor
                                     loadVar(tempObjVar),
                                     cloneMonitorNode(insnNode),
                                     call(LOCKSTATE_ENTER_METHOD, loadVar(lockStateVar), loadVar(tempObjVar)) // track after entered
@@ -125,8 +124,7 @@ final class MonitorInstrumentationGenerator {
                 case Opcodes.MONITOREXIT:
                     replacementLogic
                             = merge(
-                                    // debugPrint("exit monitor"),
-                                    saveVar(tempObjVar),
+                                    saveVar(tempObjVar), // exit monitor
                                     loadVar(tempObjVar),
                                     cloneMonitorNode(insnNode),
                                     call(LOCKSTATE_EXIT_METHOD, loadVar(lockStateVar), loadVar(tempObjVar)) // discard after exit
@@ -184,8 +182,7 @@ final class MonitorInstrumentationGenerator {
                     = forEach(counterVar, arrayLenVar,
                             call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar)),
                             merge(
-                                    // debugPrint("temp monitor enter"),
-                                    monitorEnter()
+                                    monitorEnter() // temp monitor enter
                             )
                     );
         }
@@ -201,8 +198,7 @@ final class MonitorInstrumentationGenerator {
                     = forEach(counterVar, arrayLenVar,
                             call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar)),
                                     merge(
-                                    // debugPrint("temp monitor exit"),
-                                    monitorExit()
+                                    monitorExit() // temp monitor exit
                             )
                     );
         }
