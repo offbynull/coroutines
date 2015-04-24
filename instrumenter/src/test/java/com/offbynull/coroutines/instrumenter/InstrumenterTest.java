@@ -60,6 +60,7 @@ public final class InstrumenterTest {
     private static final String BASIC_TYPE_INVOKE_TEST = "BasicTypeInvokeTest";
     private static final String EXCEPTION_THEN_CONTINUE_INVOKE_TEST = "ExceptionThenContinueInvokeTest";
     private static final String EMPTY_CONTINUATION_POINT_INVOKE_TEST = "EmptyContinuationPointInvokeTest";
+    private static final String COMPLEX_TEST = "ComplexTest";
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
@@ -107,6 +108,12 @@ public final class InstrumenterTest {
     @Test
     public void mustGracefullyIgnoreWhenContinuationPointDoesNotInvokeOtherContinuationPoints() throws Exception {
         performCountTest(EMPTY_CONTINUATION_POINT_INVOKE_TEST);
+    }
+
+    // Mix of many tests in to a single coroutine
+    @Test
+    public void mustProperlySuspendInNonTrivialCoroutine() throws Exception {
+        performCountTest(COMPLEX_TEST);
     }
     
     @Test

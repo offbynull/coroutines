@@ -245,7 +245,7 @@ final class FlowInstrumentationGenerator {
 
         
         
-        // Generates store logic and restore addLabel for each continuation point
+        // Generates invoke replacement logic and new trycatchblocks requires
         List<TryCatchBlockNode> addedTryCatchBlockNodes = new ArrayList<>(continuationPoints.size());
         Map<AbstractInsnNode, InsnList> invokeInsnNodeReplacements = new HashMap<>();
         continuationPoints.forEach((cp) -> {
