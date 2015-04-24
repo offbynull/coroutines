@@ -36,24 +36,12 @@ abstract class ContinuationPointGenerator {
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
     protected static final Method CONTINUATION_SETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "setMode", Integer.TYPE);
-    protected static final Method CONTINUATION_GETPENDINGSIZE_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "getPendingSize");
     protected static final Method CONTINUATION_CLEAREXCESSPENDING_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "clearExcessPending", Integer.TYPE);
     protected static final Method CONTINUATION_ADDPENDING_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "addPending", MethodState.class);
-    protected static final Method CONTINUATION_REMOVELASTPENDING_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "removeLastPending");
-    protected static final Method CONTINUATION_REMOVEFIRSTSAVED_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "removeFirstSaved");
     protected static final Constructor<MethodState> METHODSTATE_INIT_METHOD
             = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, Object[].class, LockState.class);
-    protected static final Method METHODSTATE_GETCONTINUATIONPOINT_METHOD
-            = MethodUtils.getAccessibleMethod(MethodState.class, "getContinuationPoint");
-    protected static final Method METHODSTATE_GETLOCALTABLE_METHOD
-            = MethodUtils.getAccessibleMethod(MethodState.class, "getLocalTable");
-    protected static final Method METHODSTATE_GETSTACK_METHOD
-            = MethodUtils.getAccessibleMethod(MethodState.class, "getStack");
     
     private final int id;
     private final AbstractInsnNode invokeInsnNode;

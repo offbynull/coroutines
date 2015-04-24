@@ -60,15 +60,15 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
     
     @Override
     ContinuationPointInstructions generate() {
-        LabelNode execContinueLabelNode = new LabelNode();
+        LabelNode continueExecLabelNode = new LabelNode();
         return new ContinuationPointInstructions(
                 getInvokeInsnNode(),
-                generateLoadInstructions(execContinueLabelNode),
-                generateInvokeReplacementInstructions(execContinueLabelNode),
+                generateLoadInstructions(continueExecLabelNode),
+                generateInvokeReplacementInstructions(continueExecLabelNode),
                 Collections.emptyList());
     }
     
-    private InsnList generateLoadInstructions(LabelNode execContinueLabelNode) {
+    private InsnList generateLoadInstructions(LabelNode continueExecLabelNode) {
         FlowInstrumentationVariables vars = getFlowInstrumentationVariables();
         MonitorInstrumentationInstructions monInsts = getMonitorInstrumentationInstructions();
         
@@ -87,7 +87,7 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         //          restoreOperandStack(stack);
         //          restoreLocalsStack(localVars);
         //          continuation.setMode(MODE_NORMAL);
-        //          goto restorePoint_<number>_restore
+        //          goto restorePoint_<number>_continue;
         return merge(
                 lineNum == null ? empty() : lineNumber(lineNum),
                 loadOperandStack(savedStackVar, tempObjVar, frame),
@@ -98,14 +98,13 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
                        // also need to pop the Continuation reference from the stack... it's important that we
                        // explicitly do it at this point becuase during loading the stack will be restored with top
                        // of stack pointing to that continuation object
-                // debugPrint("going back in to normal mode" + methodNode.name),
                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_NORMAL)),
-                jumpTo(execContinueLabelNode)
+                jumpTo(continueExecLabelNode)
         );
     }
 
     
-    private InsnList generateInvokeReplacementInstructions(LabelNode execContinueLabelNode) {
+    private InsnList generateInvokeReplacementInstructions(LabelNode continueExecLabelNode) {
         FlowInstrumentationVariables vars = getFlowInstrumentationVariables();
         MonitorInstrumentationInstructions monInsts = getMonitorInstrumentationInstructions();
         
@@ -122,7 +121,6 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         
         Frame<BasicValue> frame = getFrame();
         
-        //          restorePoint_<number>_normalExecution: // at this label: normal exec stack / normal exec var table
         //             // Clear any excess pending MethodStates that may be lingering. We need to do this because we may have pending method
         //             // states sitting around from methods that threw an exception. When a method that takes in a Continuation throws an
         //             // exception it means that that method won't clear out its pending method state.
@@ -135,7 +133,7 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         //          return <dummy>;
         //
         //
-        //          restorePoint_<number>_restore: // at this label: empty exec stack / uninit exec var table
+        //          restorePoint_<number>_continue: // at this label: empty exec stack / uninit exec var table
         return merge(
                 call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
                 saveOperandStack(savedStackVar, tempObjVar, frame),
@@ -154,7 +152,7 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
                 
                 
                 
-                addLabel(execContinueLabelNode)
+                addLabel(continueExecLabelNode)
         );
     }
     

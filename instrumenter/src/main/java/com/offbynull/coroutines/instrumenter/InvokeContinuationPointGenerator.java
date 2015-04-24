@@ -94,12 +94,31 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
         
         Frame<BasicValue> frame = getFrame();
         
+        //          enterLocks(lockState);
+        //          continuation.addPending(methodState); // method state should be loaded from Continuation.saved
+        //              // Load up enough of the stack to invoke the method. The invocation here needs to be wrapped in a try catch because
+        //              // the original invocation was within a try catch block (at least 1, maybe more). If we do get a throwable, jump
+        //              // back to the area where the original invocation was and rethrow it there so the proper catch handlers can
+        //              // handle it (if the handler is for the expected throwable type).
+        //          restoreStackSuffix(stack, <number of items required for method invocation below>);
+        //          <method invocation>
+        //          if (continuation.getMode() == MODE_SAVING) {
+        //              exitLocks(lockState);
+        //              return <dummy>;
+        //          }
+        //             // At this point the invocation happened successfully, so we want to save the invocation's result, restore this
+        //             // method's state, and then put the result on top of the stack as if invocation just happened. We then jump in to
+        //             // the method and continue running it from the instruction after the original invocation point.
+        //          tempObjVar2 = <method invocation>'s return value; // does nothing if ret type is void
+        //          restoreOperandStack(stack);
+        //          restoreLocalsStack(localVars);
+        //          place tempObjVar2 on top of stack if not void (as if it <method invocation> were just run and returned that value)
+        //          goto restorePoint_<number>_continue;
         return merge(lineNum == null ? empty() : lineNumber(lineNum),
                 cloneInsnList(enterMonitorsInLockStateInsnList),
                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg), loadVar(methodStateVar)),
                 loadOperandStackSuffix(savedStackVar, tempObjVar, frame, methodStackCount),
                 cloneInvokeNode(getInvokeInsnNode()), // invoke method  
-                castToObjectAndSave(invokeMethodReturnType, tempObjVar2), // save return (does nothing if void)
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                         loadIntConst(MODE_SAVING),
@@ -108,6 +127,7 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
                                 returnDummy(returnType)
                         )
                 ),
+                castToObjectAndSave(invokeMethodReturnType, tempObjVar2), // save return (does nothing if void)
                 loadOperandStackPrefix(savedStackVar, tempObjVar, frame, frame.getStackSize() - methodStackCount),
                 loadLocalVariableTable(savedLocalsVar, tempObjVar, frame),
                 loadAndCastToOriginal(invokeMethodReturnType, tempObjVar2),
@@ -132,10 +152,12 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
         
         Frame<BasicValue> frame = getFrame();
         
-        //          restorePoint_<number>_normalExecute: // at this label: normal stack / normal var table
-        //             // Clear any excess pending MethodStates that may be lingering. We need to do this because we may have pending method
-        //             // states sitting around from methods that threw an exception. When a method that takes in a Continuation throws an
-        //             // exception it means that that method won't clear out its pending method state.
+        //             // Clear any excess pending MethodStates that may be lingering. We need to do this because we may have one or more
+        //             // excess pending method states sitting around if invocation continuation points (methods that take in a continuation
+        //             // object) were called previously in this method. In the event that such a previous call threw an exception, there
+        //             // may be more than 1 excess item -- clearExcessPending() makes sure to clear all excess items.
+        //             //
+        //             // The pendingCount variable contains the excpected number of pending method states
         //          continuation.clearExcessPending(pendingCount);
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocals();
@@ -145,23 +167,10 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
         //              exitLocks(lockState);
         //              return <dummy>;
         //          }
-        //          continuation.removeLastPending();
-        //          goto restorePoint_<number>_end;
         //
         //
-        //          restorePoint_<number>_loadExecute: // at this label: empty stack / empty var table
-        //          enterLocks(lockState);
-        //          continuation.addPending(methodState); // method state should be loaded from Continuation.saved
-        //          restoreStackSuffix(stack, <number of items required for method invocation below>);
-        //          <method invocation>
-        //          if (continuation.getMode() == MODE_SAVING) {
-        //              exitLocks(lockState);
-        //              return <dummy>;
-        //          }
-        //          restoreOperandStack(stack);
-        //          restoreLocalsStack(localVars);
-        //          restorePoint_<number>_end;
-        //          goto restorePoint_<number>_end;
+        //          restorePoint_<number>_continue:
+        
         return merge(
                 call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
                 saveOperandStack(savedStackVar, tempObjVar, frame),
@@ -184,10 +193,7 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
                                 // debugPrint("returning dummy value" + methodNode.name),
                                 returnDummy(returnType)
                         )
-                ),
-                call(CONTINUATION_REMOVELASTPENDING_METHOD, loadVar(contArg)), // otherwise assume we're normal, and
-                                                                               // remove the state we added on to
-                                                                               // pending                
+                ),      
 
                 
                 

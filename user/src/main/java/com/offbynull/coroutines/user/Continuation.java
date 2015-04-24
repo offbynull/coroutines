@@ -29,7 +29,7 @@ import java.util.LinkedList;
  * @author Kasra Faghihi
  */
 public final class Continuation implements Serializable {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
     
     /**
      * Do not use -- for internal use only.
@@ -133,16 +133,6 @@ public final class Continuation implements Serializable {
      */
     public int getPendingSize() {
         return pendingMethodStates.size();
-    }
-
-    /**
-     * Do not use -- for internal use only.
-     */
-    public void removeLastPending() {
-        if (pendingMethodStates.isEmpty()) {
-            throw new IllegalStateException();
-        }
-        pendingMethodStates.removeLast();
     }
     
     /**

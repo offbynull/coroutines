@@ -25,7 +25,7 @@ import java.io.Serializable;
  * @author Kasra Faghihi
  */
 public final class MethodState implements Serializable {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
     
     private final int continuationPoint;
     private final Object[] stack;

@@ -21,6 +21,7 @@ package com.offbynull.coroutines.user;
  * @author Kasra Faghihi
  */
 public class CoroutineException extends RuntimeException {
+    private static final long serialVersionUID = 2L;
     
     CoroutineException(String message, Throwable cause) {
         super(message, cause);

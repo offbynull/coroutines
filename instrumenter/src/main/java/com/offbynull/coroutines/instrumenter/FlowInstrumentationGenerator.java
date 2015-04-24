@@ -102,6 +102,9 @@ final class FlowInstrumentationGenerator {
         int nextId = 0;
         List<ContinuationPointInstructions> continuationPoints = new LinkedList<>();
 
+          // IMPORTANT NOTE: Code dealing with locks (e.g. anything to do with LockState) will only be present if this method contains
+          // MONITORENTER/MONITOREXIT. See comments MonitorInstructionGenerator for more information.
+        
         for (AbstractInsnNode suspendInvocationInsnNode : suspendInvocationInsnNodes) {
             int insnIdx = methodNode.instructions.indexOf(suspendInvocationInsnNode);
             LineNumberNode invokeLineNumberNode = findLineNumberForInstruction(methodNode.instructions, suspendInvocationInsnNode);
@@ -152,9 +155,6 @@ final class FlowInstrumentationGenerator {
             continuationPoints.add(cp);
             nextId++;
         }
-
-        // IMPORTANT NOTE: Code dealing with locks (e.g. anything to do with LockState) will only be present if this method contains
-        // MONITORENTER/MONITOREXIT. See comments MonitorInstructionGenerator for more information.
         
         Variable contArg = flowInstrumentationVariables.getContArg();
         Variable pendingCountVar = flowInstrumentationVariables.getPendingCountVar();
@@ -190,7 +190,7 @@ final class FlowInstrumentationGenerator {
         //            lockState = methodState.getLockState();
         //            switch(methodState.getContinuationPoint()) {
         //                case <number>:
-        //                    CP_SETUP_INSTRUCTIONS
+        //                    <CP_RESTORE_INSTRUCTIONS>
         //                ...
         //                ...
         //                ...
@@ -242,10 +242,8 @@ final class FlowInstrumentationGenerator {
                         ),
                         addLabel(startOfMethodLabelNode)
                 );
-        
 
-        // IMPORTANT NOTE: Code dealing with locks (e.g. anything to do with LockState) will only be present if this method contains
-        // MONITORENTER/MONITOREXIT. See comments in monitor instrumentation code for more information.
+        
         
         // Generates store logic and restore addLabel for each continuation point
         List<TryCatchBlockNode> addedTryCatchBlockNodes = new ArrayList<>(continuationPoints.size());
