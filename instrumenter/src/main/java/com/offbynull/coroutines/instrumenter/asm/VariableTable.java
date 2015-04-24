@@ -174,7 +174,8 @@ public final class VariableTable {
 
         /**
          * Returns {@code true} if this object hasn't been released.
-         * @see VariableTable#releaseExtra(com.offbynull.coroutines.instrumenter.VariableTable.Variable) 
+         * @see VariableTable#releaseExtra(com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable) 
+    
          * @return index of this entry
          * @throws IllegalArgumentException if this {@link Variable} has been released
          */

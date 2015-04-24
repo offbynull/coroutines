@@ -3,3 +3,4 @@
 /build-tools/target/
 /maven-plugin/target/
 /ant-plugin/target/
+/target/

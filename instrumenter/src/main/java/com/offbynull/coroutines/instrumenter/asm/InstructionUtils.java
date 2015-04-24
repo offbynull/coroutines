@@ -719,7 +719,7 @@ public final class InstructionUtils {
      * @return instructions to load the relevant portion of the operand stack from an array
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
-     * type, or if there aren't {@link count} items on the stack
+     * type, or if there aren't {@code count} items on the stack
      */
     public static InsnList loadOperandStackSuffix(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame, int count) {
         int start = frame.getStackSize() - count;
@@ -738,7 +738,7 @@ public final class InstructionUtils {
      * @return instructions to load the relevant portion of operand stack from an array
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
-     * type, or if there aren't {@link count} items on the stack
+     * type, or if there aren't {@code count} items on the stack
      */
     public static InsnList loadOperandStackPrefix(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame, int count) {
         int start = 0;
