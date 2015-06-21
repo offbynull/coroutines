@@ -83,7 +83,7 @@
             <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm-debug-all</artifactId>
-                <version>5.0.3</version>
+                <version>5.0.4</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.maven</groupId>

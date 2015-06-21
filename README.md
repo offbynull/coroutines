@@ -135,6 +135,10 @@ Aside from that, some important things to be aware of:
 
 It depends. Instrumentation adds loading and saving code to each method that's intended to run as part of a coroutine, so your class files will become larger and that extra code will take time to execute. I personally haven't noticed any drastic slowdowns in my own projects, but be aware that highly recursive coroutines / heavy call depths may end up consuming a lot of resources thereby causing noticeable performance loss.
 
+#### What projects make use of Coroutines?
+
+The Coroutines project was originally made for use in (and is heavily used by) the [Peernetic](https://github.com/offbynull/peernetic) project. Peernetic is a Java actor-based P2P computing framework specifically designed to facilitate development and testing of distributed and P2P algorithms. Coroutines help by making logic easily understandable/readable within an actor. See the Javadoc header in [this file](https://github.com/offbynull/peernetic/blob/2143d4b208d1107a933e06868e53811a2c7608c4/core/src/main/java/com/offbynull/peernetic/core/actor/CoroutineActor.java) for an overview of why this is.
+
 #### What restrictions are there?
 
 ##### Reflection API
@@ -326,6 +330,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
+- FIXED: Upgraded to ASM 5.0.4
+- FIXED: Incorrect Javadoc comment for CoroutineRunner.execute()
 
 ### [1.1.0] - 2015-04-24
 - ADDED: Major performance improvement: Deferred operand stack and local variable table loading. As a by product, code had to be refactored to be more modular / maintainable.

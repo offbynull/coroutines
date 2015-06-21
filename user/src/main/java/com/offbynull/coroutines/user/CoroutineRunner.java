@@ -41,13 +41,15 @@ public final class CoroutineRunner implements Serializable {
     }
 
     /**
-     * Starts/resumes executes this coroutine.
+     * Starts/resumes execution of this coroutine. If the coroutine being executed reaches a suspension point (meaning that the method calls
+     * {@link Continuation#suspend() }), this method will return {@code true}. If the coroutine has finished executing, this method will
+     * return {@code false}.
      * <p>
-     * If this method returns {@code true} and you call it again, it'll start executing this coroutine from the beginning. If this method
-     * returns {@code false} and you call it again, it'll resume executing this coroutine from the point which it suspended.
-     * @return {@code true} if execution completed, {@code false} if execution was suspended.
+     * Calling this method again after the coroutine has finished executing will restart the coroutine.
+     * @return {@code false} if execution has completed (the method has return), {@code true} if execution was suspended.
      * @throws CoroutineException an exception occurred during execution of this coroutine, the saved execution stack and object state may
-     * be out of sync at this point (meaning that unless you know what you're doing, you should not use this coroutine object again)
+     * be out of sync at this point (meaning that unless you know what you're doing, you should not call {@link CoroutineRunner#execute() }
+     * again)
      */
     public boolean execute() {
         try {
