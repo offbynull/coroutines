@@ -137,66 +137,7 @@ It depends. Instrumentation adds loading and saving code to each method that's i
 
 #### What projects make use of Coroutines?
 
-The Coroutines project was originally made for use in (and is heavily used by) the [Peernetic](https://github.com/offbynull/peernetic) project. Peernetic is a Java actor-based P2P computing framework specifically designed to facilitate development and testing of distributed and P2P algorithms. The use of Coroutines makes actor logic easily understandable/readable. See the Javadoc header in [this file](https://github.com/offbynull/peernetic/blob/2143d4b208d1107a933e06868e53811a2c7608c4/core/src/main/java/com/offbynull/peernetic/core/actor/CoroutineActor.java) for an overview of why this is (reproduced below).
-
-```
-An {@link Actor} implementation that delegates to a {@link Coroutine}. Nearly all actor implementations, except for the most rudimentary,
-will end up requiring some sort of complex state machine logic. Writing your actor as a coroutine avoids the need to write out this state
-machine logic by hand.
-<p>
-For example, imagine the following scenario: Our actor expects 10 messages to arrive. For each of those 10 that arrive, if the message
-has a multi-part flag set, we expect a variable number of other "chunk" messages to immediately follow it. Implemented as a coroutine,
-the logic would be written similar to this:
-<pre>
-for (int i = 0; i &lt; 10; i++) {
-    cnt.suspend();
-    Message msg = context.getIncomingMessage();
-    if (msg.isMultipart()) {
-        for (int j = 0; j &lt; msg.numberOfChunks(); j++) {
-            cnt.suspend();
-            MessageChunk msgChunk = context.getIncomingMessage();
-            processMultipartMessageChunk(msg, msgChunk);
-        }
-    } else {
-        processMessage(msg);
-    }
-}
-</pre>
-However, if it were implemented as a normal actor, the logic would have to be written in a much more convoluted manner:
-<pre>
-//
-// Keep in mind that, due to the need to retain state between calls to onStep(), all variables have essentially become fields.
-// 
-switch (state) {
-    case START:
-        i = 0;
-        state = OUTER_LOOP;
-    case OUTER_LOOP:
-        if (i == 10) {
-            state = END;
-            return;
-        }
-        i++;
-        msg = context.getIncomingMessage();
-        if (msg.isMultipart()) {
-           state = INNER_LOOP;
-        } else {
-           process(msg);
-        }
-        return;
-    case INNER_LOOP:
-        msgChunk = context.getIncomingMessage();
-        if (i == msg.getNumberOfChunks()) {
-            state = OUTER_LOOP;
-            return;
-        }
-        processMultipartMessageChunk(msg, msgChunk);
-        return;
-    case END:
-        return;
-}
-</pre>
-```
+The Coroutines project was originally made for use in (and is heavily used by) the [Peernetic](https://github.com/offbynull/peernetic) project. Peernetic is a Java actor-based P2P computing framework specifically designed to facilitate development and testing of distributed and P2P algorithms. The use of Coroutines makes actor logic easily understandable/readable. See the Javadoc header in [this file](https://github.com/offbynull/peernetic/blob/2143d4b208d1107a933e06868e53811a2c7608c4/core/src/main/java/com/offbynull/peernetic/core/actor/CoroutineActor.java) for an overview of why this is.
 
 #### What restrictions are there?
 
