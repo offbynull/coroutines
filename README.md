@@ -332,6 +332,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### [Unreleased][unreleased]
 - FIXED: Upgraded to ASM 5.0.4
 - FIXED: Incorrect Javadoc comment for CoroutineRunner.execute()
+- FIXED: Override of SimpleVerifier.isAssignableFrom(Type t, Type u) unable to deal with arrays
 
 ### [1.1.0] - 2015-04-24
 - ADDED: Major performance improvement: Deferred operand stack and local variable table loading. As a by product, code had to be refactored to be more modular / maintainable.
