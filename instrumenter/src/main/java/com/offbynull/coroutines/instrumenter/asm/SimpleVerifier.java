@@ -92,7 +92,7 @@ public final class SimpleVerifier extends org.objectweb.asm.tree.analysis.Simple
                 // e.g. you're not allowed to do Number[][] = Integer[]
                 // e.g. you're not allowed to do Object[][] = Integer[]
                 return false;
-            } else if (t.getDimensions() > u.getDimensions()) {
+            } else if (t.getDimensions() < u.getDimensions()) {
                 // If t has LESS dimensions than u, it is not assignable UNLESS t has an element type of Object
                 // e.g. you're allowed to do Object[][] = Number[][][]
                 // e.g. you're not allowed to do Number[][] = Integer[][][]
