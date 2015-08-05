@@ -89,8 +89,9 @@ public static final class MyCoroutine implements Coroutine {
         }
     }
 
-    // IMPORTANT: Methods that are intended to be run as part of a coroutine must take in a Continuation type as a parameter. Otherwise, the
-    // plugin will fail to instrument the method.
+    // IMPORTANT: Methods that are intended to be run as part of a coroutine
+    // must take in a Continuation type as a parameter. Otherwise, the plugin
+    // will fail to instrument the method.
     private void echo(Continuation c, int x) {
         System.out.println(x);
         c.suspend();
@@ -143,7 +144,7 @@ The Coroutines project was originally made for use in (and is heavily used by) t
 
 #### Why not use annotations?
 
-This question was originally asked by @MrElusive...
+This question was originally asked by @MrElusive ...
 
 > I wanted to hide the Continuation parameter so that clients would not need to worry about passing it around.
 > 
