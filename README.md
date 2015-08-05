@@ -89,6 +89,8 @@ public static final class MyCoroutine implements Coroutine {
         }
     }
 
+    // IMPORTANT: Methods that are intended to be run as part of a coroutine must take in a Continuation type as a parameter. Otherwise, the
+    // plugin will fail to instrument the method.
     private void echo(Continuation c, int x) {
         System.out.println(x);
         c.suspend();
@@ -138,6 +140,21 @@ It depends. Instrumentation adds loading and saving code to each method that's i
 #### What projects make use of Coroutines?
 
 The Coroutines project was originally made for use in (and is heavily used by) the [Peernetic](https://github.com/offbynull/peernetic) project. Peernetic is a Java actor-based P2P computing framework specifically designed to facilitate development and testing of distributed and P2P algorithms. The use of Coroutines makes actor logic easily understandable/readable. See the Javadoc header in [this file](https://github.com/offbynull/peernetic/blob/2143d4b208d1107a933e06868e53811a2c7608c4/core/src/main/java/com/offbynull/peernetic/core/actor/CoroutineActor.java) for an overview of why this is.
+
+#### Why not use annotations?
+
+This question was originally asked by @MrElusive...
+
+> I wanted to hide the Continuation parameter so that clients would not need to worry about passing it around.
+> 
+> <snip>
+>
+> Out of curiosity, would it not be possible to annotate stack-saveable methods using something like @Continuable?"
+
+There are a couple of issues with using annotations ...
+
+1. First is that versions of Java that don't support annotations won't work anymore. This includes anything below 1.5.
+1. Second (most important) is that you introduce ambiguity by not passing in the Continuation object as a parameter. Passing in the Continuation object as a parameter acts as both a marker (equivalent to an annotation) and a guarantee that the Continuation object you're using is the one you want (it gets passed down the stack with the invocation chain). If instead of passing as a parameter, you were to use a Continuation object taken from some external source (e.g. a field or the return value of a method), there's more of a chance that you'll end up calling suspend on the wrong Continuation object / calling suspend on the correct Continuation object but at the wrong time or in the wrong state.
 
 #### What restrictions are there?
 
@@ -333,6 +350,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - FIXED: Upgraded to ASM 5.0.4
 - FIXED: Incorrect Javadoc comment for CoroutineRunner.execute()
 - FIXED: Override of SimpleVerifier.isAssignableFrom(Type t, Type u) unable to deal with arrays
+- CHANGED: Abstracted ClassInformationRepository in preparation for Java9
 
 ### [1.1.0] - 2015-04-24
 - ADDED: Major performance improvement: Deferred operand stack and local variable table loading. As a by product, code had to be refactored to be more modular / maintainable.
