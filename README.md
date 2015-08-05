@@ -90,8 +90,8 @@ public static final class MyCoroutine implements Coroutine {
     }
 
     // IMPORTANT: Methods that are intended to be run as part of a coroutine
-    // must take in a Continuation type as a parameter. Otherwise, the plugin
-    // will fail to instrument the method.
+    // must take in a Continuation type as a parameter. Otherwise, they
+    // won't be marked for instrumentation.
     private void echo(Continuation c, int x) {
         System.out.println(x);
         c.suspend();
@@ -148,7 +148,7 @@ The Coroutines project was originally made for use in (and is heavily used by) t
 > 
 > ... snip ...
 >
-> Out of curiosity, would it not be possible to annotate stack-saveable methods using something like @Continuable?"
+> Out of curiosity, would it not be possible to annotate stack-saveable methods using something like @Continuable?
 
 There are a couple of issues with using annotations ...
 
