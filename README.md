@@ -144,11 +144,9 @@ The Coroutines project was originally made for use in (and is heavily used by) t
 
 #### Why not use annotations?
 
-This question was originally asked by @MrElusive ...
-
 > I wanted to hide the Continuation parameter so that clients would not need to worry about passing it around.
 > 
-> <snip>
+> ... snip ...
 >
 > Out of curiosity, would it not be possible to annotate stack-saveable methods using something like @Continuable?"
 
