@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+        <action>
+            <actionName>CUSTOM-check_for_new_dependencies</actionName>
+            <displayName>check_for_new_dependencies</displayName>
+            <recursive>false</recursive>
+            <goals>
+                <goal>versions:display-dependency-updates</goal>
+            </goals>
+        </action>
+        <action>
+            <actionName>CUSTOM-check_for_new_plugins</actionName>
+            <displayName>check_for_new_plugins</displayName>
+            <recursive>false</recursive>
+            <goals>
+                <goal>versions:display-plugin-updates</goal>
+            </goals>
+        </action>
+    </actions>
