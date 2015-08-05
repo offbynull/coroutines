@@ -21,7 +21,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 /**
- * An extension to ASM's {@link org.objectweb.asm.tree.analysis.SimpleVerifier} that uses {@link ClassInformationRepository} to dervie type
+ * An extension to ASM's {@link org.objectweb.asm.tree.analysis.SimpleVerifier} that uses {@link ClassInformationRepository} to derive type
  * information rather than a classloader.
  * @author Kasra Faghihi
  */

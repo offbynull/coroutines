@@ -19,9 +19,9 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
-import junit.framework.Assert;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.objectweb.asm.ClassReader;
@@ -38,13 +38,13 @@ import org.objectweb.asm.tree.analysis.Frame;
 
 public class SimpleVerifierTest {
 
-    private ClassInformationRepository classRepo;
+    private FileSystemClassInformationRepository classRepo;
     private ClassNode classNode;
     private MethodNode methodNode;
 
     @Before
     public void setUp() throws IOException {
-        classRepo = new ClassInformationRepository();
+        classRepo = new FileSystemClassInformationRepository();
         classRepo.addClasspath(TestUtils.getClasspath());
 
         byte[] classData = readZipFromResource("SimpleStub.zip").get("SimpleStub.class");

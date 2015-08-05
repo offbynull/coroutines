@@ -10,11 +10,11 @@ import org.objectweb.asm.Type;
 
 public class TypeUtilsTest {
     
-    private static ClassInformationRepository repo;
+    private static FileSystemClassInformationRepository repo;
 
     @BeforeClass
     public static void beforeClass() throws Exception {
-        repo = ClassInformationRepository.create(getClasspath());
+        repo = FileSystemClassInformationRepository.create(getClasspath());
     }
     
     @AfterClass

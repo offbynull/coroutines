@@ -17,6 +17,7 @@
 package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.asm.ClassInformationRepository;
+import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepository;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findInvocationsOf;
@@ -61,13 +62,12 @@ public final class Instrumenter {
 
     private static final Type INSTRUMENTED_CLASS_TYPE = Type.getType(Instrumented.class);
     private static final Type CONTINUATION_CLASS_TYPE = Type.getType(Continuation.class);
-    private static final Method CONTINUATION_SUSPEND_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "suspend");
+    private static final Method CONTINUATION_SUSPEND_METHOD = MethodUtils.getAccessibleMethod(Continuation.class, "suspend");
 
     private ClassInformationRepository classRepo;
 
     /**
-     * Constructs a {@link Instrumenter} object.
+     * Constructs a {@link Instrumenter} object from a filesystem classpath (folders and JARs).
      * @param classpath classpath JARs and folders to use for instrumentation (this is needed by ASM to generate stack map frames).
      * @throws IOException if classes in the classpath could not be loaded up
      * @throws NullPointerException if any argument is {@code null} or contains {@code null}
@@ -76,7 +76,18 @@ public final class Instrumenter {
         Validate.notNull(classpath);
         Validate.noNullElements(classpath);
 
-        classRepo = ClassInformationRepository.create(classpath);
+        classRepo = FileSystemClassInformationRepository.create(classpath);
+    }
+
+    /**
+     * Constructs a {@link Instrumenter} object.
+     * @param repo class information repository (this is needed by ASM to generate stack map frames).
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public Instrumenter(ClassInformationRepository repo) {
+        Validate.notNull(repo);
+
+        classRepo = repo;
     }
 
     /**

@@ -18,7 +18,7 @@ package com.offbynull.coroutines.instrumenter.testhelpers;
 
 import com.offbynull.coroutines.instrumenter.Instrumenter;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
-import com.offbynull.coroutines.instrumenter.asm.ClassInformationRepository;
+import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepository;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -139,7 +139,7 @@ public final class TestUtils {
         Validate.notNull(classNodes);
         Validate.noNullElements(classNodes);
         
-        ClassInformationRepository infoRepo = ClassInformationRepository.create(getClasspath());
+        FileSystemClassInformationRepository infoRepo = FileSystemClassInformationRepository.create(getClasspath());
         SimpleClassWriter cw = new SimpleClassWriter(SimpleClassWriter.COMPUTE_MAXS | SimpleClassWriter.COMPUTE_FRAMES, infoRepo);
         
         JarEntry[] jarEntries = new JarEntry[classNodes.length];

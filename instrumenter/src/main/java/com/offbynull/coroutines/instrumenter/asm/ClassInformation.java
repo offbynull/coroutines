@@ -18,6 +18,7 @@ package com.offbynull.coroutines.instrumenter.asm;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.apache.commons.lang3.Validate;
 
 /**
@@ -67,6 +68,36 @@ public final class ClassInformation {
      */
     public boolean isInterface() {
         return interfaceMarker;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 47 * hash + Objects.hashCode(this.superClassName);
+        hash = 47 * hash + Objects.hashCode(this.interfaces);
+        hash = 47 * hash + (this.interfaceMarker ? 1 : 0);
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final ClassInformation other = (ClassInformation) obj;
+        if (!Objects.equals(this.superClassName, other.superClassName)) {
+            return false;
+        }
+        if (!Objects.equals(this.interfaces, other.interfaces)) {
+            return false;
+        }
+        if (this.interfaceMarker != other.interfaceMarker) {
+            return false;
+        }
+        return true;
     }
     
 }
