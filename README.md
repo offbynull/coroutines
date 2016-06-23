@@ -316,6 +316,7 @@ A Gradle plugin is on the backburner. In the mean time, Gradle users can make us
 
 Alternatives to the Coroutines project include:
 
+* [Tascalate-Javaflow](https://github.com/vsilaev/tascalate-javaflow/)
 * [Javaflow](http://commons.apache.org/sandbox/commons-javaflow/)
 * [Coroutines](https://code.google.com/p/coroutines/)
 * [Continuations Library](http://www.matthiasmann.de/content/view/24/26/)
