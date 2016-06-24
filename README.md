@@ -1,5 +1,7 @@
 # Coroutines
 
+<p align="center"><img src ="logo.png" alt="Coroutines logo" /></p>
+
 Inspired by the [Apache Commons Javaflow](http://commons.apache.org/sandbox/commons-javaflow/) project, the Coroutines project is a Java toolkit that allows you to write coroutines in Java. Coroutines allows you to suspend the execution your Java method at will, save its state, and resume executing it from that saved state at a later point in time.
 
 Why use Coroutines over Javaflow? The Couroutines project is a new Java coroutines implementation written from scratch that aims to solve some of the issues that Javaflow has. The Coroutines project provides several distinct advantages:
@@ -17,7 +19,21 @@ More information on the topic of coroutines and their advantages can be found on
 * [Wikipedia: Coroutine](http://en.wikipedia.org/wiki/Coroutine)
 * [Stackoverflow: Difference between a "coroutine" and a "thread"?](http://stackoverflow.com/a/23436125)
 
-## Example
+## Table of Contents
+
+ * [Quick-start Guide](#quick-start-guide)
+ * [FAQ](#faq)
+  * [How much overhead am I adding?](#how-much-overhead-am-i-adding)
+  * [What projects make use of Coroutines?](#what-projects-make-use-of-coroutines)
+  * [What restrictions are there?](#what-restrictions-are-there)
+  * [Can I use this with an IDE?](#can-i-use-this-with-an-ide)
+  * [Can I serialize/deserialize my Coroutine?](#can-i-serializedeserialize-my-coroutine)
+  * [Is there a Gradle plugin?](#is-there-a-gradle-plugin)
+  * [What alternatives are available?](#what-alternatives-are-available)
+ * [Change Log](#change-log)
+ * [Footnotes](#footnotes)
+
+## Quick-start Guide
 
 ### Setup
 
