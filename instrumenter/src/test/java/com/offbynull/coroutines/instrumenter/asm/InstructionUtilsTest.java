@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,7 +28,6 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tableSw
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.throwException;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithName;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipResourcesAsClassNodes;
-import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
@@ -40,6 +39,7 @@ import org.junit.Test;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
 
 public final class InstructionUtilsTest {
     private static final String STUB_CLASSNAME = "SimpleStub";

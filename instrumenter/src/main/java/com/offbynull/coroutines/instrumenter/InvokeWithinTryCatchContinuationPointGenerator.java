@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,6 @@ import static com.offbynull.coroutines.instrumenter.ContinuationPointInstruction
 import static com.offbynull.coroutines.instrumenter.ContinuationPointInstructionUtils.throwThrowableInVariable;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInvokeNode;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.empty;
@@ -39,7 +38,6 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveLoc
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOperandStack;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tryCatchBlock;
-import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getRequiredStackCountForInvocation;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getReturnTypeOfInvocation;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
@@ -53,6 +51,8 @@ import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getArgumentCountRequiredForInvocation;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
 
 final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationPointGenerator {
 
@@ -105,7 +105,7 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         
         Type invokeMethodReturnType = getReturnTypeOfInvocation(getInvokeInsnNode());
         Type returnType = getReturnType();
-        int methodStackCount = getRequiredStackCountForInvocation(getInvokeInsnNode());
+        int methodStackCount = getArgumentCountRequiredForInvocation(getInvokeInsnNode());
         Integer lineNum = getLineNumber();
         
         Frame<BasicValue> frame = getFrame();

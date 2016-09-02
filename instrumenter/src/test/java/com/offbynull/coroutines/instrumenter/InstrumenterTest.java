@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -46,6 +46,8 @@ public final class InstrumenterTest {
     private static final String RECURSIVE_INVOKE_TEST = "RecursiveInvokeTest";
     private static final String INHERITANCE_INVOKE_TEST = "InheritanceInvokeTest";
     private static final String RETURN_INVOKE_TEST = "ReturnInvokeTest";
+    private static final String LONG_RETURN_INVOKE_TEST = "LongReturnInvokeTest";
+    private static final String DOUBLE_RETURN_INVOKE_TEST = "DoubleReturnInvokeTest";
     private static final String LAMBDA_INVOKE_TEST = "LambdaInvokeTest";
     private static final String CONSTRUCTOR_INVOKE_TEST = "ConstructorInvokeTest";
     private static final String EXCEPTION_SUSPEND_TEST = "ExceptionSuspendTest";
@@ -93,6 +95,16 @@ public final class InstrumenterTest {
     @Test
     public void mustProperlySuspendWithMethodsThatReturnValues() throws Exception {
         performCountTest(RETURN_INVOKE_TEST);
+    }
+
+    @Test
+    public void mustProperlySuspendWithMethodsThatOperateOnLongs() throws Exception {
+        performCountTest(LONG_RETURN_INVOKE_TEST);
+    }
+
+    @Test
+    public void mustProperlySuspendWithMethodsThatOperateOnDoubles() throws Exception {
+        performDoubleCountTest(DOUBLE_RETURN_INVOKE_TEST);
     }
 
     @Test
@@ -307,6 +319,48 @@ public final class InstrumenterTest {
                     + "0\n"
                     + "1\n"
                     + "2\n", builder.toString());
+        }
+    }
+
+    private void performDoubleCountTest(String testClass) throws Exception {
+        StringBuilder builder = new StringBuilder();
+
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(testClass);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertFalse(runner.execute()); // coroutine finished executing here
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+
+            Assert.assertEquals("started\n"
+                    + "0.0\n"
+                    + "1.0\n"
+                    + "2.0\n"
+                    + "3.0\n"
+                    + "4.0\n"
+                    + "5.0\n"
+                    + "6.0\n"
+                    + "7.0\n"
+                    + "8.0\n"
+                    + "9.0\n"
+                    + "started\n"
+                    + "0.0\n"
+                    + "1.0\n"
+                    + "2.0\n", builder.toString());
         }
     }
 
