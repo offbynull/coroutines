@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,6 @@ import static com.offbynull.coroutines.instrumenter.ContinuationPointInstruction
 import static com.offbynull.coroutines.instrumenter.ContinuationPointInstructionUtils.throwThrowableInVariable;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInvokeNode;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.empty;
@@ -36,7 +35,6 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveLocalVariableTable;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOperandStack;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tryCatchBlock;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getRequiredStackCountForInvocation;
@@ -53,6 +51,10 @@ import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.combineObjectArrays;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.popMethodResult;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOperandStack;
 
 final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationPointGenerator {
 
@@ -140,7 +142,6 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         
         return merge(lineNum == null ? empty() : lineNumber(lineNum),
                 cloneInsnList(enterMonitorsInLockStateInsnList),
-                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg), loadVar(methodStateVar)),
                 loadOperandStackSuffix(savedStackVar, tempObjVar, frame, methodStackCount),
                 tryCatchBlock(
                         newTryCatchBlockNode,
@@ -159,7 +160,9 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                         loadIntConst(MODE_SAVING),
                         merge(
+                                popMethodResult(getInvokeInsnNode()),
                                 cloneInsnList(exitMonitorsInLockStateInsnList), // inserted many times, must be cloned
+                                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg), loadVar(methodStateVar)),
                                 returnDummy(returnType)
                         )
                 ),
@@ -181,6 +184,8 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         Variable pendingCountVar = vars.getPendingCountVar();
         Variable savedLocalsVar = vars.getSavedLocalsVar();
         Variable savedStackVar = vars.getSavedStackVar();
+        Variable savedPartialStackVar = vars.getSavedPartialStackVar();
+        Variable savedArgsVar = vars.getSavedArgumentsVar();
         Variable tempObjVar = vars.getTempObjectVar();
         Variable tempObjVar2 = vars.getTempObjVar2();
         
@@ -213,26 +218,32 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         //                             // need to be handled by exception handlers surrounding the original invocation.
         //
         //          restorePoint_<number>_continue:
-        return merge(
-                call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
-                saveOperandStack(savedStackVar, tempObjVar, frame),
-                saveLocalVariableTable(savedLocalsVar, tempObjVar, frame),
-                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
-                        construct(METHODSTATE_INIT_METHOD,
-                                loadIntConst(getId()),
-                                loadVar(savedStackVar),
-                                loadVar(savedLocalsVar),
-                                cloneInsnList(loadLockStateToStackInsnList) // inserted many times, must be cloned
-                        )
-                ),
+        int methodStackCount = getRequiredStackCountForInvocation(getInvokeInsnNode());
+        
+        return merge(call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
+                saveOperandStack(savedArgsVar, tempObjVar, frame, frame.getStackSize(), methodStackCount), // save the args for method
                 cloneInvokeNode(getInvokeInsnNode()), // invoke method
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                         loadIntConst(MODE_SAVING),
                         merge(
-                                // debugPrint("exiting monitors" + methodNode.name),
+                                popMethodResult(getInvokeInsnNode()),
+                                // since we invoked the method before getting here, we already consumed the arguments that were sitting
+                                // on the stack waiting to be consumed by the method -- as such, subtract the number of arguments from the
+                                // total stack size when saving!!!!! THIS IS SUPER IMPORTANT!!!!
+                                saveOperandStack(savedPartialStackVar, tempObjVar, frame, frame.getStackSize() - methodStackCount,
+                                        frame.getStackSize() - methodStackCount),
+                                combineObjectArrays(savedStackVar, savedPartialStackVar, savedArgsVar),
+                                saveLocalVariableTable(savedLocalsVar, tempObjVar, frame),
                                 cloneInsnList(exitMonitorsInLockStateInsnList), // inserted many times, must be cloned
-                                // debugPrint("returning dummy value" + methodNode.name),
+                                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
+                                        construct(METHODSTATE_INIT_METHOD,
+                                                loadIntConst(getId()),
+                                                loadVar(savedStackVar),
+                                                loadVar(savedLocalsVar),
+                                                cloneInsnList(loadLockStateToStackInsnList) // inserted many times, must be cloned
+                                        )
+                                ),
                                 returnDummy(returnType)
                         )
                 ),

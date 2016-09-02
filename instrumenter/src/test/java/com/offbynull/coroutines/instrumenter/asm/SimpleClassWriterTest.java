@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,12 +22,10 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.constru
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.jumpTo;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tableSwitch;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.throwException;
-import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipFromResource;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.io.IOException;
@@ -47,6 +45,8 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.MethodNode;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
 
 public final class SimpleClassWriterTest {
     

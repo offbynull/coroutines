@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -31,6 +31,8 @@ final class FlowInstrumentationVariables {
     private final Variable pendingCountVar;
     private final Variable savedLocalsVar;
     private final Variable savedStackVar;
+    private final Variable savedArgumentsVar;
+    private final Variable savedPartialStackVar;
     private final Variable returnValObjectVar;
 
     public FlowInstrumentationVariables(VariableTable varTable, Variable contArg, Variable methodStateVar, Variable tempObjectVar) {
@@ -48,6 +50,8 @@ final class FlowInstrumentationVariables {
         this.pendingCountVar = varTable.acquireExtra(Type.INT_TYPE);
         this.savedLocalsVar = varTable.acquireExtra(Object[].class);
         this.savedStackVar = varTable.acquireExtra(Object[].class);
+        this.savedArgumentsVar = varTable.acquireExtra(Object[].class);
+        this.savedPartialStackVar = varTable.acquireExtra(Object[].class);
         this.returnValObjectVar = varTable.acquireExtra(Object.class);
     }
 
@@ -73,6 +77,14 @@ final class FlowInstrumentationVariables {
 
     public Variable getSavedStackVar() {
         return savedStackVar;
+    }
+
+    public Variable getSavedPartialStackVar() {
+        return savedPartialStackVar;
+    }
+
+    public Variable getSavedArgumentsVar() {
+        return savedArgumentsVar;
     }
 
     public Variable getTempObjVar2() {

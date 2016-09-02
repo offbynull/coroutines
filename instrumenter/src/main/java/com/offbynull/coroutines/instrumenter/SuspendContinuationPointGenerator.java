@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,20 +18,16 @@ package com.offbynull.coroutines.instrumenter;
 
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.empty;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.jumpTo;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.lineNumber;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadIntConst;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadLocalVariableTable;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveLocalVariableTable;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOperandStack;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import static com.offbynull.coroutines.user.Continuation.MODE_NORMAL;
 import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
@@ -43,6 +39,10 @@ import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadOperandStack;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOperandStack;
 
 final class SuspendContinuationPointGenerator extends ContinuationPointGenerator {
 
@@ -134,8 +134,7 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         //
         //
         //          restorePoint_<number>_continue: // at this label: empty exec stack / uninit exec var table
-        return merge(
-                call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
+        return merge(call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
                 saveOperandStack(savedStackVar, tempObjVar, frame),
                 saveLocalVariableTable(savedLocalsVar, tempObjVar, frame),
                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),

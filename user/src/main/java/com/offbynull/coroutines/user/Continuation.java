@@ -124,7 +124,7 @@ public final class Continuation implements Serializable {
         if (methodState == null) {
             throw new NullPointerException();
         }        
-        pendingMethodStates.addLast(methodState);
+        pendingMethodStates.addFirst(methodState);
     }
 
     /**
@@ -145,7 +145,7 @@ public final class Continuation implements Serializable {
         }
         return (MethodState) savedMethodStates.removeFirst();
     }
-
+    
     /**
      * Do not use -- for internal use only. For testing.
      * @param idx n/a

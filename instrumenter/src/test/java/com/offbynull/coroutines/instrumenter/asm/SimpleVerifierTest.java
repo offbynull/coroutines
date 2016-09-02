@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3.0 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.
+ */
 package com.offbynull.coroutines.instrumenter.asm;
 
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
@@ -6,7 +22,6 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.constru
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.jumpTo;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tableSwitch;
@@ -35,6 +50,7 @@ import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
 
 public class SimpleVerifierTest {
 

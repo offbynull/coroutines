@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,6 +16,7 @@
  */
 package com.offbynull.coroutines.instrumenter.asm;
 
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getReturnTypeOfInvocation;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -27,6 +28,7 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.Validate;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -52,6 +54,9 @@ import org.objectweb.asm.tree.analysis.Frame;
  * @author Kasra Faghihi
  */
 public final class InstructionUtils {
+    
+    private static final Method SYSTEM_ARRAY_COPY_METHOD = MethodUtils.getAccessibleMethod(System.class, "arraycopy", Object.class,
+            Integer.TYPE, Object.class, Integer.TYPE, Integer.TYPE);
 
     private InstructionUtils() {
         // do nothing
@@ -148,18 +153,33 @@ public final class InstructionUtils {
     }
     
     /**
-     * Combines multiple instruction lists in to a single instruction list.
-     * @param insnLists instruction lists to merge
+     * Combines multiple instructions (or instruction lists) in to a single instruction list.
+     * @param insns instruction or instruction lists to merge
      * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @throws IllegalArgumentException if {@code insns} contains 
      * @return merged instructions
      */
-    public static InsnList merge(InsnList... insnLists) {
-        Validate.notNull(insnLists);
-        Validate.noNullElements(insnLists);
+    public static InsnList merge(Object... insns) {
+        Validate.notNull(insns);
+        Validate.noNullElements(insns);
 
         InsnList ret = new InsnList();
-        for (InsnList insnList : insnLists) {
-            ret.add(insnList);
+        for (Object insn : insns) {
+            if (insn instanceof AbstractInsnNode) {
+                // add single instruction
+                AbstractInsnNode insnNode = (AbstractInsnNode) insn;
+                ret.add(insnNode);
+            } else if (insn instanceof InsnList) {
+                // add instruction list
+                InsnList insnList = (InsnList) insn;
+                for (int i = 0; i < insnList.size(); i++) {
+                    Validate.notNull(insnList.get(i));
+                }
+                ret.add((InsnList) insn);
+            } else {
+                // unrecognized
+                throw new IllegalArgumentException();
+            }
         }
 
         return ret;
@@ -230,6 +250,57 @@ public final class InstructionUtils {
         ret.add(new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"));
         ret.add(new LdcInsnNode(text));
         ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false));
+
+        return ret;
+    }
+
+    /**
+     * Generates instructions for printing out a string using {@link System#out}. This is useful for debugging. For example, you
+     * can print out lines around your instrumented code to make sure that what you think is being run is actually being run.
+     * @param text debug text generation instruction list -- must leave an String on the stack
+     * @return instructions to call System.out.println with a string constant
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList debugPrint(InsnList text) {
+        Validate.notNull(text);
+        
+        InsnList ret = new InsnList();
+        
+        ret.add(new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"));
+        ret.add(text);
+        ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false));
+
+        return ret;
+    }
+    
+    /**
+     * Generates instructions to pop the result of the method off the stack. This will only generate instructions if the method being
+     * invoked generates a return value.
+     * @param invokeInsnNode instruction for the method that was invoked (can either be of type {@link MethodInsnNode} or
+     * {@link InvokeDynamicInsnNode} -- this is used to determine how many items to pop off the stack
+     * @return instructions for a pop (only if the method being invoked generates a return value)
+     * @throws IllegalArgumentException if {@code invokeInsnNode} isn't of type {@link MethodInsnNode} or {@link InvokeDynamicInsnNode}
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList popMethodResult(AbstractInsnNode invokeInsnNode) {
+        Validate.notNull(invokeInsnNode);
+        
+        Type returnType = getReturnTypeOfInvocation(invokeInsnNode);
+        
+        InsnList ret = new InsnList();
+        switch (returnType.getSort()) {
+            case Type.LONG:
+            case Type.DOUBLE:
+                ret.add(new InsnNode(Opcodes.POP2));
+                break;
+            case Type.VOID:
+                break;
+            case Type.METHOD:
+                throw new IllegalStateException(); // this should never happen
+            default:
+                ret.add(new InsnNode(Opcodes.POP));
+                break;
+        }
 
         return ret;
     }
@@ -398,6 +469,59 @@ public final class InstructionUtils {
 
         return ret;
     }
+
+    /**
+     * Creates a new object array on the stack.
+     * @param size instructions to calculate the size of the new array -- must leave an int on the stack
+     * @return instructions to create a new object array -- will leave the object array on the stack
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList createNewObjectArray(InsnList size) {
+        Validate.notNull(size);
+        
+        InsnList ret = new InsnList();
+        
+        ret.add(size);
+        ret.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"));
+        
+        return ret;
+    }
+
+    /**
+     * Gets the size of an array and puts it on to the stack.
+     * @param arrayRef instructions to get the array -- must leave an array on the stack
+     * @return instructions to get the size of the array -- will size an int on the stack
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList loadArrayLength(InsnList arrayRef) {
+        Validate.notNull(arrayRef);
+        
+        InsnList ret = new InsnList();
+        ret.add(arrayRef);
+        ret.add(new InsnNode(Opcodes.ARRAYLENGTH));
+        
+        return ret;
+    }
+
+    /**
+     * Adds two integers together and puts the result on to the stack.
+     * @param lhs instructions to generate the first operand -- must leave an int on the stack
+     * @param rhs instructions to generate the second operand -- must leave an int on the stack
+     * @return instructions to add the two numbers together -- will leave an int on the stack
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList addIntegers(InsnList lhs, InsnList rhs) {
+        Validate.notNull(lhs);
+        Validate.notNull(rhs);
+        
+        InsnList ret = new InsnList();
+        
+        ret.add(lhs);
+        ret.add(rhs);
+        ret.add(new InsnNode(Opcodes.IADD));
+        
+        return ret;
+    }
     
     /**
      * Calls a constructor with a set of arguments. After execution the stack should have an extra item pushed on it: the object that was
@@ -433,8 +557,8 @@ public final class InstructionUtils {
 
     /**
      * Compares two integers and performs some action if the integers are equal.
-     * @param lhs left hand side instruction list -- must leave an int on top of the stack
-     * @param rhs right hand side instruction list -- must leave an int on top of the stack
+     * @param lhs left hand side instruction list -- must leave an int on the stack
+     * @param rhs right hand side instruction list -- must leave an int on the stack
      * @param action action to perform if results of {@code lhs} and {@code rhs} are equal
      * @return instructions instruction list to perform some action if two ints are equal
      * @throws NullPointerException if any argument is {@code null}
@@ -460,8 +584,8 @@ public final class InstructionUtils {
 
 /**
      * Compares two objects and performs some action if the objects are the same (uses == to check if same, not the equals method).
-     * @param lhs left hand side instruction list -- must leave an object on top of the stack
-     * @param rhs right hand side instruction list -- must leave an object on top of the stack
+     * @param lhs left hand side instruction list -- must leave an object on the stack
+     * @param rhs right hand side instruction list -- must leave an object on the stack
      * @param action action to perform if results of {@code lhs} and {@code rhs} are equal
      * @return instructions instruction list to perform some action if two objects are equal
      * @throws NullPointerException if any argument is {@code null}
@@ -489,7 +613,7 @@ public final class InstructionUtils {
      * For each element in an object array, performs an action.
      * @param counterVar parameter used to keep track of count in loop
      * @param arrayLenVar parameter used to keep track of array length
-     * @param array object array instruction list -- must leave an array on top of the stack
+     * @param array object array instruction list -- must leave an array on the stack
      * @param action action to perform on each element -- element will be at top of stack and must be consumed by these instructions
      * @return instructions instruction list to perform some action if two ints are equal
      * @throws NullPointerException if any argument is {@code null}
@@ -588,6 +712,56 @@ public final class InstructionUtils {
     }
 
     /**
+     * Concatenates two object arrays together.
+     * @param destArrayVar variable to put concatenated object array in
+     * @param firstArrayVar variable of first object array
+     * @param secondArrayVar variable of second object array
+     * @return instructions to create a new object array where the first part of the array is the contents of {@code firstArrayVar} and the
+     * second part of the array is the contents of {@code secondArrayVar}
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
+     * type
+     */
+    public static InsnList combineObjectArrays(Variable destArrayVar, Variable firstArrayVar, Variable secondArrayVar) {
+        Validate.notNull(destArrayVar);
+        Validate.notNull(firstArrayVar);
+        Validate.notNull(secondArrayVar);
+        Validate.isTrue(destArrayVar.getType().equals(Type.getType(Object[].class)));
+        Validate.isTrue(firstArrayVar.getType().equals(Type.getType(Object[].class)));
+        Validate.isTrue(secondArrayVar.getType().equals(Type.getType(Object[].class)));
+        validateLocalIndicies(destArrayVar.getIndex(), firstArrayVar.getIndex(), secondArrayVar.getIndex());
+        
+        InsnList ret = merge(
+                // destArrayVar = new Object[firstArrayVar.length + secondArrayVar.length]
+                createNewObjectArray(
+                        addIntegers(
+                                loadArrayLength(loadVar(firstArrayVar)),
+                                loadArrayLength(loadVar(secondArrayVar))
+                        )
+                ),
+                saveVar(destArrayVar),
+                // System.arrayCopy(firstArrayVar, 0, destArrayVar, 0, firstArrayVar.length)
+                call(SYSTEM_ARRAY_COPY_METHOD,
+                        loadVar(firstArrayVar),
+                        loadIntConst(0),
+                        loadVar(destArrayVar),
+                        loadIntConst(0),
+                        loadArrayLength(loadVar(firstArrayVar))
+                ),
+                // System.arrayCopy(secondArrayVar, 0, destArrayVar, firstArrayVar.length, secondArrayVar.length)
+                call(SYSTEM_ARRAY_COPY_METHOD,
+                        loadVar(secondArrayVar),
+                        loadIntConst(0),
+                        loadVar(destArrayVar),
+                        loadArrayLength(loadVar(firstArrayVar)),
+                        loadArrayLength(loadVar(secondArrayVar))
+                )
+        );
+        
+        return ret;
+    }
+
+    /**
      * Generates instructions to throw an exception of type {@link RuntimeException} with a constant message.
      * @param message message of exception
      * @return instructions to throw an exception
@@ -611,7 +785,7 @@ public final class InstructionUtils {
      * Generates instructions for a switch table. This does not automatically generate jumps at the end of each default/case statement. It's
      * your responsibility to either add the relevant jumps, throws, or returns at each default/case statement, otherwise the code will
      * just fall through (which is likely not what you want).
-     * @param indexInsnList instructions to calculate the index -- must leave an int on top of the stack
+     * @param indexInsnList instructions to calculate the index -- must leave an int on the stack
      * @param defaultInsnList instructions to execute on default statement -- must leave the stack unchanged
      * @param caseStartIdx the number which the case statements start at
      * @param caseInsnLists instructions to execute on each case statement -- must leave the stack unchanged
@@ -827,7 +1001,7 @@ public final class InstructionUtils {
 
         return ret;
     }
-    
+
     /**
      * Generates instructions to save the operand stack to an object array.
      * @param arrayStackVar variable that the object array containing operand stack is stored
@@ -839,22 +1013,46 @@ public final class InstructionUtils {
      * type
      */
     public static InsnList saveOperandStack(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame) {
+        return saveOperandStack(arrayStackVar, tempObjectVar, frame, frame.getStackSize(), frame.getStackSize());
+    }
+
+    /**
+     * Generates instructions to save a certain number of items from the top of the operand stack to an object array.
+     * @param arrayStackVar variable that the object array containing operand stack is stored
+     * @param tempObjectVar variable to use for temporary objects
+     * @param frame execution frame at the instruction where the operand stack is to be saved
+     * @param top treat the stack returned by {@code frame} as if it has a size of this value starting from the bottom (this is useful for
+     * when you've already saved some of the stack and now you want to save the remainder)
+     * @param count number of items to store from the stack
+     * @return instructions to save the operand stack in to an array and save it to the local variables table
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
+     * type, or if {@code top} is larger than the number of items in the stack at {@code frame} (or is negative), or if {@code count} is
+     * larger than {@code top} (or is negative)
+     */
+    public static InsnList saveOperandStack(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame, int top, int count) {
         Validate.notNull(arrayStackVar);
         Validate.notNull(tempObjectVar);
         Validate.notNull(frame);
         Validate.isTrue(arrayStackVar.getType().equals(Type.getType(Object[].class)));
         Validate.isTrue(tempObjectVar.getType().equals(Type.getType(Object.class)));
         validateLocalIndicies(arrayStackVar.getIndex(), tempObjectVar.getIndex());
+        Validate.isTrue(top <= frame.getStackSize());
+        Validate.isTrue(count <= top);
+        Validate.isTrue(top >= 0);
+        Validate.isTrue(count >= 0);
         
         InsnList ret = new InsnList();
 
         // Create stack storage array and save it in local vars table
-        ret.add(new LdcInsnNode(frame.getStackSize()));
+        ret.add(new LdcInsnNode(count));
         ret.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"));
         ret.add(new VarInsnNode(Opcodes.ASTORE, arrayStackVar.getIndex()));
 
         // Save the stack
-        for (int i = frame.getStackSize() - 1; i >= 0; i--) {
+        int beforeSavedStackPos = top - 1;
+        int afterSavedStackPos = top - count;
+        for (int i = beforeSavedStackPos; i >= afterSavedStackPos; i--) {
             BasicValue basicValue = frame.getStack(i);
             Type type = basicValue.getType();
             
@@ -912,14 +1110,28 @@ public final class InstructionUtils {
             }
 
             // Store item in to stack storage array
+            int stackPos = beforeSavedStackPos - i;
+            int saveToArrayIdx = count - stackPos - 1;
             ret.add(new VarInsnNode(Opcodes.ALOAD, arrayStackVar.getIndex()));
-            ret.add(new LdcInsnNode(i));
+            ret.add(new LdcInsnNode(saveToArrayIdx));
             ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectVar.getIndex()));
             ret.add(new InsnNode(Opcodes.AASTORE));
         }
 
+        // At this point, the object array containing the saved stack will be ordered such that the last element in the array will have the
+        // top of the stack.
+        //
+        // For example...
+        //
+        //                              top of stack
+        //                                   |
+        //   stack = [item1, item2, item3, item4]
+        //   array = [item1, item2, item3, item4]
+        //              |                    |
+        //             idx0                 idx3
+        
         // Restore the stack
-        for (int i = 0; i < frame.getStackSize(); i++) {
+        for (int i = afterSavedStackPos; i <= beforeSavedStackPos; i++) {
             BasicValue basicValue = frame.getStack(i);
             Type type = basicValue.getType();
             
@@ -934,8 +1146,9 @@ public final class InstructionUtils {
             }
 
             // Load item from stack storage array
+            int loadFromArrayIdx = i - afterSavedStackPos;
             ret.add(new VarInsnNode(Opcodes.ALOAD, arrayStackVar.getIndex()));
-            ret.add(new LdcInsnNode(i));
+            ret.add(new LdcInsnNode(loadFromArrayIdx));
             ret.add(new InsnNode(Opcodes.AALOAD));
 
             // Convert the item to an object (if not already an object) and stores it in local vars table. Item removed from stack.
