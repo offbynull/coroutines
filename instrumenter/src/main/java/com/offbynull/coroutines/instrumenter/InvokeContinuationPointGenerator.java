@@ -34,7 +34,6 @@ import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveLocalVariableTable;
-import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getRequiredStackCountForInvocation;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getReturnTypeOfInvocation;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
@@ -47,9 +46,10 @@ import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.combineObjectArrays;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.popMethodResult;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOperandStack;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getArgumentCountRequiredForInvocation;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
 
 final class InvokeContinuationPointGenerator extends ContinuationPointGenerator {
 
@@ -92,7 +92,7 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
         Type invokeMethodReturnType = getReturnTypeOfInvocation(getInvokeInsnNode());        
         Type returnType = getReturnType();
         Integer lineNum = getLineNumber();
-        int methodStackCount = getRequiredStackCountForInvocation(getInvokeInsnNode());
+        int methodStackCount = getArgumentCountRequiredForInvocation(getInvokeInsnNode());
         
         Frame<BasicValue> frame = getFrame();
         
@@ -199,12 +199,15 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
         //
         //          restorePoint_<number>_continue:
         
-        int methodStackCount = getRequiredStackCountForInvocation(getInvokeInsnNode());
+        int stackCountForMethodInvocation = getArgumentCountRequiredForInvocation(getInvokeInsnNode());
+        int preInvokeStackSize = frame.getStackSize();
+        int postInvokeStackSize = frame.getStackSize() - stackCountForMethodInvocation;
         return merge(
                 //debugPrint("clearing excess pending"),
                 call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)), // clear excess pending states
                 //debugPrint("saving method args from operand stack"),
-                saveOperandStack(savedArgsVar, tempObjVar, frame, frame.getStackSize(), methodStackCount), // save the args going for method
+                // save args for invoke
+                saveOperandStack(savedArgsVar, tempObjVar, frame, preInvokeStackSize, stackCountForMethodInvocation),
                 //debugPrint("invoking method -- method args should be off the stack at this point"),
                 cloneInvokeNode(getInvokeInsnNode()),
                 ifIntegersEqual(// if we're saving after invoke
@@ -219,8 +222,7 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
                                 // on the stack waiting to be consumed by the method -- as such, subtract the number of arguments from the
                                 // total stack size when saving!!!!! The top of the stack should now be just before the arguments!!!
                                 //   THIS IS SUPER IMPORTANT!!!!!
-                                saveOperandStack(savedPartialStackVar, tempObjVar, frame, frame.getStackSize() - methodStackCount,
-                                        frame.getStackSize() - methodStackCount),
+                                saveOperandStack(savedPartialStackVar, tempObjVar, frame, postInvokeStackSize, postInvokeStackSize),
                                 //debugPrint("combining saved args with remainder of operand stack to get full stack required for loading"),
                                 combineObjectArrays(savedStackVar, savedPartialStackVar, savedArgsVar),
                                 //debugPrint("saving local vars table"),

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -214,14 +214,18 @@ public final class SearchUtils {
     }
     
     /**
-     * Get the number of items that need to be on the stack for an invocation of some method.
+     * Get the number of arguments required for an invocation of some method. This includes the 'this' argument for non-static methods.
+     * <p>
+     * NOTE THAT THIS IS NOT THE NUMBER OF ITEMS ON THE STACK. If the method takes in doubles or longs, each double or long encountered
+     * would be 2 items on the stack. This method returns the number of arguments required for the method to be invoked, not the number of
+     * items required to be on the stack for the method to be invoked.
      * @param invokeNode the invocation instruction (either normal invocation or invokedynamic)
-     * @return number of items required on the stack for this method
+     * @return number of arguments required by this method
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code invokeNode} is neither of type {@link MethodInsnNode} nor {@link InvokeDynamicInsnNode},
      * or if type of invocation ({@link MethodInsnNode}) cannot be determined
      */
-    public static int getRequiredStackCountForInvocation(AbstractInsnNode invokeNode) {
+    public static int getArgumentCountRequiredForInvocation(AbstractInsnNode invokeNode) {
         Validate.notNull(invokeNode);
 
         if (invokeNode instanceof MethodInsnNode) {
@@ -243,7 +247,7 @@ public final class SearchUtils {
             }
             Type methodType = Type.getType(methodInsnNode.desc);
             paramCount = methodType.getArgumentTypes().length;
-            
+                    
             return paramCount + extra;
         } else if (invokeNode instanceof InvokeDynamicInsnNode) {
             InvokeDynamicInsnNode invokeDynamicInsnNode = (InvokeDynamicInsnNode) invokeNode;

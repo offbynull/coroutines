@@ -347,7 +347,11 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
+<<<<<<< HEAD
 - ADDED: Major performance improvement: Deferred operand stack and local variable table saving until Coroutine suspended.
+=======
+- ADDED: Increased test coverage.
+>>>>>>> master
 
 ### [1.1.1] - 2015-08-08
 - FIXED: Upgraded to dependencies and plugins

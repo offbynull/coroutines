@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -104,7 +104,7 @@ public final class SearchUtilsTest {
         Type type = Type.getType(MethodUtils.getAccessibleMethod(Integer.class, "compareTo", Integer.class));
         MethodInsnNode methodInsnNode = new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/util/Integer", "compareTo", type.getDescriptor(),
                 false);
-        int reqStackCount = SearchUtils.getRequiredStackCountForInvocation(methodInsnNode);
+        int reqStackCount = SearchUtils.getArgumentCountRequiredForInvocation(methodInsnNode);
 
         assertEquals(2, reqStackCount);
     }
@@ -114,7 +114,7 @@ public final class SearchUtilsTest {
         Type type = Type.getType(MethodUtils.getAccessibleMethod(Integer.class, "decode", String.class));
         MethodInsnNode methodInsnNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "java/util/Integer", "decode", type.getDescriptor(),
                 false);
-        int reqStackCount = SearchUtils.getRequiredStackCountForInvocation(methodInsnNode);
+        int reqStackCount = SearchUtils.getArgumentCountRequiredForInvocation(methodInsnNode);
 
         assertEquals(1, reqStackCount);
     }
