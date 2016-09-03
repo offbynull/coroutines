@@ -99,24 +99,4 @@ public final class SearchUtilsTest {
         assertEquals("println", ((MethodInsnNode) insns.get(0)).name);
     }
     
-    @Test
-    public void mustProperlyDetermineStackSizeForNormalMethod() {
-        Type type = Type.getType(MethodUtils.getAccessibleMethod(Integer.class, "compareTo", Integer.class));
-        MethodInsnNode methodInsnNode = new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/util/Integer", "compareTo", type.getDescriptor(),
-                false);
-        int reqStackCount = SearchUtils.getArgumentCountRequiredForInvocation(methodInsnNode);
-
-        assertEquals(2, reqStackCount);
-    }
-
-    @Test
-    public void mustProperlyDetermineStackSizeForStaticMethod() {
-        Type type = Type.getType(MethodUtils.getAccessibleMethod(Integer.class, "decode", String.class));
-        MethodInsnNode methodInsnNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "java/util/Integer", "decode", type.getDescriptor(),
-                false);
-        int reqStackCount = SearchUtils.getArgumentCountRequiredForInvocation(methodInsnNode);
-
-        assertEquals(1, reqStackCount);
-    }
-    
 }

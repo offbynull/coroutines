@@ -16,8 +16,8 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.saveVar;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Opcodes;

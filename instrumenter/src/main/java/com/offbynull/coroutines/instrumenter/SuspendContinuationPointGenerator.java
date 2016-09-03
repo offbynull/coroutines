@@ -16,18 +16,20 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.empty;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.jumpTo;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.lineNumber;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadIntConst;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadLocalVariableTable;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveLocalVariableTable;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.loadLocalVariableTable;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.loadOperandStack;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.returnDummy;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.saveLocalVariableTable;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.saveOperandStack;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.addLabel;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.call;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.construct;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.empty;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.jumpTo;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.lineNumber;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadIntConst;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.merge;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import static com.offbynull.coroutines.user.Continuation.MODE_NORMAL;
 import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
@@ -39,10 +41,8 @@ import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadOperandStack;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOperandStack;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.cloneInsnList;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.pop;
 
 final class SuspendContinuationPointGenerator extends ContinuationPointGenerator {
 

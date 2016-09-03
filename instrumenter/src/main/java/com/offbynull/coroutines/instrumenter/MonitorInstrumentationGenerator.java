@@ -16,17 +16,17 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneMonitorNode;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.empty;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.forEach;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadNull;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.monitorEnter;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.monitorExit;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.call;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.cloneMonitorNode;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.construct;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.empty;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.forEach;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadNull;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.merge;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.monitorEnter;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.monitorExit;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.saveVar;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.searchForOpcodes;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import com.offbynull.coroutines.user.LockState;

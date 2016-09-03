@@ -16,16 +16,15 @@
  */
 package com.offbynull.coroutines.instrumenter.asm;
 
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.jumpTo;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tableSwitch;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.throwException;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.addLabel;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.call;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.construct;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.jumpTo;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.merge;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.saveVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.tableSwitch;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.throwException;
 import com.offbynull.coroutines.instrumenter.testhelpers.TestUtils;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipFromResource;
 import java.io.IOException;
@@ -50,7 +49,8 @@ import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.pop;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.pop;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.returnVoid;
 
 public class SimpleVerifierTest {
 
@@ -134,7 +134,7 @@ public class SimpleVerifierTest {
                         addLabel(invokePoint),
                         call(iteratorMethod, loadVar(listVar)),
                         pop(), // discard results of call
-                        returnDummy(Type.VOID_TYPE)
+                        returnVoid()
                 );
 
         methodNode.instructions = methodInsnList;

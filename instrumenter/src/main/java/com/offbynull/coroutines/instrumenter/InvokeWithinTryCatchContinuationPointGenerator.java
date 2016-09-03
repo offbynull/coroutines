@@ -16,28 +16,29 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.loadLocalVariableTable;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.loadOperandStackPrefix;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.loadOperandStackSuffix;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.popMethodResult;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.returnDummy;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.saveLocalVariableTable;
+import static com.offbynull.coroutines.instrumenter.ContinuationInstructionGenerationUtils.saveOperandStack;
 import static com.offbynull.coroutines.instrumenter.ContinuationPointInstructionUtils.castToObjectAndSave;
 import static com.offbynull.coroutines.instrumenter.ContinuationPointInstructionUtils.loadAndCastToOriginal;
 import static com.offbynull.coroutines.instrumenter.ContinuationPointInstructionUtils.throwThrowableInVariable;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.addLabel;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.call;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInvokeNode;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.construct;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.empty;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.ifIntegersEqual;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.jumpTo;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.lineNumber;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadIntConst;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadLocalVariableTable;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadOperandStackPrefix;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadOperandStackSuffix;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnDummy;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveLocalVariableTable;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tryCatchBlock;
-import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getReturnTypeOfInvocation;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.addLabel;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.call;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.cloneInvokeNode;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.construct;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.empty;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.ifIntegersEqual;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.jumpTo;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.lineNumber;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadIntConst;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.merge;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.saveVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.tryCatchBlock;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import static com.offbynull.coroutines.user.Continuation.MODE_SAVING;
 import java.util.ArrayList;
@@ -50,11 +51,10 @@ import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.combineObjectArrays;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.popMethodResult;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveOperandStack;
-import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.getArgumentCountRequiredForInvocation;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.cloneInsnList;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.combineObjectArrays;
+import static com.offbynull.coroutines.instrumenter.asm.MethodInvokeUtils.getArgumentCountRequiredForInvocation;
+import static com.offbynull.coroutines.instrumenter.asm.MethodInvokeUtils.getReturnTypeOfInvocation;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.cloneInsnList;
 
 final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationPointGenerator {
 

@@ -16,32 +16,32 @@
  */
 package com.offbynull.coroutines.instrumenter.asm;
 
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.forEach;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.ifIntegersEqual;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.ifObjectsEqual;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.loadStringConst;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.merge;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.returnValue;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.saveVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.tableSwitch;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionUtils.throwException;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.forEach;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.ifIntegersEqual;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.ifObjectsEqual;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadStringConst;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.merge;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.returnValue;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.saveVar;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.tableSwitch;
+import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.throwException;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithName;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipResourcesAsClassNodes;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
 import org.apache.commons.lang3.reflect.MethodUtils;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
 
-public final class InstructionUtilsTest {
+public final class InstructionGenerationUtilsTest {
     private static final String STUB_CLASSNAME = "SimpleStub";
     private static final String STUB_FILENAME = STUB_CLASSNAME + ".class";
     private static final String ZIP_RESOURCE_PATH = STUB_CLASSNAME + ".zip";
@@ -100,7 +100,7 @@ public final class InstructionUtilsTest {
                                 0,
                                 throwException("inner0"),
                                 throwException("inner1"),
-                                InstructionUtils.returnValue(Type.getType(String.class), loadStringConst("OK!"))
+                                InstructionGenerationUtils.returnValue(Type.getType(String.class), loadStringConst("OK!"))
                         )
                 );
         
