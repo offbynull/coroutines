@@ -90,8 +90,8 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         //          goto restorePoint_<number>_continue;
         return merge(
                 lineNum == null ? empty() : lineNumber(lineNum),
-                loadOperandStack(savedStackVar, tempObjVar, frame),
-                loadLocalVariableTable(savedLocalsVar, tempObjVar, frame),
+                loadOperandStack(savedStackVar, frame),
+                loadLocalVariableTable(savedLocalsVar, frame),
                 cloneInsnList(enterMonitorsInLockStateInsnList),
                 pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
                        // stack that would have been consumed by that invocation... since we're removing that call, we

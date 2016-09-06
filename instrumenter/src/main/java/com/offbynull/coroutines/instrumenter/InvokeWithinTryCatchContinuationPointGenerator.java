@@ -142,7 +142,7 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         
         return merge(lineNum == null ? empty() : lineNumber(lineNum),
                 cloneInsnList(enterMonitorsInLockStateInsnList),
-                loadOperandStackSuffix(savedStackVar, tempObjVar, frame, methodStackCount),
+                loadOperandStackSuffix(savedStackVar, frame, methodStackCount),
                 tryCatchBlock(
                         newTryCatchBlockNode,
                         null,
@@ -151,8 +151,8 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
                         ),
                         merge(
                                 saveVar(tempObjVar2),
-                                loadOperandStackPrefix(savedStackVar, tempObjVar, frame, frame.getStackSize() - methodStackCount),
-                                loadLocalVariableTable(savedLocalsVar, tempObjVar, frame),
+                                loadOperandStackPrefix(savedStackVar, frame, frame.getStackSize() - methodStackCount),
+                                loadLocalVariableTable(savedLocalsVar, frame),
                                 jumpTo(failedRestoreExecLabelNode)
                         )
                 ),
@@ -167,8 +167,8 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
                         )
                 ),
                 castToObjectAndSave(invokeMethodReturnType, tempObjVar2), // save return (does nothing if invoked method returns void)
-                loadOperandStackPrefix(savedStackVar, tempObjVar, frame, frame.getStackSize() - methodStackCount),
-                loadLocalVariableTable(savedLocalsVar, tempObjVar, frame),
+                loadOperandStackPrefix(savedStackVar, frame, frame.getStackSize() - methodStackCount),
+                loadLocalVariableTable(savedLocalsVar, frame),
                 loadAndCastToOriginal(invokeMethodReturnType, tempObjVar2),
                 jumpTo(continueExecLabelNode)
         );

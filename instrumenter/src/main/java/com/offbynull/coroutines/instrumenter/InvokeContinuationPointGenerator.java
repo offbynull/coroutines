@@ -122,7 +122,7 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
                 // debugPrint("loading just enough in to the stack to invoke method"),
                 // debugPrint(call(MethodUtils.getAccessibleMethod(Arrays.class, "toString", Object[].class), loadVar(savedStackVar))),
                 // debugPrint("method stack count " + methodStackCount),
-                loadOperandStackSuffix(savedStackVar, tempObjVar, frame, methodStackCount),
+                loadOperandStackSuffix(savedStackVar, frame, methodStackCount),
                 // debugPrint("invoking method"),
                 cloneInvokeNode(getInvokeInsnNode()), // invoke method  
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
@@ -144,9 +144,9 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
                 // debugPrint("saving result"),
                 castToObjectAndSave(invokeMethodReturnType, tempObjVar2), // save return (does nothing if void)
                 // debugPrint("loading remainder of stack"),
-                loadOperandStackPrefix(savedStackVar, tempObjVar, frame, frame.getStackSize() - methodStackCount),
+                loadOperandStackPrefix(savedStackVar, frame, frame.getStackSize() - methodStackCount),
                 // debugPrint("loading local vars"),
-                loadLocalVariableTable(savedLocalsVar, tempObjVar, frame),
+                loadLocalVariableTable(savedLocalsVar, frame),
                 // debugPrint("loading result"),
                 loadAndCastToOriginal(invokeMethodReturnType, tempObjVar2),
                 // debugPrint("continuing..."),

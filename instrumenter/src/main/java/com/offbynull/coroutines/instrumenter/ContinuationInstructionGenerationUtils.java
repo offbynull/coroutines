@@ -45,22 +45,20 @@ final class ContinuationInstructionGenerationUtils {
     /**
      * Generates instructions to load the operand stack from an object array.
      * @param arrayStackVar variable that the object array containing operand stack is stored
-     * @param tempObjectVar variable to use for temporary objects
      * @param frame execution frame at the instruction for which the operand stack is to be restored
      * @return instructions to load the operand stack from an array
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
      * type
      */
-    public static InsnList loadOperandStack(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame) {
-        return loadOperandStack(arrayStackVar, tempObjectVar, frame, 0, frame.getStackSize());
+    public static InsnList loadOperandStack(Variable arrayStackVar, Frame<BasicValue> frame) {
+        return loadOperandStack(arrayStackVar, frame, 0, frame.getStackSize());
     }
 
     /**
      * Generates instructions to load the last {@code count} items of the operand stack from an object array. The object array contains all
      * items for the stack, but only the tail {@code count} items will be loaded on to the stack.
      * @param arrayStackVar variable that the object array containing operand stack is stored
-     * @param tempObjectVar variable to use for temporary objects
      * @param frame execution frame at the instruction for which the operand stack is to be restored
      * @param count number of items to load to the bottom of the stack.
      * @return instructions to load the relevant portion of the operand stack from an array
@@ -68,18 +66,17 @@ final class ContinuationInstructionGenerationUtils {
      * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
      * type, or if there aren't {@code count} items on the stack
      */
-    public static InsnList loadOperandStackSuffix(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame, int count) {
+    public static InsnList loadOperandStackSuffix(Variable arrayStackVar, Frame<BasicValue> frame, int count) {
         int start = frame.getStackSize() - count;
         int end = frame.getStackSize();
         Validate.isTrue(start >= 0);
-        return loadOperandStack(arrayStackVar, tempObjectVar, frame, start, end);
+        return loadOperandStack(arrayStackVar, frame, start, end);
     }
 
     /**
      * Generates instructions to load the first {@code count} items of the operand stack from an object array. The object array contains all
      * items for the stack, but only the beginning {@code count} items will be loaded on to the stack.
      * @param arrayStackVar variable that the object array containing operand stack is stored
-     * @param tempObjectVar variable to use for temporary objects
      * @param frame execution frame at the instruction for which the operand stack is to be restored
      * @param count number of items to load to the bottom of the stack.
      * @return instructions to load the relevant portion of operand stack from an array
@@ -87,20 +84,17 @@ final class ContinuationInstructionGenerationUtils {
      * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
      * type, or if there aren't {@code count} items on the stack
      */
-    public static InsnList loadOperandStackPrefix(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame, int count) {
+    public static InsnList loadOperandStackPrefix(Variable arrayStackVar, Frame<BasicValue> frame, int count) {
         int start = 0;
         int end = count;
         Validate.isTrue(end <= frame.getStackSize());
-        return loadOperandStack(arrayStackVar, tempObjectVar, frame, start, end);
+        return loadOperandStack(arrayStackVar, frame, start, end);
     }
     
-    private static InsnList loadOperandStack(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame, int start, int end) {
+    private static InsnList loadOperandStack(Variable arrayStackVar, Frame<BasicValue> frame, int start, int end) {
         Validate.notNull(arrayStackVar);
-        Validate.notNull(tempObjectVar);
         Validate.notNull(frame);
         Validate.isTrue(arrayStackVar.getType().equals(Type.getType(Object[].class)));
-        Validate.isTrue(tempObjectVar.getType().equals(Type.getType(Object.class)));
-        validateLocalIndicies(arrayStackVar.getIndex(), tempObjectVar.getIndex());
         Validate.isTrue(start >= 0);
         Validate.isTrue(end >= start); // end is exclusive
         Validate.isTrue(end <= frame.getStackSize());
@@ -376,20 +370,16 @@ final class ContinuationInstructionGenerationUtils {
      * Generates instructions to load the local variables table from an object array.
      *
      * @param arrayLocalsVar variable that the object array containing local variables table is stored
-     * @param tempObjectVar variable to use for temporary objects
      * @param frame execution frame at the instruction for which the local variables table is to be restored
      * @return instructions to load the local variables table from an array
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
      * type
      */
-    public static InsnList loadLocalVariableTable(Variable arrayLocalsVar, Variable tempObjectVar, Frame<BasicValue> frame) {
+    public static InsnList loadLocalVariableTable(Variable arrayLocalsVar, Frame<BasicValue> frame) {
         Validate.notNull(arrayLocalsVar);
-        Validate.notNull(tempObjectVar);
         Validate.notNull(frame);
         Validate.isTrue(arrayLocalsVar.getType().equals(Type.getType(Object[].class)));
-        Validate.isTrue(tempObjectVar.getType().equals(Type.getType(Object.class)));
-        validateLocalIndicies(arrayLocalsVar.getIndex(), tempObjectVar.getIndex());
         InsnList ret = new InsnList();
         
         // Load the locals
