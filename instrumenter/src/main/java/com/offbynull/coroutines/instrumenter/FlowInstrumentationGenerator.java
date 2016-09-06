@@ -51,8 +51,6 @@ final class FlowInstrumentationGenerator {
     
     private static final Method CONTINUATION_GETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
-    private static final Method CONTINUATION_GETPENDINGSIZE_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "getPendingSize");
     private static final Method CONTINUATION_REMOVEFIRSTSAVED_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "removeFirstSaved");
     private static final Method METHODSTATE_GETCONTINUATIONPOINT_METHOD
@@ -157,7 +155,6 @@ final class FlowInstrumentationGenerator {
         }
         
         Variable contArg = flowInstrumentationVariables.getContArg();
-        Variable pendingCountVar = flowInstrumentationVariables.getPendingCountVar();
         Variable methodStateVar = flowInstrumentationVariables.getMethodStateVar();
         Variable savedLocalsVar = flowInstrumentationVariables.getSavedLocalsVar();
         Variable savedStackVar = flowInstrumentationVariables.getSavedStackVar();
@@ -208,8 +205,6 @@ final class FlowInstrumentationGenerator {
         LabelNode startOfMethodLabelNode = new LabelNode();
         InsnList entryPointInsnList
                 = merge(
-                        call(CONTINUATION_GETPENDINGSIZE_METHOD, loadVar(contArg)), // call getPendingSize()
-                        saveVar(pendingCountVar),
                         tableSwitch(
                                 call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                                 throwException("Unrecognized state"),

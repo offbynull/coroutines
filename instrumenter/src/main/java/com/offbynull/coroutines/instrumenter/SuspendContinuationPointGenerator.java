@@ -108,7 +108,6 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         MonitorInstrumentationInstructions monInsts = getMonitorInstrumentationInstructions();
         
         Variable contArg = vars.getContArg();
-        Variable pendingCountVar = vars.getPendingCountVar();
         Variable savedLocalsVar = vars.getSavedLocalsVar();
         Variable savedStackVar = vars.getSavedStackVar();
         

@@ -180,7 +180,6 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         MonitorInstrumentationInstructions monInsts = getMonitorInstrumentationInstructions();
         
         Variable contArg = vars.getContArg();
-        Variable pendingCountVar = vars.getPendingCountVar();
         Variable savedLocalsVar = vars.getSavedLocalsVar();
         Variable savedStackVar = vars.getSavedStackVar();
         Variable savedPartialStackVar = vars.getSavedPartialStackVar();

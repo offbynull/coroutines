@@ -27,7 +27,6 @@ final class FlowInstrumentationVariables {
 
     private final Variable contArg;
     private final Variable methodStateVar;
-    private final Variable pendingCountVar;
     private final Variable savedLocalsVar;
     private final Variable savedStackVar;
     private final Variable savedArgumentsVar;
@@ -43,7 +42,6 @@ final class FlowInstrumentationVariables {
 
         this.contArg = contArg;
         this.methodStateVar = methodStateVar;
-        this.pendingCountVar = varTable.acquireExtra(Type.INT_TYPE);
         this.savedLocalsVar = varTable.acquireExtra(Object[].class);
         this.savedStackVar = varTable.acquireExtra(Object[].class);
         this.savedArgumentsVar = varTable.acquireExtra(Object[].class);
@@ -57,10 +55,6 @@ final class FlowInstrumentationVariables {
 
     public Variable getMethodStateVar() {
         return methodStateVar;
-    }
-
-    public Variable getPendingCountVar() {
-        return pendingCountVar;
     }
 
     public Variable getSavedLocalsVar() {

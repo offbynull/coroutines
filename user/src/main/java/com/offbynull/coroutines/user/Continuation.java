@@ -82,14 +82,6 @@ public final class Continuation implements Serializable {
         }        
         pendingMethodStates.addFirst(methodState);
     }
-
-    /**
-     * Do not use -- for internal use only.
-     * @return n/a
-     */
-    public int getPendingSize() {
-        return pendingMethodStates.size();
-    }
     
     /**
      * Do not use -- for internal use only.
