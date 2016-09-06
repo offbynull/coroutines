@@ -172,21 +172,19 @@ final class ContinuationInstructionGenerationUtils {
     /**
      * Generates instructions to save the operand stack to an object array.
      * @param arrayStackVar variable that the object array containing operand stack is stored
-     * @param tempObjectVar variable to use for temporary objects
      * @param frame execution frame at the instruction where the operand stack is to be saved
      * @return instructions to save the operand stack in to an array and save it to the local variables table
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
      * type
      */
-    public static InsnList saveOperandStack(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame) {
-        return saveOperandStack(arrayStackVar, tempObjectVar, frame, frame.getStackSize(), frame.getStackSize());
+    public static InsnList saveOperandStack(Variable arrayStackVar, Frame<BasicValue> frame) {
+        return saveOperandStack(arrayStackVar, frame, frame.getStackSize(), frame.getStackSize());
     }
 
     /**
      * Generates instructions to save a certain number of items from the top of the operand stack to an object array.
      * @param arrayStackVar variable that the object array containing operand stack is stored
-     * @param tempObjectVar variable to use for temporary objects
      * @param frame execution frame at the instruction where the operand stack is to be saved
      * @param top treat the stack returned by {@code frame} as if it has a size of this value starting from the bottom (this is useful for
      * when you've already saved some of the stack and now you want to save the remainder)
@@ -197,13 +195,10 @@ final class ContinuationInstructionGenerationUtils {
      * type, or if {@code top} is larger than the number of items in the stack at {@code frame} (or is negative), or if {@code count} is
      * larger than {@code top} (or is negative)
      */
-    public static InsnList saveOperandStack(Variable arrayStackVar, Variable tempObjectVar, Frame<BasicValue> frame, int top, int count) {
+    public static InsnList saveOperandStack(Variable arrayStackVar, Frame<BasicValue> frame, int top, int count) {
         Validate.notNull(arrayStackVar);
-        Validate.notNull(tempObjectVar);
         Validate.notNull(frame);
         Validate.isTrue(arrayStackVar.getType().equals(Type.getType(Object[].class)));
-        Validate.isTrue(tempObjectVar.getType().equals(Type.getType(Object.class)));
-        validateLocalIndicies(arrayStackVar.getIndex(), tempObjectVar.getIndex());
         Validate.isTrue(top <= frame.getStackSize());
         Validate.isTrue(count <= top);
         Validate.isTrue(top >= 0);
@@ -235,40 +230,31 @@ final class ContinuationInstructionGenerationUtils {
             // Convert the item to an object (if not already an object) and stores it in local vars table. Item removed from stack.
             switch (type.getSort()) {
                 case Type.BOOLEAN:
-                    ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;"));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
+                    ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;", false));
                     break;
                 case Type.BYTE:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.SHORT:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.CHAR:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.INT:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.FLOAT:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.LONG:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.DOUBLE:
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.ARRAY:
                 case Type.OBJECT:
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.METHOD:
                 case Type.VOID:
@@ -276,13 +262,15 @@ final class ContinuationInstructionGenerationUtils {
                     throw new IllegalArgumentException();
             }
 
-            // Store item in to stack storage array
+            // At this point, item should be on the stack as an Object. Store item to storage array.
             int stackPos = beforeSavedStackPos - i;
             int saveToArrayIdx = count - stackPos - 1;
-            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayStackVar.getIndex()));
-            ret.add(new LdcInsnNode(saveToArrayIdx));
-            ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectVar.getIndex()));
-            ret.add(new InsnNode(Opcodes.AASTORE));
+                                                                               // [val]
+            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayStackVar.getIndex())); // [val, arrayStack]
+            ret.add(new InsnNode(Opcodes.SWAP));                               // [arrayStack, val]
+            ret.add(new LdcInsnNode(saveToArrayIdx));                          // [arrayStack, val, idx]
+            ret.add(new InsnNode(Opcodes.SWAP));                               // [arrayStack, idx, val]
+            ret.add(new InsnNode(Opcodes.AASTORE));                            // []
         }
 
         // At this point, the object array containing the saved stack will be ordered such that the last element in the array will have the
@@ -470,20 +458,16 @@ final class ContinuationInstructionGenerationUtils {
      * Generates instructions to save the local variables table to an object array.
      *
      * @param arrayLocalsVar variable that the object array containing local variables table is stored
-     * @param tempObjectVar variable to use for temporary objects
      * @param frame execution frame at the instruction where the local variables table is to be saved
      * @return instructions to save the local variables table in to an array
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if variables have the same index, or if variables have been released, or if variables are of wrong
      * type
      */
-    public static InsnList saveLocalVariableTable(Variable arrayLocalsVar, Variable tempObjectVar, Frame<BasicValue> frame) {
+    public static InsnList saveLocalVariableTable(Variable arrayLocalsVar, Frame<BasicValue> frame) {
         Validate.notNull(arrayLocalsVar);
-        Validate.notNull(tempObjectVar);
         Validate.notNull(frame);
         Validate.isTrue(arrayLocalsVar.getType().equals(Type.getType(Object[].class)));
-        Validate.isTrue(tempObjectVar.getType().equals(Type.getType(Object.class)));
-        validateLocalIndicies(arrayLocalsVar.getIndex(), tempObjectVar.getIndex());
         InsnList ret = new InsnList();
 
         // Create array and save it in local vars table
@@ -514,48 +498,39 @@ final class ContinuationInstructionGenerationUtils {
             switch (type.getSort()) {
                 case Type.BOOLEAN:
                     ret.add(new VarInsnNode(Opcodes.ILOAD, i));
-                    ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;"));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
+                    ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;", false));
                     break;
                 case Type.BYTE:
                     ret.add(new VarInsnNode(Opcodes.ILOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.SHORT:
                     ret.add(new VarInsnNode(Opcodes.ILOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.CHAR:
                     ret.add(new VarInsnNode(Opcodes.ILOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.INT:
                     ret.add(new VarInsnNode(Opcodes.ILOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.FLOAT:
                     ret.add(new VarInsnNode(Opcodes.FLOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.LONG:
                     ret.add(new VarInsnNode(Opcodes.LLOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.DOUBLE:
                     ret.add(new VarInsnNode(Opcodes.DLOAD, i));
                     ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.ARRAY:
                 case Type.OBJECT:
                     ret.add(new VarInsnNode(Opcodes.ALOAD, i));
-                    ret.add(new VarInsnNode(Opcodes.ASTORE, tempObjectVar.getIndex()));
                     break;
                 case Type.METHOD:
                 case Type.VOID:
@@ -564,10 +539,12 @@ final class ContinuationInstructionGenerationUtils {
             }
 
             // Store item in to locals storage array
-            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsVar.getIndex()));
-            ret.add(new LdcInsnNode(i));
-            ret.add(new VarInsnNode(Opcodes.ALOAD, tempObjectVar.getIndex()));
-            ret.add(new InsnNode(Opcodes.AASTORE));
+                                                                               // [val]
+            ret.add(new VarInsnNode(Opcodes.ALOAD, arrayLocalsVar.getIndex())); // [val, arrayStack]
+            ret.add(new InsnNode(Opcodes.SWAP));                               // [arrayStack, val]
+            ret.add(new LdcInsnNode(i));                                       // [arrayStack, val, idx]
+            ret.add(new InsnNode(Opcodes.SWAP));                               // [arrayStack, idx, val]
+            ret.add(new InsnNode(Opcodes.AASTORE));                            // []
         }
 
         return ret;

@@ -182,8 +182,7 @@ public final class Instrumenter {
             FlowInstrumentationVariables flowInstrumentationVariables = new FlowInstrumentationVariables(
                     varTable,
                     contArg,
-                    methodStateVar,
-                    tempObjVar);
+                    methodStateVar);
             FlowInstrumentationInstructions flowInstrumentationInstructions = new FlowInstrumentationGenerator(
                     methodNode,
                     suspendInvocationInsnNodes,

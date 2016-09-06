@@ -99,7 +99,6 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         Variable methodStateVar = vars.getMethodStateVar();
         Variable savedLocalsVar = vars.getSavedLocalsVar();
         Variable savedStackVar = vars.getSavedStackVar();
-        Variable tempObjVar = vars.getTempObjectVar();
         Variable tempObjVar2 = vars.getTempObjVar2();
         
         InsnList enterMonitorsInLockStateInsnList = monInsts.getEnterMonitorsInLockStateInsnList();
@@ -186,7 +185,6 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         Variable savedStackVar = vars.getSavedStackVar();
         Variable savedPartialStackVar = vars.getSavedPartialStackVar();
         Variable savedArgsVar = vars.getSavedArgumentsVar();
-        Variable tempObjVar = vars.getTempObjectVar();
         Variable tempObjVar2 = vars.getTempObjVar2();
         
         InsnList loadLockStateToStackInsnList = monInsts.getLoadLockStateToStackInsnList();
@@ -224,7 +222,7 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         
         return merge(call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
                 // save args for invoke
-                saveOperandStack(savedArgsVar, tempObjVar, frame, preInvokeStackSize, stackCountForMethodInvocation),
+                saveOperandStack(savedArgsVar, frame, preInvokeStackSize, stackCountForMethodInvocation),
                 cloneInvokeNode(getInvokeInsnNode()), // invoke method
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
@@ -234,9 +232,9 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
                                 // since we invoked the method before getting here, we already consumed the arguments that were sitting
                                 // on the stack waiting to be consumed by the method -- as such, subtract the number of arguments from the
                                 // total stack size when saving!!!!! THIS IS SUPER IMPORTANT!!!!
-                                saveOperandStack(savedPartialStackVar, tempObjVar, frame, postInvokeStackSize, postInvokeStackSize),
+                                saveOperandStack(savedPartialStackVar, frame, postInvokeStackSize, postInvokeStackSize),
                                 combineObjectArrays(savedStackVar, savedPartialStackVar, savedArgsVar),
-                                saveLocalVariableTable(savedLocalsVar, tempObjVar, frame),
+                                saveLocalVariableTable(savedLocalsVar, frame),
                                 cloneInsnList(exitMonitorsInLockStateInsnList), // inserted many times, must be cloned
                                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,

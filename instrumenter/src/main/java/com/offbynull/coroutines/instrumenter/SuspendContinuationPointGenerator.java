@@ -75,7 +75,6 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         Variable contArg = vars.getContArg();
         Variable savedLocalsVar = vars.getSavedLocalsVar();
         Variable savedStackVar = vars.getSavedStackVar();
-        Variable tempObjVar = vars.getTempObjectVar();
         
         InsnList enterMonitorsInLockStateInsnList = monInsts.getEnterMonitorsInLockStateInsnList();
 
@@ -112,7 +111,6 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         Variable pendingCountVar = vars.getPendingCountVar();
         Variable savedLocalsVar = vars.getSavedLocalsVar();
         Variable savedStackVar = vars.getSavedStackVar();
-        Variable tempObjVar = vars.getTempObjectVar();
         
         InsnList loadLockStateToStackInsnList = monInsts.getLoadLockStateToStackInsnList();
         InsnList exitMonitorsInLockStateInsnList = monInsts.getExitMonitorsInLockStateInsnList();
@@ -135,8 +133,8 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         //
         //          restorePoint_<number>_continue: // at this label: empty exec stack / uninit exec var table
         return merge(call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
-                saveOperandStack(savedStackVar, tempObjVar, frame),
-                saveLocalVariableTable(savedLocalsVar, tempObjVar, frame),
+                saveOperandStack(savedStackVar, frame),
+                saveLocalVariableTable(savedLocalsVar, frame),
                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                         construct(METHODSTATE_INIT_METHOD,
                                 loadIntConst(getId()),

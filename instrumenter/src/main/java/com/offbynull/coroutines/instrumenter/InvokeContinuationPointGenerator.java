@@ -83,7 +83,6 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
         Variable methodStateVar = vars.getMethodStateVar();
         Variable savedLocalsVar = vars.getSavedLocalsVar();
         Variable savedStackVar = vars.getSavedStackVar();
-        Variable tempObjVar = vars.getTempObjectVar();
         Variable tempObjVar2 = vars.getTempObjVar2();
         
         InsnList enterMonitorsInLockStateInsnList = monInsts.getEnterMonitorsInLockStateInsnList();
@@ -164,7 +163,6 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
         Variable savedStackVar = vars.getSavedStackVar();
         Variable savedPartialStackVar = vars.getSavedPartialStackVar();
         Variable savedArgsVar = vars.getSavedArgumentsVar();
-        Variable tempObjVar = vars.getTempObjectVar();
         
         InsnList loadLockStateToStackInsnList = monInsts.getLoadLockStateToStackInsnList();
         InsnList exitMonitorsInLockStateInsnList = monInsts.getExitMonitorsInLockStateInsnList();
@@ -207,7 +205,7 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
                 call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)), // clear excess pending states
                 //debugPrint("saving method args from operand stack"),
                 // save args for invoke
-                saveOperandStack(savedArgsVar, tempObjVar, frame, preInvokeStackSize, stackCountForMethodInvocation),
+                saveOperandStack(savedArgsVar, frame, preInvokeStackSize, stackCountForMethodInvocation),
                 //debugPrint("invoking method -- method args should be off the stack at this point"),
                 cloneInvokeNode(getInvokeInsnNode()),
                 ifIntegersEqual(// if we're saving after invoke
@@ -222,11 +220,11 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
                                 // on the stack waiting to be consumed by the method -- as such, subtract the number of arguments from the
                                 // total stack size when saving!!!!! The top of the stack should now be just before the arguments!!!
                                 //   THIS IS SUPER IMPORTANT!!!!!
-                                saveOperandStack(savedPartialStackVar, tempObjVar, frame, postInvokeStackSize, postInvokeStackSize),
+                                saveOperandStack(savedPartialStackVar, frame, postInvokeStackSize, postInvokeStackSize),
                                 //debugPrint("combining saved args with remainder of operand stack to get full stack required for loading"),
                                 combineObjectArrays(savedStackVar, savedPartialStackVar, savedArgsVar),
                                 //debugPrint("saving local vars table"),
-                                saveLocalVariableTable(savedLocalsVar, tempObjVar, frame),
+                                saveLocalVariableTable(savedLocalsVar, frame),
                                 //debugPrint("exiting monitors"),
                                 cloneInsnList(exitMonitorsInLockStateInsnList), // inserted many times, must be cloned
                                 //debugPrint("adding pending method state"),
