@@ -166,13 +166,11 @@ public final class Instrumenter {
             VariableTable varTable = new VariableTable(classNode, methodNode);
             Variable contArg = varTable.getArgument(contArgIdx); // Continuation argument
             Variable methodStateVar = varTable.acquireExtra(MethodState.class); // var shared between monitor and flow instrumentation
-            Variable tempObjVar = varTable.acquireExtra(Object.class); // var shared between monitor and flow instrumentation
                    
             // Generate code to deal with suspending around synchronized blocks
             MonitorInstrumentationVariables monitorInstrumentationVariables = new MonitorInstrumentationVariables(
                     varTable,
-                    methodStateVar,
-                    tempObjVar);
+                    methodStateVar);
             MonitorInstrumentationInstructions monitorInstrumentationLogic = new MonitorInstrumentationGenerator(
                     methodNode,
                     monitorInstrumentationVariables)

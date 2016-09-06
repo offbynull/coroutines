@@ -26,20 +26,16 @@ import org.objectweb.asm.Type;
 final class MonitorInstrumentationVariables {
 
     private final Variable methodStateVar;
-    private final Variable tempObjectVar;
     private final Variable lockStateVar;
     private final Variable counterVar;
     private final Variable arrayLenVar;
     
-    public MonitorInstrumentationVariables(VariableTable varTable, Variable methodStateVar, Variable tempObjectVar) {
+    public MonitorInstrumentationVariables(VariableTable varTable, Variable methodStateVar) {
         Validate.notNull(varTable);
         Validate.notNull(methodStateVar);
-        Validate.notNull(tempObjectVar);
         Validate.isTrue(methodStateVar.getType().equals(Type.getType(MethodState.class)));
-        Validate.isTrue(tempObjectVar.getType().equals(Type.getType(Object.class)));
         
         this.methodStateVar = methodStateVar;
-        this.tempObjectVar = tempObjectVar;
         lockStateVar = varTable.acquireExtra(LockState.class);
         counterVar = varTable.acquireExtra(Type.INT_TYPE);
         arrayLenVar = varTable.acquireExtra(Type.INT_TYPE);
@@ -47,10 +43,6 @@ final class MonitorInstrumentationVariables {
 
     public Variable getMethodStateVar() {
         return methodStateVar;
-    }
-
-    public Variable getTempObjectVar() {
-        return tempObjectVar;
     }
 
     public Variable getLockStateVar() {

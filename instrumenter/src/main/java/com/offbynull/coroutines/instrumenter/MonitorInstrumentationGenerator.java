@@ -17,7 +17,6 @@
 package com.offbynull.coroutines.instrumenter;
 
 import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.call;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.cloneMonitorNode;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.construct;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.empty;
 import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.forEach;
@@ -40,10 +39,13 @@ import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
+import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.VarInsnNode;
 
 final class MonitorInstrumentationGenerator {
 
@@ -60,7 +62,6 @@ final class MonitorInstrumentationGenerator {
     
 
     private final MethodNode methodNode;
-    private final Variable tempObjVar;
     private final Variable counterVar;
     private final Variable arrayLenVar;
     private final Variable lockStateVar;
@@ -73,8 +74,7 @@ final class MonitorInstrumentationGenerator {
         Validate.notNull(monitorInstrumentationVariables);
 
         this.methodNode = methodNode;
-        
-        tempObjVar = monitorInstrumentationVariables.getTempObjectVar();
+
         counterVar = monitorInstrumentationVariables.getCounterVar();
         arrayLenVar = monitorInstrumentationVariables.getArrayLenVar();
         lockStateVar = monitorInstrumentationVariables.getLockStateVar();
@@ -112,24 +112,52 @@ final class MonitorInstrumentationGenerator {
             InsnList replacementLogic;
             
             switch (insnNode.getOpcode()) {
-                case Opcodes.MONITORENTER:
+                case Opcodes.MONITORENTER: {
+                    Type clsType = Type.getType(LOCKSTATE_ENTER_METHOD.getDeclaringClass());
+                    Type methodType = Type.getType(LOCKSTATE_ENTER_METHOD);
+                    String clsInternalName = clsType.getInternalName();
+                    String methodDesc = methodType.getDescriptor();
+                    String methodName = LOCKSTATE_ENTER_METHOD.getName();
+
+                    // NOTE: This adds to the lock state AFTER locking.
                     replacementLogic
                             = merge(
-                                    saveVar(tempObjVar), // enter monitor
-                                    loadVar(tempObjVar),
-                                    cloneMonitorNode(insnNode),
-                                    call(LOCKSTATE_ENTER_METHOD, loadVar(lockStateVar), loadVar(tempObjVar)) // track after entered
+                                                                                             // [obj]
+                                    new InsnNode(Opcodes.DUP),                               // [obj, obj]
+                                    new InsnNode(Opcodes.MONITORENTER),                      // [obj]
+                                    new VarInsnNode(Opcodes.ALOAD, lockStateVar.getIndex()), // [obj, lockState]
+                                    new InsnNode(Opcodes.SWAP),                              // [lockState, obj]
+                                    new MethodInsnNode(Opcodes.INVOKEVIRTUAL,                // []
+                                            clsInternalName,
+                                            methodName,
+                                            methodDesc,
+                                            false)
                             );
                     break;
-                case Opcodes.MONITOREXIT:
+                }
+                case Opcodes.MONITOREXIT: {
+                    Type clsType = Type.getType(LOCKSTATE_EXIT_METHOD.getDeclaringClass());
+                    Type methodType = Type.getType(LOCKSTATE_EXIT_METHOD);
+                    String clsInternalName = clsType.getInternalName();
+                    String methodDesc = methodType.getDescriptor();
+                    String methodName = LOCKSTATE_EXIT_METHOD.getName();
+
+                    // NOTE: This adds to the lock state AFTER unlocking.
                     replacementLogic
                             = merge(
-                                    saveVar(tempObjVar), // exit monitor
-                                    loadVar(tempObjVar),
-                                    cloneMonitorNode(insnNode),
-                                    call(LOCKSTATE_EXIT_METHOD, loadVar(lockStateVar), loadVar(tempObjVar)) // discard after exit
+                                                                                             // [obj]
+                                    new InsnNode(Opcodes.DUP),                               // [obj, obj]
+                                    new InsnNode(Opcodes.MONITOREXIT),                       // [obj]
+                                    new VarInsnNode(Opcodes.ALOAD, lockStateVar.getIndex()), // [obj, lockState]
+                                    new InsnNode(Opcodes.SWAP),                              // [lockState, obj]
+                                    new MethodInsnNode(Opcodes.INVOKEVIRTUAL,                // []
+                                            clsInternalName,
+                                            methodName,
+                                            methodDesc,
+                                            false)
                             );
                     break;
+                }
                 default:
                     throw new IllegalStateException(); // should never happen
             }
