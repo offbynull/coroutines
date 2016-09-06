@@ -171,13 +171,6 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
         
         Frame<BasicValue> frame = getFrame();
         
-        //             // Clear any excess pending MethodStates that may be lingering. We need to do this because we may have one or more
-        //             // excess pending method states sitting around if invocation continuation points (methods that take in a continuation
-        //             // object) were called previously in this method. In the event that such a previous call threw an exception, there
-        //             // may be more than 1 excess item -- clearExcessPending() makes sure to clear all excess items.
-        //             //
-        //             // The pendingCount variable contains the excpected number of pending method states
-        //          continuation.clearExcessPending(pendingCount);
         //          Object[] duplicatedArgs = saveOperandStack(<method param count>); -- Why do we do this? because when we want to save the
         //                                                                            -- args to this method when we call
         //                                                                            -- saveOperandStack(). We need to save here becuase
@@ -201,8 +194,6 @@ final class InvokeContinuationPointGenerator extends ContinuationPointGenerator 
         int preInvokeStackSize = frame.getStackSize();
         int postInvokeStackSize = frame.getStackSize() - stackCountForMethodInvocation;
         return merge(
-                //debugPrint("clearing excess pending"),
-                call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)), // clear excess pending states
                 //debugPrint("saving method args from operand stack"),
                 // save args for invoke
                 saveOperandStack(savedArgsVar, frame, preInvokeStackSize, stackCountForMethodInvocation),

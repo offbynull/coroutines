@@ -119,10 +119,6 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         
         Frame<BasicValue> frame = getFrame();
         
-        //             // Clear any excess pending MethodStates that may be lingering. We need to do this because we may have pending method
-        //             // states sitting around from methods that threw an exception. When a method that takes in a Continuation throws an
-        //             // exception it means that that method won't clear out its pending method state.
-        //          continuation.clearExcessPending(pendingCount);
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocals();
         //          continuation.addPending(new MethodState(<number>, stack, locals, lockState);
@@ -132,7 +128,7 @@ final class SuspendContinuationPointGenerator extends ContinuationPointGenerator
         //
         //
         //          restorePoint_<number>_continue: // at this label: empty exec stack / uninit exec var table
-        return merge(call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
+        return merge(
                 saveOperandStack(savedStackVar, frame),
                 saveLocalVariableTable(savedLocalsVar, frame),
                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),

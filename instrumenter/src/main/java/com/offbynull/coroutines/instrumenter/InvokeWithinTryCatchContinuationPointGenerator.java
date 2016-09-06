@@ -194,13 +194,6 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         
         Frame<BasicValue> frame = getFrame();
         
-        //             // Clear any excess pending MethodStates that may be lingering. We need to do this because we may have one or more
-        //             // excess pending method states sitting around if invocation continuation points (methods that take in a continuation
-        //             // object) were called previously in this method. In the event that such a previous call threw an exception, there
-        //             // may be more than 1 excess item -- clearExcessPending() makes sure to clear all excess items.
-        //             //
-        //             // The pendingCount variable contains the excpected number of pending method states
-        //          continuation.clearExcessPending(pendingCount);
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocals();
         //          continuation.addPending(new MethodState(<number>, stack, locals, lockState);
@@ -220,7 +213,7 @@ final class InvokeWithinTryCatchContinuationPointGenerator extends ContinuationP
         int preInvokeStackSize = frame.getStackSize();
         int postInvokeStackSize = frame.getStackSize() - stackCountForMethodInvocation;
         
-        return merge(call(CONTINUATION_CLEAREXCESSPENDING_METHOD, loadVar(contArg), loadVar(pendingCountVar)),
+        return merge(
                 // save args for invoke
                 saveOperandStack(savedArgsVar, frame, preInvokeStackSize, stackCountForMethodInvocation),
                 cloneInvokeNode(getInvokeInsnNode()), // invoke method

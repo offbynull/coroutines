@@ -36,8 +36,6 @@ abstract class ContinuationPointGenerator {
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
     protected static final Method CONTINUATION_SETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "setMode", Integer.TYPE);
-    protected static final Method CONTINUATION_CLEAREXCESSPENDING_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "clearExcessPending", Integer.TYPE);
     protected static final Method CONTINUATION_ADDPENDING_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "addPending", MethodState.class);
     protected static final Constructor<MethodState> METHODSTATE_INIT_METHOD
