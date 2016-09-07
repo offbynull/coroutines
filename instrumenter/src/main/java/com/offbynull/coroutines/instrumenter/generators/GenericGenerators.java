@@ -14,24 +14,26 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.instrumenter.asm;
+package com.offbynull.coroutines.instrumenter.generators;
 
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.IincInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
@@ -47,15 +49,15 @@ import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
 /**
- * Utility class to generate common bytecode instructions.
+ * Utility class to generate common/generic bytecode instructions.
  * @author Kasra Faghihi
  */
-public final class InstructionGenerationUtils {
+public final class GenericGenerators {
     
     private static final Method SYSTEM_ARRAY_COPY_METHOD = MethodUtils.getAccessibleMethod(System.class, "arraycopy", Object.class,
             Integer.TYPE, Object.class, Integer.TYPE, Integer.TYPE);
 
-    private InstructionGenerationUtils() {
+    private GenericGenerators() {
         // do nothing
     }
     
@@ -152,8 +154,7 @@ public final class InstructionGenerationUtils {
     /**
      * Combines multiple instructions (or instruction lists) in to a single instruction list.
      * @param insns instruction or instruction lists to merge
-     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
-     * @throws IllegalArgumentException if {@code insns} contains 
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null} 
      * @return merged instructions
      */
     public static InsnList merge(Object... insns) {
@@ -173,6 +174,13 @@ public final class InstructionGenerationUtils {
                     Validate.notNull(insnList.get(i));
                 }
                 ret.add((InsnList) insn);
+            } else if (insn instanceof ConditionalMerger) {
+                // generate conditional merger instruction list and add
+                InsnList insnList = ((ConditionalMerger) insn).generate();
+                for (int i = 0; i < insnList.size(); i++) {
+                    Validate.notNull(insnList.get(i));
+                }
+                ret.add(insnList);
             } else {
                 // unrecognized
                 throw new IllegalArgumentException();
@@ -180,6 +188,56 @@ public final class InstructionGenerationUtils {
         }
 
         return ret;
+    }
+    
+    /**
+     * Combines multiple instructions (or instruction lists) in to a single instruction list if some condition is met.
+     * @param condition flag indicating if the instruction list should be generated
+     * @param insnsSupplier supplier that generates the instructions to merge (only generated if {@code condition == true})
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @return merged instructions if {@code condition} is {@code true}, empty instructions list otherwise
+     */
+    public static ConditionalMerger mergeIf(boolean condition, Supplier<Object[]> insnsSupplier) {
+        Validate.notNull(insnsSupplier);
+
+        ConditionalMerger merger = new ConditionalMerger();
+        return merger.mergeIf(condition, insnsSupplier);
+    }
+
+    /**
+     * Generates instruction lists based on conditions.
+     */
+    public static final class ConditionalMerger {
+        private List<Object> generatedInstructions = new ArrayList<>();
+
+        private ConditionalMerger() {
+            // do nothing
+        }
+
+        /**
+         * Generates a set of instructions if a certain condition is met.
+         * @param condition condition
+         * @param insnsSupplier supplier that generates instructions
+         * @return this conditional merger
+         */
+        public ConditionalMerger mergeIf(boolean condition, Supplier<Object[]> insnsSupplier) {
+            Validate.notNull(insnsSupplier);
+
+            if (!condition) {
+                return this;
+            }
+
+            generatedInstructions.addAll(Arrays.asList(insnsSupplier.get()));
+            return this;
+        }
+
+        /**
+         * Generate final instruction list.
+         * @return instruction list
+         */
+        public InsnList generate() {
+            return merge(generatedInstructions.toArray());
+        }
     }
 
     /**
@@ -228,44 +286,6 @@ public final class InstructionGenerationUtils {
         LabelNode labelNode = new LabelNode();
         ret.add(labelNode);
         ret.add(new LineNumberNode(num, labelNode));
-
-        return ret;
-    }
-
-    /**
-     * Generates instructions for printing out a string constant using {@link System#out}. This is useful for debugging. For example, you
-     * can print out lines around your instrumented code to make sure that what you think is being run is actually being run.
-     * @param text text to print out
-     * @return instructions to call System.out.println with a string constant
-     * @throws NullPointerException if any argument is {@code null}
-     */
-    public static InsnList debugPrint(String text) {
-        Validate.notNull(text);
-        
-        InsnList ret = new InsnList();
-        
-        ret.add(new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"));
-        ret.add(new LdcInsnNode(text));
-        ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false));
-
-        return ret;
-    }
-
-    /**
-     * Generates instructions for printing out a string using {@link System#out}. This is useful for debugging. For example, you
-     * can print out lines around your instrumented code to make sure that what you think is being run is actually being run.
-     * @param text debug text generation instruction list -- must leave an String on the stack
-     * @return instructions to call System.out.println with a string constant
-     * @throws NullPointerException if any argument is {@code null}
-     */
-    public static InsnList debugPrint(InsnList text) {
-        Validate.notNull(text);
-        
-        InsnList ret = new InsnList();
-        
-        ret.add(new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"));
-        ret.add(text);
-        ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false));
 
         return ret;
     }
@@ -547,7 +567,7 @@ public final class InstructionGenerationUtils {
         return ret;
     }
 
-/**
+    /**
      * Compares two objects and performs some action if the objects are the same (uses == to check if same, not the equals method).
      * @param lhs left hand side instruction list -- must leave an object on the stack
      * @param rhs right hand side instruction list -- must leave an object on the stack
@@ -732,7 +752,7 @@ public final class InstructionGenerationUtils {
      * @return instructions to throw an exception
      * @throws NullPointerException if any argument is {@code null}
      */
-    public static InsnList throwException(String message) {
+    public static InsnList throwRuntimeException(String message) {
         Validate.notNull(message);
 
         InsnList ret = new InsnList();
@@ -743,6 +763,21 @@ public final class InstructionGenerationUtils {
         ret.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/lang/RuntimeException", "<init>", "(Ljava/lang/String;)V", false));
         ret.add(new InsnNode(Opcodes.ATHROW));
 
+        return ret;
+    }
+
+    /**
+     * Generates instructions to throw the exception type at top of stack. You may run in to problems if the item on top of the stack isn't
+     * a {@link Throwable} type. 
+     * @return instructions to throw an exception
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList throwThrowable() {
+        InsnList ret = new InsnList();
+        
+//        ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Throwable"));
+        ret.add(new InsnNode(Opcodes.ATHROW));
+        
         return ret;
     }
     

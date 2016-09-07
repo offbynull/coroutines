@@ -14,18 +14,20 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-package com.offbynull.coroutines.instrumenter.asm;
+package com.offbynull.coroutines.instrumenter.generators;
 
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.forEach;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.ifIntegersEqual;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.ifObjectsEqual;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadStringConst;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.merge;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.returnValue;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.saveVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.tableSwitch;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.throwException;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.call;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.construct;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.forEach;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.ifIntegersEqual;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.ifObjectsEqual;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadVar;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadStringConst;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.merge;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.returnValue;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.saveVar;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.tableSwitch;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithName;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipResourcesAsClassNodes;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
@@ -39,9 +41,10 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.throwRuntimeException;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
 
-public final class InstructionGenerationUtilsTest {
+public final class GenericGeneratorsTest {
     private static final String STUB_CLASSNAME = "SimpleStub";
     private static final String STUB_FILENAME = STUB_CLASSNAME + ".class";
     private static final String ZIP_RESOURCE_PATH = STUB_CLASSNAME + ".zip";
@@ -91,16 +94,16 @@ public final class InstructionGenerationUtilsTest {
          */
         methodNode.instructions
                 = tableSwitch(loadVar(intVar1),
-                        throwException("default"),
+                        throwRuntimeException("default"),
                         0,
-                        throwException("0"),
-                        throwException("1"),
+                        throwRuntimeException("0"),
+                        throwRuntimeException("1"),
                         tableSwitch(loadVar(intVar2),
-                                throwException("innerdefault"),
+                                throwRuntimeException("innerdefault"),
                                 0,
-                                throwException("inner0"),
-                                throwException("inner1"),
-                                InstructionGenerationUtils.returnValue(Type.getType(String.class), loadStringConst("OK!"))
+                                throwRuntimeException("inner0"),
+                                throwRuntimeException("inner1"),
+                                GenericGenerators.returnValue(Type.getType(String.class), loadStringConst("OK!"))
                         )
                 );
         
@@ -134,7 +137,7 @@ public final class InstructionGenerationUtilsTest {
     }
 
     @Test
-    public void mustCreateAndRunIfStatements() throws Exception {
+    public void mustCreateAndRunIfIntStatements() throws Exception {
         // Augment signature
         methodNode.desc = Type.getMethodDescriptor(Type.getType(String.class), new Type[] { Type.INT_TYPE, Type.INT_TYPE });
         
@@ -164,6 +167,46 @@ public final class InstructionGenerationUtilsTest {
             assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, 2, 2));
             assertEquals("nomatch", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, -2, 2));
             assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, -2, -2));
+        }
+    }
+    
+    @Test
+    public void mustCreateAndRunIfObjectStatements() throws Exception {
+        // Augment signature
+        methodNode.desc = Type.getMethodDescriptor(
+                Type.getType(String.class),
+                new Type[] { Type.getType(Object.class), Type.getType(Object.class) });
+        
+        // Initialize variable table
+        VariableTable varTable = new VariableTable(classNode, methodNode);
+        Variable intVar1 = varTable.getArgument(1);
+        Variable intVar2 = varTable.getArgument(2);
+        
+        // Update method logic
+        /**
+         * if (arg1 == arg2) {
+         *     return "match";
+         * }
+         * return "nomatch";
+         */
+        methodNode.instructions
+                = merge(
+                        ifObjectsEqual(
+                                loadVar(intVar1),
+                                loadVar(intVar2),
+                                returnValue(Type.getType(String.class), loadStringConst("match"))),
+                        returnValue(Type.getType(String.class), loadStringConst("nomatch"))
+                );
+        
+        Object testObj1 = "test1";
+        Object testObj2 = "test2";
+        // Write to JAR file + load up in classloader -- then execute tests
+        try (URLClassLoader cl = createJarAndLoad(classNode)) {
+            Object obj = cl.loadClass(STUB_CLASSNAME).newInstance();
+            
+            assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, testObj1, testObj1));
+            assertEquals("nomatch", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, testObj1, testObj2));
+            assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, testObj2, testObj2));
         }
     }
 
@@ -221,6 +264,38 @@ public final class InstructionGenerationUtilsTest {
             assertEquals("match", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, (Object) new Object[] { o1, o2, o3 }, o3));
             assertEquals("nomatch", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, (Object) new Object[] { o1, o2, o3 }, null));
             assertEquals("nomatch", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, (Object) new Object[] { o1, o2, o3 }, new Object()));
+        }
+    }
+    
+    @Test
+    public void mustConstructAndCall() throws Exception {
+        // Augment signature
+        methodNode.desc = Type.getMethodDescriptor(Type.getType(String.class), new Type[] { });
+        
+        // Initialize variable table
+        VariableTable varTable = new VariableTable(classNode, methodNode);
+        Variable sbVar = varTable.acquireExtra(StringBuilder.class);
+        Variable retVar = varTable.acquireExtra(String.class);
+        
+        // Update method logic
+        /**
+         * return new StringBuilder().append("hi!").toString()
+         */
+        methodNode.instructions
+                = merge(
+                        construct(StringBuilder.class.getConstructor()),
+                        saveVar(sbVar),
+                        call(StringBuilder.class.getMethod("append", String.class), loadVar(sbVar), loadStringConst("hi!")),
+                        call(StringBuilder.class.getMethod("toString"), loadVar(sbVar)),
+                        saveVar(retVar),
+                        returnValue(Type.getType(String.class), loadVar(retVar))
+                );
+        
+        // Write to JAR file + load up in classloader -- then execute tests
+        try (URLClassLoader cl = createJarAndLoad(classNode)) {
+            Object obj = cl.loadClass(STUB_CLASSNAME).newInstance();
+            
+            assertEquals("hi!", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME));
         }
     }
 }

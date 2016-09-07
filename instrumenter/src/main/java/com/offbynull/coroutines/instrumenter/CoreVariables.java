@@ -16,41 +16,42 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
-import com.offbynull.coroutines.instrumenter.asm.VariableTable;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
-import com.offbynull.coroutines.user.Continuation;
-import com.offbynull.coroutines.user.MethodState;
 import org.apache.commons.lang3.Validate;
-import org.objectweb.asm.Type;
 
-final class FlowInstrumentationVariables {
-
-    private final Variable contArg;
+final class CoreVariables {
+    private final Variable continuationArgVar;
     private final Variable methodStateVar;
+    
     private final Variable savedLocalsVar;
     private final Variable savedStackVar;
     private final Variable savedArgumentsVar;
     private final Variable savedPartialStackVar;
-    private final Variable returnValObjectVar;
-
-    public FlowInstrumentationVariables(VariableTable varTable, Variable contArg, Variable methodStateVar) {
-        Validate.notNull(varTable);
-        Validate.notNull(contArg);
+    
+    CoreVariables(
+            Variable continuationArgVar,
+            Variable methodStateVar,
+            Variable savedLocalsVar,
+            Variable savedStackVar,
+            Variable savedArgumentsVar,
+            Variable savedPartialStackVar) {
+        Validate.notNull(continuationArgVar);
         Validate.notNull(methodStateVar);
-        Validate.isTrue(contArg.getType().equals(Type.getType(Continuation.class)));
-        Validate.isTrue(methodStateVar.getType().equals(Type.getType(MethodState.class)));
-
-        this.contArg = contArg;
+        Validate.notNull(savedLocalsVar);
+        Validate.notNull(savedStackVar);
+        Validate.notNull(savedArgumentsVar);
+        Validate.notNull(savedPartialStackVar);
+        
+        this.continuationArgVar = continuationArgVar;
         this.methodStateVar = methodStateVar;
-        this.savedLocalsVar = varTable.acquireExtra(Object[].class);
-        this.savedStackVar = varTable.acquireExtra(Object[].class);
-        this.savedArgumentsVar = varTable.acquireExtra(Object[].class);
-        this.savedPartialStackVar = varTable.acquireExtra(Object[].class);
-        this.returnValObjectVar = varTable.acquireExtra(Object.class);
+        this.savedLocalsVar = savedLocalsVar;
+        this.savedStackVar = savedStackVar;
+        this.savedArgumentsVar = savedArgumentsVar;
+        this.savedPartialStackVar = savedPartialStackVar;
     }
 
-    public Variable getContArg() {
-        return contArg;
+    public Variable getContinuationArgVar() {
+        return continuationArgVar;
     }
 
     public Variable getMethodStateVar() {
@@ -65,16 +66,11 @@ final class FlowInstrumentationVariables {
         return savedStackVar;
     }
 
-    public Variable getSavedPartialStackVar() {
-        return savedPartialStackVar;
-    }
-
     public Variable getSavedArgumentsVar() {
         return savedArgumentsVar;
     }
 
-    public Variable getTempObjVar2() {
-        return returnValObjectVar;
+    public Variable getSavedPartialStackVar() {
+        return savedPartialStackVar;
     }
-
 }

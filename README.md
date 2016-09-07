@@ -347,7 +347,9 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
-- ADDED: Major performance improvement: Deferred operand stack and local variable table saving until Coroutine suspended.
+- CHANGED: Performance improvement: Deferred operand stack and local variable table saving until Coroutine suspended.
+- CHANGED: Performance improvement: No longer autoboxing when caching return value of continuation points.
+- CHANGED: Refactored instrumentation logic.
 - ADDED: Increased test coverage.
 
 ### [1.1.1] - 2015-08-08
@@ -356,7 +358,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - FIXED: Override of SimpleVerifier.isAssignableFrom(Type t, Type u) unable to deal with arrays
 
 ### [1.1.0] - 2015-04-24
-- ADDED: Major performance improvement: Deferred operand stack and local variable table loading. As a by product, code had to be refactored to be more modular / maintainable.
+- CHANGED: Performance improvement: Deferred operand stack and local variable table loading. As a by product, code had to be refactored to be more modular / maintainable.
 - FIXED: Missing serialization UID in CoroutineException.
 - CHANGED: Upgraded all serialization UIDs due to removal of internal removePending() method.
 

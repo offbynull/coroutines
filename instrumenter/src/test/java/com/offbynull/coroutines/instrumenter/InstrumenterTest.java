@@ -40,6 +40,7 @@ import org.junit.rules.ExpectedException;
 
 public final class InstrumenterTest {
 
+    private static final String SANITY_TEST = "SanityTest";
     private static final String NORMAL_INVOKE_TEST = "NormalInvokeTest";
     private static final String STATIC_INVOKE_TEST = "StaticInvokeTest";
     private static final String INTERFACE_INVOKE_TEST = "InterfaceInvokeTest";
@@ -66,6 +67,11 @@ public final class InstrumenterTest {
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
+
+    @Test
+    public void mustProperlyExecuteSanityTest() throws Exception {
+        performSanityTest(SANITY_TEST);
+    }
 
     @Test
     public void mustProperlySuspendWithVirtualMethods() throws Exception {
@@ -278,6 +284,24 @@ public final class InstrumenterTest {
         thrown.expectMessage("Exception thrown during execution");
         
         performCountTest(EXCEPTION_THROW_TEST);
+    }
+
+    private void performSanityTest(String testClass) throws Exception {
+        StringBuilder builder = new StringBuilder();
+
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(testClass);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+
+            Assert.assertTrue(runner.execute());
+            Assert.assertFalse(runner.execute());
+            Assert.assertTrue(runner.execute()); // coroutine finished executing here
+            Assert.assertFalse(runner.execute());
+
+            Assert.assertEquals("abab", builder.toString());
+        }
     }
 
     private void performCountTest(String testClass) throws Exception {

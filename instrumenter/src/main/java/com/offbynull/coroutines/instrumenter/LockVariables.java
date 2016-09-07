@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,33 +16,22 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
-import com.offbynull.coroutines.instrumenter.asm.VariableTable;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
-import com.offbynull.coroutines.user.LockState;
-import com.offbynull.coroutines.user.MethodState;
-import org.apache.commons.lang3.Validate;
-import org.objectweb.asm.Type;
 
-final class MonitorInstrumentationVariables {
-
-    private final Variable methodStateVar;
+final class LockVariables {
     private final Variable lockStateVar;
     private final Variable counterVar;
     private final Variable arrayLenVar;
-    
-    public MonitorInstrumentationVariables(VariableTable varTable, Variable methodStateVar) {
-        Validate.notNull(varTable);
-        Validate.notNull(methodStateVar);
-        Validate.isTrue(methodStateVar.getType().equals(Type.getType(MethodState.class)));
-        
-        this.methodStateVar = methodStateVar;
-        lockStateVar = varTable.acquireExtra(LockState.class);
-        counterVar = varTable.acquireExtra(Type.INT_TYPE);
-        arrayLenVar = varTable.acquireExtra(Type.INT_TYPE);
-    }
 
-    public Variable getMethodStateVar() {
-        return methodStateVar;
+    public LockVariables(
+            Variable lockStateVar,
+            Variable counterVar,
+            Variable arrayLenVar) {
+        // vars can be null -- they'll be null if the analyzer determined tehy aren't required
+
+        this.lockStateVar = lockStateVar;
+        this.counterVar = counterVar;
+        this.arrayLenVar = arrayLenVar;
     }
 
     public Variable getLockStateVar() {
@@ -56,5 +45,4 @@ final class MonitorInstrumentationVariables {
     public Variable getArrayLenVar() {
         return arrayLenVar;
     }
-    
 }

@@ -16,15 +16,14 @@
  */
 package com.offbynull.coroutines.instrumenter.asm;
 
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.addLabel;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.call;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.construct;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.jumpTo;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.loadVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.merge;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.saveVar;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.tableSwitch;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.throwException;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.addLabel;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.call;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.construct;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.jumpTo;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadVar;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.merge;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.saveVar;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.tableSwitch;
 import com.offbynull.coroutines.instrumenter.testhelpers.TestUtils;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipFromResource;
 import java.io.IOException;
@@ -49,8 +48,10 @@ import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.pop;
-import static com.offbynull.coroutines.instrumenter.asm.InstructionGenerationUtils.returnVoid;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.returnVoid;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.throwRuntimeException;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
 
 public class SimpleVerifierTest {
 
@@ -110,10 +111,8 @@ public class SimpleVerifierTest {
          */
         LabelNode invokePoint = new LabelNode();
         InsnList methodInsnList
-                = merge(
-                        tableSwitch(
-                                loadVar(testArg),
-                                throwException("must be 0 or 1"),
+                = merge(tableSwitch(loadVar(testArg),
+                                throwRuntimeException("must be 0 or 1"),
                                 0,
                                 merge(
                                         construct(arrayListConstructor),

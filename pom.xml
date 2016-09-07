@@ -81,6 +81,11 @@
                 <version>3.4</version>
             </dependency>
             <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-collections4</artifactId>
+                <version>4.1</version>
+            </dependency>
+            <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm-debug-all</artifactId>
                 <version>5.0.4</version>
