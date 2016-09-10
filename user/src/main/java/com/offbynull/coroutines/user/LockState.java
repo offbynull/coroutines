@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,7 @@ import java.util.ListIterator;
  * @author Kasra Faghihi
  */
 public final class LockState implements Serializable {
-    private static final long serialVersionUID = 2L;
+    private static final long serialVersionUID = 3L;
 
     // We use a linkedlist to make sure that we retain the order of monitors as they come in. Otherwise we're going to deal with deadlock
     // issues if we have code structured with double locks. For example, imagine the following scenario...
