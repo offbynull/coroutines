@@ -1,5 +1,6 @@
 package com.offbynull.coroutines.mavenplugin;
 
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,6 +37,7 @@ public final class TestInstrumentMojoTest {
         Log log = Mockito.mock(Log.class);
         
         FieldUtils.writeField(fixture, "project", mavenProject, true);
+        FieldUtils.writeField(fixture, "debugMarkerType", DebugGenerators.MarkerType.NONE, true);
         FieldUtils.writeField(fixture, "log", log, true);
         FieldUtils.writeField(fixture, "jdkLibsDirectory", System.getProperty("java.home") + "/lib", true);
     }

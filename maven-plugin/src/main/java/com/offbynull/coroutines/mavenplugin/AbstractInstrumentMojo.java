@@ -17,6 +17,7 @@
 package com.offbynull.coroutines.mavenplugin;
 
 import com.offbynull.coroutines.instrumenter.Instrumenter;
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.File;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,16 +43,18 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
     /**
      * Instruments all classes in a path recursively.
      * @param log maven logger
+     * @param debugMarkerType debug marker type
      * @param instrumenter coroutine instrumenter
      * @param path directory containing files to instrument
      * @throws MojoExecutionException if any exception occurs
      */
-    protected final void instrumentPath(Log log, Instrumenter instrumenter, File path) throws MojoExecutionException {
+    protected final void instrumentPath(Log log, MarkerType debugMarkerType, Instrumenter instrumenter, File path)
+            throws MojoExecutionException {
         try {
             for (File classFile : FileUtils.listFiles(path, new String[]{"class"}, true)) {
                 log.info("Instrumenting " + classFile);
                 byte[] input = FileUtils.readFileToByteArray(classFile);
-                byte[] output = instrumenter.instrument(input);
+                byte[] output = instrumenter.instrument(input, debugMarkerType);
                 log.debug("File size changed from " + input.length + " to " + output.length);
                 FileUtils.writeByteArrayToFile(classFile, output);
             }

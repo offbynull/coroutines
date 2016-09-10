@@ -16,6 +16,7 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.collections4.list.UnmodifiableList;
@@ -24,7 +25,8 @@ import org.objectweb.asm.Type;
 
 final class MethodProperties {
     private final String methodName;
-    private final Type methodReturnType;
+    private final Type methodSignature;
+    private final MarkerType debugMarkerType;
 
     private final UnmodifiableList<ContinuationPoint> continuationPoints;
     private final UnmodifiableList<SynchronizationPoint> synchPoints;
@@ -35,14 +37,16 @@ final class MethodProperties {
 
     MethodProperties(
             String methodName,
-            Type methodReturnType,
+            Type methodSignature,
+            MarkerType debugMarkerType,
             List<ContinuationPoint> continuationPoints,
             List<SynchronizationPoint> synchPoints,
             CoreVariables coreVars,
             CacheVariables cacheVars,
             LockVariables lockVars) {
         Validate.notNull(methodName);
-        Validate.notNull(methodReturnType);
+        Validate.notNull(methodSignature);
+        Validate.notNull(debugMarkerType);
         Validate.notNull(continuationPoints);
         Validate.notNull(synchPoints);
         Validate.notNull(coreVars);
@@ -50,26 +54,11 @@ final class MethodProperties {
         Validate.notNull(lockVars);
         Validate.noNullElements(continuationPoints);
         Validate.noNullElements(synchPoints);
-        
-        switch (methodReturnType.getSort()) {
-            case Type.BOOLEAN:
-            case Type.BYTE:
-            case Type.CHAR:
-            case Type.SHORT:
-            case Type.INT:
-            case Type.LONG:
-            case Type.FLOAT:
-            case Type.DOUBLE:
-            case Type.OBJECT:
-            case Type.ARRAY:
-            case Type.VOID:
-                break;
-            default:
-                throw new IllegalArgumentException();
-        }
+        Validate.isTrue(methodSignature.getSort() == Type.METHOD);
 
         this.methodName = methodName;
-        this.methodReturnType = methodReturnType;
+        this.methodSignature = methodSignature;
+        this.debugMarkerType = debugMarkerType;
         this.continuationPoints =
                 (UnmodifiableList<ContinuationPoint>) UnmodifiableList.unmodifiableList(new ArrayList<>(continuationPoints));
         this.synchPoints =
@@ -81,6 +70,18 @@ final class MethodProperties {
 
     public String getMethodName() {
         return methodName;
+    }
+
+    public Type getMethodSignature() {
+        return methodSignature;
+    }
+
+    public Type getMethodReturnType() {
+        return methodSignature.getReturnType();
+    }
+
+    public MarkerType getDebugMarkerType() {
+        return debugMarkerType;
     }
 
     public UnmodifiableList<ContinuationPoint> getContinuationPoints() {
@@ -101,9 +102,5 @@ final class MethodProperties {
 
     public LockVariables getLockVariables() {
         return lockVars;
-    }
-    
-    public Type getReturnType() {
-        return methodReturnType;
     }
 }

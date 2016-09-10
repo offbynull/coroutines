@@ -16,6 +16,7 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
+import static com.offbynull.coroutines.instrumenter.InternalUtils.validateAndGetContinuationPoint;
 import static com.offbynull.coroutines.instrumenter.StateGenerators.loadLocalVariableTable;
 import static com.offbynull.coroutines.instrumenter.StateGenerators.loadOperandStackPrefix;
 import static com.offbynull.coroutines.instrumenter.StateGenerators.loadOperandStackSuffix;
@@ -49,7 +50,6 @@ import com.offbynull.coroutines.user.LockState;
 import com.offbynull.coroutines.user.MethodState;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.List;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
@@ -69,6 +69,8 @@ import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
 import static com.offbynull.coroutines.instrumenter.StateGenerators.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.StateGenerators.saveOperandStack;
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
+import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.debugMarker;
 
 final class ContinuationGenerators {
     
@@ -106,23 +108,35 @@ final class ContinuationGenerators {
         
         Variable lockStateVar = props.getLockVariables().getLockStateVar();
 
-        String methodName = props.getMethodName();
         int numOfContinuationPoints = props.getContinuationPoints().size();
 
+        MarkerType markerType = props.getDebugMarkerType();
+        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
+        
         LabelNode startOfMethodLabelNode = new LabelNode();
-        return merge(tableSwitch(call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
-                        throwRuntimeException("Unrecognized state"),
-                        0,
-                        // CASE 0 (FRESH)...
+        return merge(
+                tableSwitch(
                         merge(
-                                // fresh invoke
+                                debugMarker(markerType, dbgSig + "Getting state for switch"),
+                                call(CONTINUATION_GETMODE_METHOD, loadVar(contArg))
+                        ),
+                        merge(
+                                debugMarker(markerType, dbgSig + "Unrecognized state"),
+                                throwRuntimeException("Unrecognized state")
+                        ),
+                        0,
+                        merge(
+                                debugMarker(markerType, dbgSig + "Case 0 -- Fresh invocation"),
                                 createMonitorContainerAndSaveToVar(props),
+                                debugMarker(markerType, dbgSig + "Jump to start of method point"),
                                 jumpTo(startOfMethodLabelNode)
                         ),
-                        // CASE 1 (SAVING)...
-                        throwRuntimeException("Unexpected state (saving not allowed at this point)"),
-                        // CASE 2 (LOADING)...
-                        merge(// restore invoke
+                        merge(
+                                debugMarker(markerType, dbgSig + "Case 1 -- Saving state"),
+                                throwRuntimeException("Unexpected state (saving not allowed at this point)")
+                        ),
+                        merge(
+                                debugMarker(markerType, dbgSig + "Case 2 -- Loading state"),
                                 call(CONTINUATION_REMOVEFIRSTSAVED_METHOD, loadVar(contArg)),
                                 saveVar(methodStateVar),
                                 call(METHODSTATE_GETLOCALTABLE_METHOD, loadVar(methodStateVar)),
@@ -131,11 +145,19 @@ final class ContinuationGenerators {
                                 saveVar(savedStackVar),
                                 // get lockstate if method actually has monitorenter/exit insn in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[] {
+                                        debugMarker(markerType, dbgSig + "Method has synch points, so loading lockstate as well"),
                                         call(METHODSTATE_GETLOCKSTATE_METHOD, loadVar(methodStateVar)),
                                         saveVar(lockStateVar)
-                                }).generate(),
-                                tableSwitch(call(METHODSTATE_GETCONTINUATIONPOINT_METHOD, loadVar(methodStateVar)),
-                                        throwRuntimeException("Unrecognized restore id " + methodName),
+                                }),
+                                tableSwitch(
+                                        merge(
+                                                debugMarker(markerType, dbgSig + "Getting continuation id for switch"),
+                                                call(METHODSTATE_GETCONTINUATIONPOINT_METHOD, loadVar(methodStateVar))
+                                        ),
+                                        merge(
+                                                debugMarker(markerType, dbgSig + "Unrecognized continuation id"),
+                                                throwRuntimeException("Unrecognized continuation id")
+                                        ),
                                         0,
                                         IntStream.range(0, numOfContinuationPoints)
                                                 .mapToObj(idx -> restoreState(props, idx))
@@ -144,7 +166,8 @@ final class ContinuationGenerators {
                                 // jump to not required here, switch above either throws exception or jumps to restore point
                         )
                 ),
-                addLabel(startOfMethodLabelNode)
+                addLabel(startOfMethodLabelNode),
+                debugMarker(markerType, dbgSig + "Starting method...")
         );
     }
 
@@ -179,22 +202,33 @@ final class ContinuationGenerators {
         Frame<BasicValue> frame = cp.getFrame();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
+        MarkerType markerType = props.getDebugMarkerType();
+        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
+        
         //          enterLocks(lockState);
         //          restoreOperandStack(stack);
         //          restoreLocalsStack(localVars);
         //          continuation.setMode(MODE_NORMAL);
         //          goto restorePoint_<number>_continue;
         return merge(
-                loadOperandStack(savedStackVar, frame),
-                loadLocalVariableTable(savedLocalsVar, frame),
+                debugMarker(markerType, dbgSig + "Restoring SUSPEND " + idx),
+                debugMarker(markerType, dbgSig + "Restoring operand stack"),
+                loadOperandStack(markerType, savedStackVar, frame),
+                debugMarker(markerType, dbgSig + "Restoring locals"),
+                loadLocalVariableTable(markerType, savedLocalsVar, frame),
+                debugMarker(markerType, dbgSig + "Entering monitors"),
                 enterStoredMonitors(props),
+                debugMarker(markerType, dbgSig + "Popping off continuation object from operand stack"),
                 pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
                        // stack that would have been consumed by that invocation... since we're removing that call, we
                        // also need to pop the Continuation reference from the stack... it's important that we
                        // explicitly do it at this point becuase during loading the stack will be restored with top
                        // of stack pointing to that continuation object
+                debugMarker(markerType, dbgSig + "Setting mode to normal"),
                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_NORMAL)),
-                jumpTo(continueExecLabelNode)
+                debugMarker(markerType, dbgSig + "Restore complete. Jumping to post-invocation point"),
+                jumpTo(continueExecLabelNode),
+                debugMarker(markerType, dbgSig + "Continuing execution...")
         );
     }
     
@@ -208,7 +242,7 @@ final class ContinuationGenerators {
         Variable savedLocalsVar = props.getCoreVariables().getSavedLocalsVar();
         Variable savedStackVar = props.getCoreVariables().getSavedStackVar();
         
-        Type returnType = props.getReturnType();
+        Type returnType = props.getMethodReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
@@ -218,6 +252,9 @@ final class ContinuationGenerators {
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         
         Variable returnCacheVar = getReturnCacheVar(props, invokeReturnType); // will be null if void
+        
+        MarkerType markerType = props.getDebugMarkerType();
+        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
         
         //          enterLocks(lockState);
         //              // Load up enough of the stack to invoke the method. The invocation here needs to be wrapped in a try catch because
@@ -240,42 +277,43 @@ final class ContinuationGenerators {
         //          place tempObjVar2 on top of stack if not void (as if it <method invocation> were just run and returned that value)
         //          goto restorePoint_<number>_continue;
         return merge(
-                // debugPrint("entering monitors"),
-                enterStoredMonitors(props),
-                // debugPrint("loading just enough in to the stack to invoke method"),
-                // debugPrint(call(MethodUtils.getAccessibleMethod(Arrays.class, "toString", Object[].class), loadVar(savedStackVar))),
-                // debugPrint("method stack count " + methodStackCount),
-                loadOperandStackSuffix(savedStackVar, frame, invokeArgCount),
-                // debugPrint("invoking method"),
+                debugMarker(markerType, dbgSig + "Restoring INVOKE " + idx),
+                debugMarker(markerType, dbgSig + "Entering monitors"),
+                enterStoredMonitors(props), // we MUST re-enter montiors before going further
+                debugMarker(markerType, dbgSig + "Restoring top " + invokeArgCount + " items of operand stack (just enough to invoke)"),
+                loadOperandStackSuffix(markerType, savedStackVar, frame, invokeArgCount),
+                debugMarker(markerType, dbgSig + "Invoking"),
                 cloneInvokeNode(invokeNode), // invoke method  (ADDED MULTIPLE TIMES -- MUST BE CLONED)
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                         loadIntConst(MODE_SAVING),
                         merge(
-                                // debugPrint("no continuation, save signal recvd"),
-                                // debugPrint("popping dummy result of method off stack (if it exists)"),
+                                debugMarker(markerType, dbgSig + "Mode set to save on return"),
+                                debugMarker(markerType, dbgSig + "Popping dummy return value off stack"),
                                 popMethodResult(invokeNode),
-                                // debugPrint("exiting monitors"),
+                                debugMarker(markerType, dbgSig + "Exiting monitors"),
                                 exitStoredMonitors(props),
-                                // debugPrint("adding pending method"),
+                                debugMarker(markerType, dbgSig + "Re-adding method state"),
                                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg), loadVar(methodStateVar)),
-                                // debugPrint("returning"),
-                                // debugPrint("---------------------------"),
+                                debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
                         )
                 ),
-                // save return (if returnCacheVar is null means ret type is void)
-                mergeIf(returnCacheVar != null, () -> new Object[] {
+                mergeIf(returnCacheVar != null, () -> new Object[] {// save return (if returnCacheVar is null means ret type is void)
+                    debugMarker(markerType, dbgSig + "Saving invocation return value"),
                     saveVar(returnCacheVar)
                 }),
-                // load remaninder of operandstack and localvars
-                loadOperandStackPrefix(savedStackVar, frame, frame.getStackSize() - invokeArgCount),
-                loadLocalVariableTable(savedLocalsVar, frame),
-                // load return (if returnCacheVar is null means ret type is void)
-                mergeIf(returnCacheVar != null, () -> new Object[] {
+                debugMarker(markerType, dbgSig + "Restoring remainder of items of operand stack"),
+                loadOperandStackPrefix(markerType, savedStackVar, frame, frame.getStackSize() - invokeArgCount),
+                debugMarker(markerType, dbgSig + "Restoring locals"),
+                loadLocalVariableTable(markerType, savedLocalsVar, frame),
+                mergeIf(returnCacheVar != null, () -> new Object[] {// load return (if returnCacheVar is null means ret type is void)
+                    debugMarker(markerType, dbgSig + "Loading invocation return value"),
                     loadVar(returnCacheVar)
                 }),
-                jumpTo(continueExecLabelNode) // continuing...
+                debugMarker(markerType, dbgSig + "Restore complete. Jumping to post-invocation point"),
+                jumpTo(continueExecLabelNode),
+                debugMarker(markerType, dbgSig + "Continuing execution...")
         );
     }
     
@@ -291,7 +329,7 @@ final class ContinuationGenerators {
 
         Variable throwableVar = props.getCacheVariables().getThrowableCacheVar();
         
-        Type returnType = props.getReturnType();
+        Type returnType = props.getMethodReturnType();
         
         // tryCatchBlock() invocation further on in this method will populate TryCatchBlockNode fields
         TryCatchBlockNode newTryCatchBlockNode = cp.getTryCatchBlock();
@@ -305,6 +343,9 @@ final class ContinuationGenerators {
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         
         Variable returnCacheVar = getReturnCacheVar(props, invokeReturnType); // will be null if void
+        
+        MarkerType markerType = props.getDebugMarkerType();
+        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
         
         //          enterLocks(lockState);
         //          continuation.addPending(methodState); // method state should be loaded from Continuation.saved
@@ -335,18 +376,27 @@ final class ContinuationGenerators {
         //          goto restorePoint_<number>_continue;
         
         return merge(
-                enterStoredMonitors(props),
-                loadOperandStackSuffix(savedStackVar, frame, invokeArgCount),
+                debugMarker(markerType, dbgSig + "Restoring INVOKE WITHIN TRYCATCH " + idx),
+                debugMarker(markerType, dbgSig + "Entering monitors"),
+                enterStoredMonitors(props), // we MUST re-enter montiors before going further
+                debugMarker(markerType, dbgSig + "Restoring top " + invokeArgCount + " items of operand stack (just enough to invoke)"),
+                loadOperandStackSuffix(markerType, savedStackVar, frame, invokeArgCount),
                 tryCatchBlock(
                         newTryCatchBlockNode,
                         null,
                         merge(// try
+                                debugMarker(markerType, dbgSig + "Invoking (within custom try-catch)"),
                                 cloneInvokeNode(invokeNode) // invoke method  (ADDED MULTIPLE TIMES -- MUST BE CLONED)
                         ),
                         merge(// catch(any)
+                                debugMarker(markerType, dbgSig + "Throwable caught"),
+                                debugMarker(markerType, dbgSig + "Saving caught throwable"),
                                 saveVar(throwableVar),
-                                loadOperandStackPrefix(savedStackVar, frame, frame.getStackSize() - invokeArgCount),
-                                loadLocalVariableTable(savedLocalsVar, frame),
+                                debugMarker(markerType, dbgSig + "Restoring remainder of items of operand stack"),
+                                loadOperandStackPrefix(markerType, savedStackVar, frame, frame.getStackSize() - invokeArgCount),
+                                debugMarker(markerType, dbgSig + "Restoring locals"),
+                                loadLocalVariableTable(markerType, savedLocalsVar, frame),
+                                debugMarker(markerType, dbgSig + "Restore complete. Jumping to rethrow point (within orig trycatch block)"),
                                 jumpTo(exceptionExecutionLabelNode)
                         )
                 ),
@@ -354,21 +404,31 @@ final class ContinuationGenerators {
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                         loadIntConst(MODE_SAVING),
                         merge(
+                                debugMarker(markerType, dbgSig + "Mode set to save on return"),
+                                debugMarker(markerType, dbgSig + "Popping dummy return value off stack"),
                                 popMethodResult(invokeNode),
+                                debugMarker(markerType, dbgSig + "Exiting monitors"),
                                 exitStoredMonitors(props), // inserted many times, must be cloned
+                                debugMarker(markerType, dbgSig + "Re-adding method state"),
                                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg), loadVar(methodStateVar)),
+                                debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
                         )
                 ),
                 mergeIf(returnCacheVar != null, () -> new Object[] {// save return (if returnCacheVar is null means ret type is void)
+                    debugMarker(markerType, dbgSig + "Saving invocation return value"),
                     saveVar(returnCacheVar)
                 }),
-                loadOperandStackPrefix(savedStackVar, frame, frame.getStackSize() - invokeArgCount),
-                loadLocalVariableTable(savedLocalsVar, frame),
+                debugMarker(markerType, dbgSig + "Restoring remainder of items of operand stack"),
+                loadOperandStackPrefix(markerType, savedStackVar, frame, frame.getStackSize() - invokeArgCount),
+                debugMarker(markerType, dbgSig + "Restoring locals"),
+                loadLocalVariableTable(markerType, savedLocalsVar, frame),
                 mergeIf(returnCacheVar != null, () -> new Object[] {// load return (if returnCacheVar is null means ret type is void)
+                    debugMarker(markerType, dbgSig + "Loading invocation return value"),
                     loadVar(returnCacheVar)
                 }),
-                jumpTo(continueExecLabelNode)
+                jumpTo(continueExecLabelNode),
+                debugMarker(markerType, dbgSig + "Continuing execution...")
         );
     }
 
@@ -439,10 +499,13 @@ final class ContinuationGenerators {
         
         Variable lockStateVar = props.getLockVariables().getLockStateVar();
         
-        Type returnType = props.getReturnType();
+        Type returnType = props.getMethodReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
+        
+        MarkerType markerType = props.getDebugMarkerType();
+        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
         
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocals();
@@ -453,8 +516,13 @@ final class ContinuationGenerators {
         //
         //
         //          restorePoint_<number>_continue: // at this label: empty exec stack / uninit exec var table
-        return merge(saveOperandStack(savedStackVar, frame),
-                saveLocalVariableTable(savedLocalsVar, frame),
+        return merge(
+                debugMarker(markerType, dbgSig + "Saving SUSPEND " + idx),
+                debugMarker(markerType, dbgSig + "Saving operand stack"),
+                saveOperandStack(markerType, savedStackVar, frame), // DONT FORGET cont object will be at top, needs to be discarded on load
+                debugMarker(markerType, dbgSig + "Saving locals"),
+                saveLocalVariableTable(markerType, savedLocalsVar, frame),
+                debugMarker(markerType, dbgSig + "Creating and adding method state"),
                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                         construct(METHODSTATE_INIT_METHOD,
                                 loadIntConst(idx),
@@ -469,13 +537,17 @@ final class ContinuationGenerators {
                                 }).generate()
                         )
                 ),
+                debugMarker(markerType, dbgSig + "Setting mode to save"),
                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_SAVING)),
-                exitStoredMonitors(props), // used several times, must be cloned
+                debugMarker(markerType, dbgSig + "Exiting monitors"),
+                exitStoredMonitors(props),
+                debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                 returnDummy(returnType), // return dummy value
                 
                 
                 
-                addLabel(continueExecLabelNode)
+                addLabel(continueExecLabelNode),
+                debugMarker(markerType, dbgSig + "Continuing execution...")
         );
     }
     
@@ -493,11 +565,14 @@ final class ContinuationGenerators {
         
         Variable lockStateVar = props.getLockVariables().getLockStateVar();
 
-        Type returnType = props.getReturnType();
+        Type returnType = props.getMethodReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
+        
+        MarkerType markerType = props.getDebugMarkerType();
+        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
         
         //          Object[] duplicatedArgs = saveOperandStack(<method param count>); -- Why do we do this? because when we want to save the
         //                                                                            -- args to this method when we call
@@ -521,30 +596,32 @@ final class ContinuationGenerators {
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         int preInvokeStackSize = frame.getStackSize();
         int postInvokeStackSize = frame.getStackSize() - invokeArgCount;
-        return merge(//debugPrint("saving method args from operand stack"),
-                // save args for invoke
-                saveOperandStack(savedArgsVar, frame, preInvokeStackSize, invokeArgCount),
-                //debugPrint("invoking method -- method args should be off the stack at this point"),
+        return merge(
+                debugMarker(markerType, dbgSig + "Saving INVOKE " + idx),
+                debugMarker(markerType, dbgSig + "Saving top " + invokeArgCount + " items of operand stack (args for invoke)"),
+                saveOperandStack(markerType, savedArgsVar, frame, preInvokeStackSize, invokeArgCount),
+                debugMarker(markerType, dbgSig + "Invoking"),
                 cloneInvokeNode(invokeNode), // invoke method  (ADDED MULTIPLE TIMES -- MUST BE CLONED)
-                        ifIntegersEqual(// if we're saving after invoke
+                ifIntegersEqual(// if we're saving after invoke
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                         loadIntConst(MODE_SAVING),
-                        merge(//debugPrint("no continuation, save signal recvd"),
-                                //debugPrint("popping dummy result of method off stack (if it exists)"),
+                        merge(
+                                debugMarker(markerType, dbgSig + "Mode set to save on return"),
+                                debugMarker(markerType, dbgSig + "Popping dummy return value off stack"),
                                 popMethodResult(invokeNode),
-                                //debugPrint("saving remainder of operand stack"),
                                 // since we invoked the method before getting here, we already consumed the arguments that were sitting
                                 // on the stack waiting to be consumed by the method -- as such, subtract the number of arguments from the
                                 // total stack size when saving!!!!! The top of the stack should now be just before the arguments!!!
                                 //   THIS IS SUPER IMPORTANT!!!!!
-                                saveOperandStack(savedPartialStackVar, frame, postInvokeStackSize, postInvokeStackSize),
-                                //debugPrint("combining saved args with remainder of operand stack to get full stack required for loading"),
+                                debugMarker(markerType, dbgSig + "Saving remainder of items of operand stack"),
+                                saveOperandStack(markerType, savedPartialStackVar, frame, postInvokeStackSize, postInvokeStackSize),
+                                debugMarker(markerType, dbgSig + "Merging operand stack arrays to get total operand stack"),
                                 combineObjectArrays(savedStackVar, savedPartialStackVar, savedArgsVar),
-                                //debugPrint("saving local vars table"),
-                                saveLocalVariableTable(savedLocalsVar, frame),
-                                //debugPrint("exiting monitors"),
-                                exitStoredMonitors(props), // inserted many times, must be cloned
-                                //debugPrint("adding pending method state"),
+                                debugMarker(markerType, dbgSig + "Saving locals"),
+                                saveLocalVariableTable(markerType, savedLocalsVar, frame),
+                                debugMarker(markerType, dbgSig + "Exiting monitors"),
+                                exitStoredMonitors(props),
+                                debugMarker(markerType, dbgSig + "Creating and adding method state"),
                                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(idx),
@@ -559,8 +636,7 @@ final class ContinuationGenerators {
                                                 }).generate()
                                         )
                                 ),
-                                //debugPrint("returning dummy value"),
-                                //debugPrint("--------------------------------------"),
+                                debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
                         )
                 ),      
@@ -568,7 +644,8 @@ final class ContinuationGenerators {
                 
                 
                 
-                addLabel(continueExecLabelNode)
+                addLabel(continueExecLabelNode),
+                debugMarker(markerType, dbgSig + "Continuing execution...")
         );
     }
     
@@ -588,30 +665,45 @@ final class ContinuationGenerators {
 
         Variable throwableVar = props.getCacheVariables().getThrowableCacheVar();
 
-        Type returnType = props.getReturnType();
+        Type returnType = props.getMethodReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         LabelNode exceptionExecutionLabelNode = cp.getExceptionExecutionLabel();
+        
+        MarkerType markerType = props.getDebugMarkerType();
+        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
 
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         int preInvokeStackSize = frame.getStackSize();
         int postInvokeStackSize = frame.getStackSize() - invokeArgCount;
-        return merge(// save args for invoke
-                saveOperandStack(savedArgsVar, frame, preInvokeStackSize, invokeArgCount),
+        return merge(
+                debugMarker(markerType, dbgSig + "Saving INVOKE WITHIN TRYCATCH " + idx),
+                debugMarker(markerType, dbgSig + "Saving top " + invokeArgCount + " items of operand stack (args for invoke)"),
+                saveOperandStack(markerType, savedArgsVar, frame, preInvokeStackSize, invokeArgCount),
+                debugMarker(markerType, dbgSig + "Invoking"),
                 cloneInvokeNode(invokeNode), // invoke method  (ADDED MULTIPLE TIMES -- MUST BE CLONED)
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                         loadIntConst(MODE_SAVING),
-                        merge(popMethodResult(invokeNode),
+                        merge(
+                                debugMarker(markerType, dbgSig + "Mode set to save on return"),
+                                debugMarker(markerType, dbgSig + "Popping dummy return value off stack"),
+                                popMethodResult(invokeNode),
                                 // since we invoked the method before getting here, we already consumed the arguments that were sitting
                                 // on the stack waiting to be consumed by the method -- as such, subtract the number of arguments from the
-                                // total stack size when saving!!!!! THIS IS SUPER IMPORTANT!!!!
-                                saveOperandStack(savedPartialStackVar, frame, postInvokeStackSize, postInvokeStackSize),
+                                // total stack size when saving!!!!! The top of the stack should now be just before the arguments!!!
+                                //   THIS IS SUPER IMPORTANT!!!!!
+                                debugMarker(markerType, dbgSig + "Saving remainder of items of operand stack"),
+                                saveOperandStack(markerType, savedPartialStackVar, frame, postInvokeStackSize, postInvokeStackSize),
+                                debugMarker(markerType, dbgSig + "Merging operand stack arrays to get total operand stack"),
                                 combineObjectArrays(savedStackVar, savedPartialStackVar, savedArgsVar),
-                                saveLocalVariableTable(savedLocalsVar, frame),
-                                exitStoredMonitors(props), // inserted many times, must be cloned
+                                debugMarker(markerType, dbgSig + "Saving locals"),
+                                saveLocalVariableTable(markerType, savedLocalsVar, frame),
+                                debugMarker(markerType, dbgSig + "Exiting monitors"),
+                                exitStoredMonitors(props),
+                                debugMarker(markerType, dbgSig + "Creating and adding method state"),
                                 call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(idx),
@@ -626,20 +718,24 @@ final class ContinuationGenerators {
                                                 }).generate()
                                         )
                                 ),
+                                debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
                         )
                 ),
+                debugMarker(markerType, dbgSig + "Jumping to continue execution point..."),
                 jumpTo(continueExecLabelNode),
                 
                 
                 
                 addLabel(exceptionExecutionLabelNode),
+                debugMarker(markerType, dbgSig + "Rethrowing throwable"),
                 loadVar(throwableVar),
                 throwThrowable(),
                 
                 
                 
-                addLabel(continueExecLabelNode)
+                addLabel(continueExecLabelNode),
+                debugMarker(markerType, dbgSig + "Continuing execution...")
         );
     }
     
@@ -740,32 +836,5 @@ final class ContinuationGenerators {
         }
 
         return ret;
-    }
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    @SuppressWarnings("unchecked")
-    private static <T extends ContinuationPoint> T validateAndGetContinuationPoint(
-            MethodProperties props, int idx, Class<T> expectedType) {
-        Validate.notNull(props);
-        Validate.notNull(expectedType);
-        Validate.isTrue(idx >= 0);
-        
-        List<ContinuationPoint> continuationPoints = props.getContinuationPoints();
-        Validate.isTrue(idx < continuationPoints.size());
-        
-        ContinuationPoint continuationPoint = continuationPoints.get(idx);
-        Validate.isTrue(expectedType.isAssignableFrom(continuationPoint.getClass()));
-        
-        return (T) continuationPoint;
     }
 }

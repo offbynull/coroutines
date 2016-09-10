@@ -21,6 +21,7 @@ import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepos
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithParameter;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import com.offbynull.coroutines.user.Continuation;
 import com.offbynull.coroutines.user.Instrumented;
 import java.io.File;
@@ -73,12 +74,14 @@ public final class Instrumenter {
     /**
      * Instruments a class.
      * @param input class file contents
+     * @param debugMarkerType type of debugging marker to inject in to the instrumented code
      * @return instrumented class
      * @throws IllegalArgumentException if the class could not be instrumented for some reason
      * @throws NullPointerException if any argument is {@code null}
      */
-    public byte[] instrument(byte[] input) {
+    public byte[] instrument(byte[] input, MarkerType debugMarkerType) {
         Validate.notNull(input);
+        Validate.notNull(debugMarkerType);
         Validate.isTrue(input.length > 0);
         
         // Read class as tree model -- because we're using SimpleClassNode, JSR blocks get inlined
@@ -109,7 +112,7 @@ public final class Instrumenter {
         MethodAnalyzer analyzer = new MethodAnalyzer(classRepo);
         MethodInstrumenter instrumenter = new MethodInstrumenter();
         for (MethodNode methodNode : methodNodesToInstrument) {
-            MethodProperties methodProps = analyzer.analyze(classNode, methodNode);
+            MethodProperties methodProps = analyzer.analyze(classNode, methodNode, debugMarkerType);
             
             // If methodProps is null, it means that the analyzer determined that the method doesn't need to be instrumented.
             if (methodProps != null) {

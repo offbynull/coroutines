@@ -24,6 +24,8 @@ import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.merge;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.saveVar;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
+import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.debugMarker;
 import com.offbynull.coroutines.user.LockState;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -68,7 +70,10 @@ final class SynchronizationGenerators {
         Variable lockStateVar = props.getLockVariables().getLockStateVar();
         Validate.isTrue(lockStateVar != null);
 
+        MarkerType markerType = props.getDebugMarkerType();
+
         return merge(
+                debugMarker(markerType, "Creating lockstate and storing"),
                 construct(LOCKSTATE_INIT_METHOD),
                 saveVar(lockStateVar)
         );
@@ -92,10 +97,16 @@ final class SynchronizationGenerators {
         Validate.isTrue(lockStateVar != null);
         Validate.isTrue(counterVar != null);
         Validate.isTrue(arrayLenVar != null);
+        
+        MarkerType markerType = props.getDebugMarkerType();
 
         return forEach(counterVar, arrayLenVar,
-                call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar)),
                 merge(
+                        debugMarker(markerType, "Loading monitors to enter"),
+                        call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar))
+                ),
+                merge(
+                        debugMarker(markerType, "Entering monitor"),
                         new InsnNode(Opcodes.MONITORENTER)
                 )
         );
@@ -120,9 +131,15 @@ final class SynchronizationGenerators {
         Validate.isTrue(counterVar != null);
         Validate.isTrue(arrayLenVar != null);
 
+        MarkerType markerType = props.getDebugMarkerType();
+
         return forEach(counterVar, arrayLenVar,
-                call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar)),
                 merge(
+                        debugMarker(markerType, "Loading monitors to exit"),
+                        call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar))
+                ),
+                merge(
+                        debugMarker(markerType, "Exitting monitor"),
                         new InsnNode(Opcodes.MONITOREXIT)
                 )
         );
@@ -143,9 +160,12 @@ final class SynchronizationGenerators {
         
         Variable lockStateVar = props.getLockVariables().getLockStateVar();
         Validate.isTrue(lockStateVar != null);
+        
+        MarkerType markerType = props.getDebugMarkerType();
 
         // NOTE: This adds to the lock state AFTER locking.
         return merge(
+                debugMarker(markerType, "Entering monitor and storing"),
                                                                          // [obj]
                 new InsnNode(Opcodes.DUP),                               // [obj, obj]
                 new InsnNode(Opcodes.MONITORENTER),                      // [obj]
@@ -175,8 +195,11 @@ final class SynchronizationGenerators {
         Variable lockStateVar = props.getLockVariables().getLockStateVar();
         Validate.isTrue(lockStateVar != null);
 
+        MarkerType markerType = props.getDebugMarkerType();
+        
         // NOTE: This removes the lock AFTER unlocking.
         return merge(
+                debugMarker(markerType, "Exiting monitor and unstoring"),
                                                                          // [obj]
                 new InsnNode(Opcodes.DUP),                               // [obj, obj]
                 new InsnNode(Opcodes.MONITOREXIT),                       // [obj]

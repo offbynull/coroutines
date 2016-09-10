@@ -19,6 +19,7 @@ package com.offbynull.coroutines.instrumenter.testhelpers;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepository;
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -88,7 +89,7 @@ public final class TestUtils {
         for (Entry<String, byte[]> entry : classContents.entrySet()) {
             byte[] content = entry.getValue();
             if (entry.getKey().endsWith(".class")) {
-                content = instrumenter.instrument(content);
+                content = instrumenter.instrument(content, MarkerType.NONE);
             }
             instrumentedJarEntries.add(new JarEntry(entry.getKey(), content));
         }

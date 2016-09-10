@@ -17,6 +17,7 @@
 package com.offbynull.coroutines.mavenplugin;
 
 import com.offbynull.coroutines.instrumenter.Instrumenter;
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.File;
 import java.util.List;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
@@ -25,6 +26,7 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
 /**
@@ -57,6 +59,9 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 @Mojo(name = "test-instrument", defaultPhase = LifecyclePhase.PROCESS_TEST_CLASSES, requiresDependencyResolution = ResolutionScope.COMPILE)
 public final class TestInstrumentMojo extends AbstractInstrumentMojo {
 
+    @Parameter(property = "coroutines.debugMarkerType", defaultValue = "NONE")
+    private MarkerType debugMarkerType;
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         Log log = getLog();
@@ -76,6 +81,6 @@ public final class TestInstrumentMojo extends AbstractInstrumentMojo {
         
         Instrumenter instrumenter = getInstrumenter(log, classpath);
         log.info("Processing test output folder ... ");
-        instrumentPath(log, instrumenter, testOutputFolder);
+        instrumentPath(log, debugMarkerType, instrumenter, testOutputFolder);
     }
 }
