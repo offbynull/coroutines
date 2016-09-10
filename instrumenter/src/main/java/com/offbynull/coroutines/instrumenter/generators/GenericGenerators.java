@@ -152,8 +152,9 @@ public final class GenericGenerators {
     }
     
     /**
-     * Combines multiple instructions (or instruction lists) in to a single instruction list.
-     * @param insns instruction or instruction lists to merge
+     * Combines multiple instructions in to a single instruction list. You can include normal instructions ({@link AbstractInsnNode}),
+     * instruction lists ({@link InsnList}), or instruction generators ({@link InstructionGenerator}).
+     * @param insns instructions
      * @throws NullPointerException if any argument is {@code null} or contains {@code null} 
      * @return merged instructions
      */
@@ -174,9 +175,9 @@ public final class GenericGenerators {
                     Validate.notNull(insnList.get(i));
                 }
                 ret.add((InsnList) insn);
-            } else if (insn instanceof ConditionalMerger) {
+            } else if (insn instanceof InstructionGenerator) {
                 // generate conditional merger instruction list and add
-                InsnList insnList = ((ConditionalMerger) insn).generate();
+                InsnList insnList = ((InstructionGenerator) insn).generate();
                 for (int i = 0; i < insnList.size(); i++) {
                     Validate.notNull(insnList.get(i));
                 }
@@ -207,7 +208,7 @@ public final class GenericGenerators {
     /**
      * Generates instruction lists based on conditions.
      */
-    public static final class ConditionalMerger {
+    public static final class ConditionalMerger implements InstructionGenerator {
         private List<Object> generatedInstructions = new ArrayList<>();
 
         private ConditionalMerger() {
@@ -235,6 +236,7 @@ public final class GenericGenerators {
          * Generate final instruction list.
          * @return instruction list
          */
+        @Override
         public InsnList generate() {
             return merge(generatedInstructions.toArray());
         }
@@ -924,7 +926,18 @@ public final class GenericGenerators {
 
         return ret;
     }
-    
+
+    /**
+     * Instruction list generator.
+     */
+    public interface InstructionGenerator {
+        /**
+         * Generate instruction list.
+         * @return instruction list
+         */
+        InsnList generate();
+    }
+
     private static void validateLocalIndicies(int ... indicies) {
         Arrays.stream(indicies).forEach((x) -> Validate.isTrue(x >= 0));
         long uniqueCount = Arrays.stream(indicies).distinct().count();
