@@ -20,6 +20,7 @@ import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.loadCl
 import com.offbynull.coroutines.user.Continuation;
 import com.offbynull.coroutines.user.Coroutine;
 import com.offbynull.coroutines.user.CoroutineRunner;
+import com.offbynull.coroutines.user.MethodState;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -284,6 +285,34 @@ public final class InstrumenterTest {
         thrown.expectMessage("Exception thrown during execution");
         
         performCountTest(EXCEPTION_THROW_TEST);
+    }
+
+    @Test
+    public void mustHaveEmptyPendingMethodStatesOnException() throws Exception {
+        StringBuilder builder = new StringBuilder();
+        Continuation continuation = null;
+        boolean hit = false;
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(EXCEPTION_THROW_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(EXCEPTION_THROW_TEST);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+            continuation = (Continuation) FieldUtils.readField(runner, "continuation", true);
+            
+            runner.execute();
+            runner.execute();
+            runner.execute();
+            runner.execute();
+            runner.execute();
+            runner.execute();
+        } catch (RuntimeException e) {
+            hit = true;
+        }
+
+        Assert.assertTrue(hit);
+        
+        LinkedList<MethodState> pending = (LinkedList<MethodState>) FieldUtils.readField(continuation, "pendingMethodStates", true);
+        Assert.assertTrue(pending.isEmpty());
     }
 
     private void performSanityTest(String testClass) throws Exception {
