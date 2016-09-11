@@ -76,7 +76,7 @@ public final class Continuation implements Serializable {
      * Do not use -- for internal use only.
      * @param methodState n/a
      */
-    public void addPending(MethodState methodState) {
+    public void pushMethodState(MethodState methodState) {
         if (methodState == null) {
             throw new NullPointerException();
         }        
@@ -87,7 +87,7 @@ public final class Continuation implements Serializable {
      * Do not use -- for internal use only.
      * @return n/a
      */
-    public MethodState removeFirstSaved() {
+    public MethodState popMethodState() {
         if (savedMethodStates.isEmpty()) {
             throw new IllegalStateException();
         }
@@ -118,7 +118,7 @@ public final class Continuation implements Serializable {
         savedMethodStates = pendingMethodStates;
         pendingMethodStates = new LinkedList();
     }
-    
+
     /**
      * Call to suspend/yield execution.
      * @throws UnsupportedOperationException if the caller has not been instrumented

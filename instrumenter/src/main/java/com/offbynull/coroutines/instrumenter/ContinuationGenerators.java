@@ -78,10 +78,10 @@ final class ContinuationGenerators {
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
     private static final Method CONTINUATION_SETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "setMode", Integer.TYPE);
-    private static final Method CONTINUATION_REMOVEFIRSTSAVED_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "removeFirstSaved");
-    private static final Method CONTINUATION_ADDPENDING_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "addPending", MethodState.class);
+    private static final Method CONTINUATION_POPMETHODSTATE_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "popMethodState");
+    private static final Method CONTINUATION_PUSHMETHODSTATE_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "pushMethodState", MethodState.class);
     private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
             = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, Object[].class, LockState.class);
 
@@ -137,7 +137,7 @@ final class ContinuationGenerators {
                         ),
                         merge(
                                 debugMarker(markerType, dbgSig + "Case 2 -- Loading state"),
-                                call(CONTINUATION_REMOVEFIRSTSAVED_METHOD, loadVar(contArg)),
+                                call(CONTINUATION_POPMETHODSTATE_METHOD, loadVar(contArg)),
                                 saveVar(methodStateVar),
                                 call(METHODSTATE_GETLOCALTABLE_METHOD, loadVar(methodStateVar)),
                                 saveVar(savedLocalsVar),
@@ -294,7 +294,7 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Exiting monitors"),
                                 exitStoredMonitors(props),
                                 debugMarker(markerType, dbgSig + "Re-adding method state"),
-                                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg), loadVar(methodStateVar)),
+                                call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg), loadVar(methodStateVar)),
                                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
                         )
@@ -410,7 +410,7 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Exiting monitors"),
                                 exitStoredMonitors(props), // inserted many times, must be cloned
                                 debugMarker(markerType, dbgSig + "Re-adding method state"),
-                                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg), loadVar(methodStateVar)),
+                                call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg), loadVar(methodStateVar)),
                                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
                         )
@@ -523,7 +523,7 @@ final class ContinuationGenerators {
                 debugMarker(markerType, dbgSig + "Saving locals"),
                 saveLocalVariableTable(markerType, savedLocalsVar, frame),
                 debugMarker(markerType, dbgSig + "Creating and adding method state"),
-                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
+                call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg),
                         construct(METHODSTATE_INIT_METHOD,
                                 loadIntConst(idx),
                                 loadVar(savedStackVar),
@@ -622,7 +622,7 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Exiting monitors"),
                                 exitStoredMonitors(props),
                                 debugMarker(markerType, dbgSig + "Creating and adding method state"),
-                                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
+                                call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(idx),
                                                 loadVar(savedStackVar),
@@ -704,7 +704,7 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Exiting monitors"),
                                 exitStoredMonitors(props),
                                 debugMarker(markerType, dbgSig + "Creating and adding method state"),
-                                call(CONTINUATION_ADDPENDING_METHOD, loadVar(contArg),
+                                call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(idx),
                                                 loadVar(savedStackVar),
