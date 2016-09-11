@@ -23,7 +23,7 @@ final class LockVariables {
     private final Variable counterVar;
     private final Variable arrayLenVar;
 
-    public LockVariables(
+    LockVariables(
             Variable lockStateVar,
             Variable counterVar,
             Variable arrayLenVar) {

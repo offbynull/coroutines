@@ -54,7 +54,7 @@ final class MethodAnalyzer {
     
     private final ClassInformationRepository classInfoRepo;
     
-    public MethodAnalyzer(ClassInformationRepository classInfoRepo) {
+    MethodAnalyzer(ClassInformationRepository classInfoRepo) {
         Validate.notNull(classInfoRepo);
 
         this.classInfoRepo = classInfoRepo;
