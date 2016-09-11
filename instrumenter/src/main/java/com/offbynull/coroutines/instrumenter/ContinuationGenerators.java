@@ -21,7 +21,6 @@ import static com.offbynull.coroutines.instrumenter.StateGenerators.loadLocalVar
 import static com.offbynull.coroutines.instrumenter.StateGenerators.loadOperandStackPrefix;
 import static com.offbynull.coroutines.instrumenter.StateGenerators.loadOperandStackSuffix;
 import static com.offbynull.coroutines.instrumenter.StateGenerators.saveLocalVariableTable;
-import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.createMonitorContainerAndSaveToVar;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.enterStoredMonitors;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.exitStoredMonitors;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.addLabel;
@@ -66,11 +65,12 @@ import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.throwRuntimeException;
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
+import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.debugMarker;
+import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.createMonitorContainer;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
 import static com.offbynull.coroutines.instrumenter.StateGenerators.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.StateGenerators.saveOperandStack;
-import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
-import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.debugMarker;
 
 final class ContinuationGenerators {
     
@@ -114,9 +114,7 @@ final class ContinuationGenerators {
         String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
         
         LabelNode startOfMethodLabelNode = new LabelNode();
-        return merge(
-                tableSwitch(
-                        merge(
+        return merge(tableSwitch(merge(
                                 debugMarker(markerType, dbgSig + "Getting state for switch"),
                                 call(CONTINUATION_GETMODE_METHOD, loadVar(contArg))
                         ),
@@ -125,9 +123,12 @@ final class ContinuationGenerators {
                                 throwRuntimeException("Unrecognized state")
                         ),
                         0,
-                        merge(
-                                debugMarker(markerType, dbgSig + "Case 0 -- Fresh invocation"),
-                                createMonitorContainerAndSaveToVar(props),
+                        merge(debugMarker(markerType, dbgSig + "Case 0 -- Fresh invocation"),
+                                // create lockstate if method actually has monitorenter/exit in it (var != null if this were the case)
+                                mergeIf(lockStateVar != null, () -> new Object[] {
+                                        debugMarker(markerType, "Creating monitors container"),
+                                        createMonitorContainer(props),
+                                }),
                                 debugMarker(markerType, dbgSig + "Jump to start of method point"),
                                 jumpTo(startOfMethodLabelNode)
                         ),
@@ -143,7 +144,7 @@ final class ContinuationGenerators {
                                 saveVar(savedLocalsVar),
                                 call(METHODSTATE_GETSTACK_METHOD, loadVar(methodStateVar)),
                                 saveVar(savedStackVar),
-                                // get lockstate if method actually has monitorenter/exit insn in it (var != null if this were the case)
+                                // get lockstate if method actually has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[] {
                                         debugMarker(markerType, dbgSig + "Method has synch points, so loading lockstate as well"),
                                         call(METHODSTATE_GETLOCKSTATE_METHOD, loadVar(methodStateVar)),
@@ -199,6 +200,8 @@ final class ContinuationGenerators {
         Variable savedLocalsVar = props.getCoreVariables().getSavedLocalsVar();
         Variable savedStackVar = props.getCoreVariables().getSavedStackVar();
         
+        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        
         Frame<BasicValue> frame = cp.getFrame();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
@@ -216,8 +219,11 @@ final class ContinuationGenerators {
                 loadOperandStack(markerType, savedStackVar, frame),
                 debugMarker(markerType, dbgSig + "Restoring locals"),
                 loadLocalVariableTable(markerType, savedLocalsVar, frame),
-                debugMarker(markerType, dbgSig + "Entering monitors"),
-                enterStoredMonitors(props),
+                // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
+                mergeIf(lockStateVar != null, () -> new Object[]{
+                        debugMarker(markerType, dbgSig + "Entering monitors"),
+                        enterStoredMonitors(props),
+                }),
                 debugMarker(markerType, dbgSig + "Popping off continuation object from operand stack"),
                 pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
                        // stack that would have been consumed by that invocation... since we're removing that call, we
@@ -241,6 +247,8 @@ final class ContinuationGenerators {
         Variable methodStateVar = props.getCoreVariables().getMethodStateVar();
         Variable savedLocalsVar = props.getCoreVariables().getSavedLocalsVar();
         Variable savedStackVar = props.getCoreVariables().getSavedStackVar();
+        
+        Variable lockStateVar = props.getLockVariables().getLockStateVar();
         
         Type returnType = props.getMethodReturnType();
         
@@ -278,8 +286,11 @@ final class ContinuationGenerators {
         //          goto restorePoint_<number>_continue;
         return merge(
                 debugMarker(markerType, dbgSig + "Restoring INVOKE " + idx),
-                debugMarker(markerType, dbgSig + "Entering monitors"),
-                enterStoredMonitors(props), // we MUST re-enter montiors before going further
+                // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
+                mergeIf(lockStateVar != null, () -> new Object[]{
+                        debugMarker(markerType, dbgSig + "Entering monitors"),
+                        enterStoredMonitors(props), // we MUST re-enter montiors before going further
+                }),
                 debugMarker(markerType, dbgSig + "Restoring top " + invokeArgCount + " items of operand stack (just enough to invoke)"),
                 loadOperandStackSuffix(markerType, savedStackVar, frame, invokeArgCount),
                 debugMarker(markerType, dbgSig + "Invoking"),
@@ -291,8 +302,11 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Mode set to save on return"),
                                 debugMarker(markerType, dbgSig + "Popping dummy return value off stack"),
                                 popMethodResult(invokeNode),
-                                debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                exitStoredMonitors(props),
+                                // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
+                                mergeIf(lockStateVar != null, () -> new Object[]{
+                                        debugMarker(markerType, dbgSig + "Exiting monitors"),
+                                        exitStoredMonitors(props),
+                                }),
                                 debugMarker(markerType, dbgSig + "Re-adding method state"),
                                 call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg), loadVar(methodStateVar)),
                                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
@@ -327,6 +341,8 @@ final class ContinuationGenerators {
         Variable savedLocalsVar = props.getCoreVariables().getSavedLocalsVar();
         Variable savedStackVar = props.getCoreVariables().getSavedStackVar();
 
+        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        
         Variable throwableVar = props.getCacheVariables().getThrowableCacheVar();
         
         Type returnType = props.getMethodReturnType();
@@ -377,8 +393,11 @@ final class ContinuationGenerators {
         
         return merge(
                 debugMarker(markerType, dbgSig + "Restoring INVOKE WITHIN TRYCATCH " + idx),
-                debugMarker(markerType, dbgSig + "Entering monitors"),
-                enterStoredMonitors(props), // we MUST re-enter montiors before going further
+                // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
+                mergeIf(lockStateVar != null, () -> new Object[]{
+                        debugMarker(markerType, dbgSig + "Entering monitors"),
+                        enterStoredMonitors(props), // we MUST re-enter montiors before going further
+                }),
                 debugMarker(markerType, dbgSig + "Restoring top " + invokeArgCount + " items of operand stack (just enough to invoke)"),
                 loadOperandStackSuffix(markerType, savedStackVar, frame, invokeArgCount),
                 tryCatchBlock(
@@ -407,8 +426,11 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Mode set to save on return"),
                                 debugMarker(markerType, dbgSig + "Popping dummy return value off stack"),
                                 popMethodResult(invokeNode),
-                                debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                exitStoredMonitors(props), // inserted many times, must be cloned
+                                // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
+                                mergeIf(lockStateVar != null, () -> new Object[]{
+                                        debugMarker(markerType, dbgSig + "Exiting monitors"),
+                                        exitStoredMonitors(props),
+                                }),
                                 debugMarker(markerType, dbgSig + "Re-adding method state"),
                                 call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg), loadVar(methodStateVar)),
                                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
@@ -528,7 +550,7 @@ final class ContinuationGenerators {
                                 loadIntConst(idx),
                                 loadVar(savedStackVar),
                                 loadVar(savedLocalsVar),
-                                // load lockstate for last arg if method actually has monitorenter/exit insn in it
+                                // load lockstate for last arg if method actually has monitorenter/exit in it
                                 // (var != null if this were the case), otherwise load null for that arg
                                 mergeIf(lockStateVar != null, () -> new Object[] {
                                         loadVar(lockStateVar)
@@ -539,8 +561,11 @@ final class ContinuationGenerators {
                 ),
                 debugMarker(markerType, dbgSig + "Setting mode to save"),
                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_SAVING)),
-                debugMarker(markerType, dbgSig + "Exiting monitors"),
-                exitStoredMonitors(props),
+                // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
+                mergeIf(lockStateVar != null, () -> new Object[]{
+                        debugMarker(markerType, dbgSig + "Exiting monitors"),
+                        exitStoredMonitors(props),
+                }),
                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                 returnDummy(returnType), // return dummy value
                 
@@ -619,15 +644,18 @@ final class ContinuationGenerators {
                                 combineObjectArrays(savedStackVar, savedPartialStackVar, savedArgsVar),
                                 debugMarker(markerType, dbgSig + "Saving locals"),
                                 saveLocalVariableTable(markerType, savedLocalsVar, frame),
-                                debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                exitStoredMonitors(props),
+                                // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
+                                mergeIf(lockStateVar != null, () -> new Object[]{
+                                        debugMarker(markerType, dbgSig + "Exiting monitors"),
+                                        exitStoredMonitors(props),
+                                }),
                                 debugMarker(markerType, dbgSig + "Creating and adding method state"),
                                 call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(idx),
                                                 loadVar(savedStackVar),
                                                 loadVar(savedLocalsVar),
-                                                // load lockstate for last arg if method actually has monitorenter/exit insn in it
+                                                // load lockstate for last arg if method actually has monitorenter/exit in it
                                                 // (var != null if this were the case), otherwise load null for that arg
                                                 mergeIf(lockStateVar != null, () -> new Object[] {
                                                         loadVar(lockStateVar)
@@ -701,15 +729,18 @@ final class ContinuationGenerators {
                                 combineObjectArrays(savedStackVar, savedPartialStackVar, savedArgsVar),
                                 debugMarker(markerType, dbgSig + "Saving locals"),
                                 saveLocalVariableTable(markerType, savedLocalsVar, frame),
-                                debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                exitStoredMonitors(props),
+                                // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
+                                mergeIf(lockStateVar != null, () -> new Object[]{
+                                        debugMarker(markerType, dbgSig + "Exiting monitors"),
+                                        exitStoredMonitors(props),
+                                }),
                                 debugMarker(markerType, dbgSig + "Creating and adding method state"),
                                 call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(idx),
                                                 loadVar(savedStackVar),
                                                 loadVar(savedLocalsVar),
-                                                // load lockstate for last arg if method actually has monitorenter/exit insn in it
+                                                // load lockstate for last arg if method actually has monitorenter/exit in it
                                                 // (var != null if this were the case), otherwise load null for that arg
                                                 mergeIf(lockStateVar != null, () -> new Object[] {
                                                         loadVar(lockStateVar)

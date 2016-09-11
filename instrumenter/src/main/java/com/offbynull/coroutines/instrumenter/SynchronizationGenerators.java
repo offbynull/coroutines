@@ -18,7 +18,6 @@ package com.offbynull.coroutines.instrumenter;
 
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.call;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.construct;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.empty;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.forEach;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadVar;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.merge;
@@ -29,7 +28,6 @@ import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.d
 import com.offbynull.coroutines.user.LockState;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.List;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
@@ -55,43 +53,45 @@ final class SynchronizationGenerators {
         // do nothing
     }
     
-    public static InsnList createMonitorContainerAndSaveToVar(MethodProperties props) {
+    /**
+     * Generates instruction to that creates a new {@link LockState} object and saves it to the lockstate variable.
+     * @param props method properties
+     * @return instructions to push a new {@link LockState} object
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if properties of the method doesn't have any synchronization points (the method doesn't contain any
+     * monitorenter/monitorexit instructions)
+     */
+    public static InsnList createMonitorContainer(MethodProperties props) {
         Validate.notNull(props);
-        
-        List<SynchronizationPoint> syncPoints = props.getSynchronizationPoints();
-
-        // If we don't have any MONITORENTER/MONITOREXIT instructions in the method, we don't need to create a LockState object to monitors
-        // in. There are no monitors being entered/exited to store.
-
-        if (syncPoints.isEmpty()) {
-            return empty();
-        }
+        Validate.isTrue(!props.getSynchronizationPoints().isEmpty());
 
         Variable lockStateVar = props.getLockVariables().getLockStateVar();
-        Validate.isTrue(lockStateVar != null);
+        Validate.isTrue(lockStateVar != null);  // extra sanity check, if no synch points this should be null
 
         MarkerType markerType = props.getDebugMarkerType();
 
         return merge(
-                debugMarker(markerType, "Creating lockstate and storing"),
+                debugMarker(markerType, "Creating lockstate"),
                 construct(LOCKSTATE_INIT_METHOD),
                 saveVar(lockStateVar)
         );
     }
     
+    /**
+     * Generates instruction to enter all monitors in the {@link LockState} object sitting in the lockstate variable.
+     * @param props method properties
+     * @return instructions to enter all monitors in the {@link LockState} object
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if properties of the method doesn't have any synchronization points (the method doesn't contain any
+     * monitorenter/monitorexit instructions)
+     */
     public static InsnList enterStoredMonitors(MethodProperties props) {
         Validate.notNull(props);
-
-        List<SynchronizationPoint> syncPoints = props.getSynchronizationPoints();
-
-        // If we don't have any MONITORENTER/MONITOREXIT instructions in the method, we don't need to create a LockState object to monitors
-        // in. There are no monitors being entered/exited to store.
-
-        if (syncPoints.isEmpty()) {
-            return empty();
-        }
+        Validate.isTrue(!props.getSynchronizationPoints().isEmpty());
 
         Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Validate.isTrue(lockStateVar != null); // extra sanity check, if no synch points this should be null
+
         Variable counterVar = props.getLockVariables().getCounterVar();
         Variable arrayLenVar = props.getLockVariables().getArrayLenVar();
         Validate.isTrue(lockStateVar != null);
@@ -112,19 +112,21 @@ final class SynchronizationGenerators {
         );
     }
     
+    /**
+     * Generates instruction to exit all monitors in the {@link LockState} object sitting in the lockstate variable.
+     * @param props method properties
+     * @return instructions to exit all monitors in the {@link LockState} object
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if properties of the method doesn't have any synchronization points (the method doesn't contain any
+     * monitorenter/monitorexit instructions)
+     */
     public static InsnList exitStoredMonitors(MethodProperties props) {
-        Validate.notNull(props);
-
-        List<SynchronizationPoint> syncPoints = props.getSynchronizationPoints();
-
-        // If we don't have any MONITORENTER/MONITOREXIT instructions in the method, we don't need to create a LockState object to monitors
-        // in. There are no monitors being entered/exited to store.
-
-        if (syncPoints.isEmpty()) {
-            return empty();
-        }
+        Validate.notNull(props);        Validate.notNull(props);
+        Validate.isTrue(!props.getSynchronizationPoints().isEmpty());
 
         Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Validate.isTrue(lockStateVar != null); // extra sanity check, if no synch points this should be null
+
         Variable counterVar = props.getLockVariables().getCounterVar();
         Variable arrayLenVar = props.getLockVariables().getArrayLenVar();        
         Validate.isTrue(lockStateVar != null);
@@ -144,22 +146,28 @@ final class SynchronizationGenerators {
                 )
         );
     }
-    
-    public static InsnList enterMonitorAndStore(MethodProperties props) {
-        Validate.notNull(props);
 
-        // Doesn't make sense for this to get called if there are no synchronization points
-        List<SynchronizationPoint> syncPoints = props.getSynchronizationPoints();
-        Validate.isTrue(!syncPoints.isEmpty()); 
+    /**
+     * Generates instruction to enter a monitor (top item on the stack) and store it in the {@link LockState} object sitting in the
+     * lockstate variable.
+     * @param props method properties
+     * @return instructions to enter a monitor and store it in the {@link LockState} object
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if properties of the method doesn't have any synchronization points (the method doesn't contain any
+     * monitorenter/monitorexit instructions)
+     */
+    public static InsnList enterMonitorAndStore(MethodProperties props) {
+        Validate.notNull(props);        Validate.notNull(props);
+        Validate.isTrue(!props.getSynchronizationPoints().isEmpty());
+
+        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Validate.isTrue(lockStateVar != null); // extra sanity check, if no synch points this should be null
 
         Type clsType = Type.getType(LOCKSTATE_ENTER_METHOD.getDeclaringClass());
         Type methodType = Type.getType(LOCKSTATE_ENTER_METHOD);
         String clsInternalName = clsType.getInternalName();
         String methodDesc = methodType.getDescriptor();
         String methodName = LOCKSTATE_ENTER_METHOD.getName();
-        
-        Variable lockStateVar = props.getLockVariables().getLockStateVar();
-        Validate.isTrue(lockStateVar != null);
         
         MarkerType markerType = props.getDebugMarkerType();
 
@@ -178,22 +186,28 @@ final class SynchronizationGenerators {
                         false)
         );
     }
-    
-    public static InsnList exitMonitorAndDelete(MethodProperties props) {
-        Validate.notNull(props);
 
-        // Doesn't make sense for this to get called if there are no synchronization points
-        List<SynchronizationPoint> syncPoints = props.getSynchronizationPoints();
-        Validate.isTrue(!syncPoints.isEmpty()); 
+    /**
+     * Generates instruction to exit a monitor (top item on the stack) and remove it from the {@link LockState} object sitting in the
+     * lockstate variable.
+     * @param props method properties
+     * @return instructions to exit a monitor and remove it from the {@link LockState} object
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if properties of the method doesn't have any synchronization points (the method doesn't contain any
+     * monitorenter/monitorexit instructions)
+     */
+    public static InsnList exitMonitorAndDelete(MethodProperties props) {
+        Validate.notNull(props);        Validate.notNull(props);
+        Validate.isTrue(!props.getSynchronizationPoints().isEmpty());
+
+        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Validate.isTrue(lockStateVar != null); // extra sanity check, if no synch points this should be null
 
         Type clsType = Type.getType(LOCKSTATE_EXIT_METHOD.getDeclaringClass());
         Type methodType = Type.getType(LOCKSTATE_EXIT_METHOD);
         String clsInternalName = clsType.getInternalName();
         String methodDesc = methodType.getDescriptor();
         String methodName = LOCKSTATE_EXIT_METHOD.getName();
-
-        Variable lockStateVar = props.getLockVariables().getLockStateVar();
-        Validate.isTrue(lockStateVar != null);
 
         MarkerType markerType = props.getDebugMarkerType();
         
