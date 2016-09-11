@@ -32,6 +32,7 @@ import com.offbynull.coroutines.user.MethodState;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
+import static org.apache.commons.collections4.CollectionUtils.union;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.objectweb.asm.Opcodes;
@@ -181,15 +182,7 @@ final class MethodAnalyzer {
         //
         // The try/catch information is needed because the instrumenter needs to temporarily cache a throwable if the invocation throws one.
         // The variable slot for the throwable is assigned lower on in the code.
-        boolean invocationWithBooleanReturnFound = false;
-        boolean invocationWithByteReturnFound = false;
-        boolean invocationWithCharReturnFound = false;
-        boolean invocationWithShortReturnFound = false;
-        boolean invocationWithIntReturnFound = false;
-        boolean invocationWithLongReturnFound = false;
-        boolean invocationWithFloatReturnFound = false;
-        boolean invocationWithDoubleReturnFound = false;
-        boolean invocationWithObjectReturnFound = false;
+        TypeTracker invocationReturnTypes = new TypeTracker();
         boolean invocationFoundWrappedInTryCatch = false;
         for (AbstractInsnNode invokeInsnNode : contInvocationInsnNodes) {
             if (findTryCatchBlockNodesEncompassingInstruction(
@@ -200,40 +193,74 @@ final class MethodAnalyzer {
             }
             
             Type returnType = getReturnTypeOfInvocation(invokeInsnNode);
-            switch (returnType.getSort()) {
-                case Type.BOOLEAN:
-                    invocationWithBooleanReturnFound = true;
-                    break;
-                case Type.BYTE:
-                    invocationWithByteReturnFound = true;
-                    break;
-                case Type.CHAR:
-                    invocationWithCharReturnFound = true;
-                    break;
-                case Type.SHORT:
-                    invocationWithShortReturnFound = true;
-                    break;
-                case Type.INT:
-                    invocationWithIntReturnFound = true;
-                    break;
-                case Type.LONG:
-                    invocationWithLongReturnFound = true;
-                    break;
-                case Type.FLOAT:
-                    invocationWithFloatReturnFound = true;
-                    break;
-                case Type.DOUBLE:
-                    invocationWithDoubleReturnFound = true;
-                    break;
-                case Type.OBJECT:
-                    invocationWithObjectReturnFound = true;
-                    break;
-                case Type.VOID:
-                    // do nothing
-                    break;
-                case Type.METHOD:
-                default:
-                    throw new IllegalStateException(); // this should never happen
+            if (returnType.getSort() != Type.VOID) {
+                invocationReturnTypes.trackType(returnType);
+            }
+        }
+
+
+
+
+        ///////////////////////////////////////////////////////////////////////////////////////////
+        // DETERMINE TYPES ON THE LOCAL VARIABLES TABE AT SUSPEND / CONTINUATION POINTS
+        ///////////////////////////////////////////////////////////////////////////////////////////
+
+        // For each invocation node found, see whats on the locals.
+        //
+        // We need on scan the types on the locals because the instrumenter needs to know which extra variable slots to allot to the
+        // storage containers for those types. The variable slots for these storage containers are assigned lower on in the code.
+        TypeTracker localsTypes = new TypeTracker();
+        for (AbstractInsnNode invokeInsnNode : union(contInvocationInsnNodes, suspendInvocationInsnNodes)) {
+            int instructionIndex = methodNode.instructions.indexOf(invokeInsnNode);
+            Frame<BasicValue> frame = frames[instructionIndex];
+
+            for (int i = 0; i < frame.getLocals(); i++) {
+                BasicValue basicValue = frame.getLocal(i);
+                Type type = basicValue.getType();
+                
+                // If type == null, basicValue is pointing to uninitialized var -- basicValue.toString() will return '.'. This means that
+                // this slot contains nothing to save. We don't store anything in this case so skip this slot if we encounter it.
+                //
+                // If type is 'Lnull;', this means that the slot has been assigned null and that "there has been no merge yet that would
+                // 'raise' the type toward some class or interface type" (from ASM mailing list). We know this slot will always contain null
+                // at this point in the code so we can avoid saving it. When we load it back up, we can simply push a null in to that slot,
+                // thereby keeping the same 'Lnull;' type.
+                if (type == null || "Lnull;".equals(type.getDescriptor())) {
+                    continue;
+                }
+                
+                localsTypes.trackType(type);
+            }
+        }
+
+
+
+        ///////////////////////////////////////////////////////////////////////////////////////////
+        // DETERMINE TYPES ON THE OPERAND STACK AT SUSPEND / CONTINUATION POINTS
+        ///////////////////////////////////////////////////////////////////////////////////////////
+
+        // For each invocation node found, see whats on the operand stack.
+        //
+        // We need on scan the types on the operand stack because the instrumenter needs to know which extra variable slots to allot to the
+        // storage containers for those types. The variable slots for these storage containers are assigned lower on in the code.
+        TypeTracker operandStackTypes = new TypeTracker();
+        for (AbstractInsnNode invokeInsnNode : union(contInvocationInsnNodes, suspendInvocationInsnNodes)) {
+            int instructionIndex = methodNode.instructions.indexOf(invokeInsnNode);
+            Frame<BasicValue> frame = frames[instructionIndex];
+
+            for (int i = 0; i < frame.getStackSize(); i++) {
+                BasicValue basicValue = frame.getStack(i);
+                Type type = basicValue.getType();
+                
+                // If type is 'Lnull;', this means that the slot has been assigned null and that "there has been no merge yet that would
+                // 'raise' the type toward some class or interface type" (from ASM mailing list). We know this slot will always contain null
+                // at this point in the code so we can avoid saving it. When we load it back up, we can simply push a null in to that slot,
+                // thereby keeping the same 'Lnull;' type.
+                if ("Lnull;".equals(type.getDescriptor())) {
+                    continue;
+                }
+                
+                operandStackTypes.trackType(type);
             }
         }
 
@@ -256,108 +283,46 @@ final class MethodAnalyzer {
 
         VariableTable varTable = new VariableTable(classNode, methodNode);
         
-        // Create variable for the continuation object passed in as arg
+        // Create variable for the continuation object passed in as arg + variable for storing/loading method state
         Variable continuationArgVar = varTable.getArgument(contArgIdx);
-        
-        // Create variables for storing method state
         Variable methodStateVar = varTable.acquireExtra(MethodState.class);
-        Variable savedLocalsVar = varTable.acquireExtra(Object[].class);
-        Variable savedStackVar = varTable.acquireExtra(Object[].class);
-        Variable savedArgumentsVar = varTable.acquireExtra(Object[].class);
-        Variable savedPartialStackVar = varTable.acquireExtra(Object[].class);
-
-        // Create variables to cache return values and thrown exceptions of invocations -- only create ones we need
-        Variable booleanReturnCacheVar = null;
-        Variable byteReturnCacheVar = null;
-        Variable charReturnCacheVar = null;
-        Variable shortReturnCacheVar = null;
-        Variable intReturnCacheVar = null;
-        Variable longReturnCacheVar = null;
-        Variable floatReturnCacheVar = null;
-        Variable doubleReturnCacheVar = null;
-        Variable objectReturnCacheVar = null;
-        Variable throwableCacheVar = null;
-        if (invocationWithBooleanReturnFound) {
-            booleanReturnCacheVar = varTable.acquireExtra(Boolean.TYPE);
-        }
-        if (invocationWithByteReturnFound) {
-            byteReturnCacheVar = varTable.acquireExtra(Byte.TYPE);
-        }
-        if (invocationWithCharReturnFound) {
-            charReturnCacheVar = varTable.acquireExtra(Character.TYPE);
-        }
-        if (invocationWithShortReturnFound) {
-            shortReturnCacheVar = varTable.acquireExtra(Short.TYPE);
-        }
-        if (invocationWithIntReturnFound) {
-            intReturnCacheVar = varTable.acquireExtra(Integer.TYPE);
-        }
-        if (invocationWithLongReturnFound) {
-            longReturnCacheVar = varTable.acquireExtra(Long.TYPE);
-        }
-        if (invocationWithFloatReturnFound) {
-            floatReturnCacheVar = varTable.acquireExtra(Float.TYPE);
-        }
-        if (invocationWithDoubleReturnFound) {
-            doubleReturnCacheVar = varTable.acquireExtra(Double.TYPE);
-        }
-        if (invocationWithObjectReturnFound) {
-            objectReturnCacheVar = varTable.acquireExtra(Object.class);
-        }
-        if (invocationFoundWrappedInTryCatch) {
-            throwableCacheVar = varTable.acquireExtra(Throwable.class);
-        }
-        
-        // Create variables to for holding on to monitors -- only create if we need them
-        Variable lockStateVar = null;
-        Variable lockCounterVar = null;
-        Variable lockArrayLenVar = null;
-        if (!synchPoints.isEmpty()) {
-            lockStateVar = varTable.acquireExtra(LockState.class);
-            lockCounterVar = varTable.acquireExtra(Type.INT_TYPE);
-            lockArrayLenVar = varTable.acquireExtra(Type.INT_TYPE);
-        }
-
-
-
-
-        ///////////////////////////////////////////////////////////////////////////////////////////
-        // RETURN RESULTS
-        ///////////////////////////////////////////////////////////////////////////////////////////
-
         CoreVariables coreVars = new CoreVariables(
                 continuationArgVar,
-                methodStateVar,
-                savedLocalsVar,
-                savedStackVar,
-                savedArgumentsVar,
-                savedPartialStackVar);
-        CacheVariables cacheVars = new CacheVariables(
-                booleanReturnCacheVar,
-                byteReturnCacheVar,
-                charReturnCacheVar,
-                shortReturnCacheVar,
-                intReturnCacheVar,
-                longReturnCacheVar,
-                floatReturnCacheVar,
-                doubleReturnCacheVar,
-                objectReturnCacheVar,
-                throwableCacheVar);
-        LockVariables lockVars = new LockVariables(
-                lockStateVar,
-                lockCounterVar,
-                lockArrayLenVar);
+                methodStateVar);
+        
+        // Create variables for storing/loading locals -- only create ones we need
+        StorageVariables localsStorageVars = allocateStorageVariableSlots(varTable, localsTypes);
 
-        String methodName = methodNode.name;
-        Type methodSignature = Type.getMethodType(methodNode.desc);
+        // Create variables for storing/loading operand stack -- only create ones we need
+        StorageVariables stackStorageVars = allocateStorageVariableSlots(varTable, operandStackTypes);
+        
+        // Create variables to locals and operand stack storage containers -- these must exist
+        StorageContainerVariables storageContainerVars = allocateStorageContainerVariableSlots(varTable);
+
+        // Create variables to cache return values and thrown exceptions of invocations -- only create ones we need
+        CacheVariables cacheVars = allocateCacheVariableSlots(varTable, invocationReturnTypes, invocationFoundWrappedInTryCatch);
+        
+        // Create variables to for holding on to monitors -- only create if we need them
+        LockVariables lockVars = allocateLockVariableSlots(varTable, !synchPoints.isEmpty());
+        
+
+
+
+
+        ///////////////////////////////////////////////////////////////////////////////////////////
+        // RETURN RESULTS OF ANALYSIS
+        ///////////////////////////////////////////////////////////////////////////////////////////
+
         return new MethodProperties(
-                methodName,
-                methodSignature,
+                methodNode,
                 debugMarkerType,
                 continuationPoints,
                 synchPoints,
                 coreVars,
                 cacheVars,
+                storageContainerVars,
+                localsStorageVars,
+                stackStorageVars,
                 lockVars);
     }
     
@@ -382,6 +347,102 @@ final class MethodAnalyzer {
         }
 
         return isStatic ? idx : idx + 1;
+    }
+    
+    private CacheVariables allocateCacheVariableSlots(
+            VariableTable varTable,
+            TypeTracker invocationReturnTypes,
+            boolean invocationFoundWrappedInTryCatch) {
+        Variable intReturnCacheVar = null;
+        Variable longReturnCacheVar = null;
+        Variable floatReturnCacheVar = null;
+        Variable doubleReturnCacheVar = null;
+        Variable objectReturnCacheVar = null;
+        Variable throwableCacheVar = null;
+        if (invocationReturnTypes.intFound) {
+            intReturnCacheVar = varTable.acquireExtra(Integer.TYPE);
+        }
+        if (invocationReturnTypes.longFound) {
+            longReturnCacheVar = varTable.acquireExtra(Long.TYPE);
+        }
+        if (invocationReturnTypes.floatFound) {
+            floatReturnCacheVar = varTable.acquireExtra(Float.TYPE);
+        }
+        if (invocationReturnTypes.doubleFound) {
+            doubleReturnCacheVar = varTable.acquireExtra(Double.TYPE);
+        }
+        if (invocationReturnTypes.objectFound) {
+            objectReturnCacheVar = varTable.acquireExtra(Object.class);
+        }
+        if (invocationFoundWrappedInTryCatch) {
+            throwableCacheVar = varTable.acquireExtra(Throwable.class);
+        }
+
+        return new CacheVariables(
+                intReturnCacheVar,
+                longReturnCacheVar,
+                floatReturnCacheVar,
+                doubleReturnCacheVar,
+                objectReturnCacheVar,
+                throwableCacheVar);
+    }
+    
+    private StorageVariables allocateStorageVariableSlots(
+            VariableTable varTable,
+            TypeTracker storageTypes) {
+        Variable intStorageVar = null;
+        Variable longStorageVar = null;
+        Variable floatStorageVar = null;
+        Variable doubleStorageVar = null;
+        Variable objectStorageVar = null;
+        if (storageTypes.intFound) {
+            intStorageVar = varTable.acquireExtra(int[].class);
+        }
+        if (storageTypes.longFound) {
+            longStorageVar = varTable.acquireExtra(long[].class);
+        }
+        if (storageTypes.floatFound) {
+            floatStorageVar = varTable.acquireExtra(float[].class);
+        }
+        if (storageTypes.doubleFound) {
+            doubleStorageVar = varTable.acquireExtra(double[].class);
+        }
+        if (storageTypes.objectFound) {
+            objectStorageVar = varTable.acquireExtra(Object[].class);
+        }
+
+        return new StorageVariables(
+                intStorageVar,
+                longStorageVar,
+                floatStorageVar,
+                doubleStorageVar,
+                objectStorageVar);
+    }
+
+    private StorageContainerVariables allocateStorageContainerVariableSlots(
+            VariableTable varTable) {
+        Variable containerVar = varTable.acquireExtra(Object[].class);
+
+        return new StorageContainerVariables(containerVar);
+    }
+
+    private LockVariables allocateLockVariableSlots(
+            VariableTable varTable,
+            boolean containsSyncPoints) {
+        Variable lockStateVar = null;
+        Variable lockCounterVar = null;
+        Variable lockArrayLenVar = null;
+
+        if (containsSyncPoints) {
+            lockStateVar = varTable.acquireExtra(LockState.class);
+            lockCounterVar = varTable.acquireExtra(Type.INT_TYPE);
+            lockArrayLenVar = varTable.acquireExtra(Type.INT_TYPE);
+        }
+
+        return new LockVariables(
+                lockStateVar,
+                lockCounterVar,
+                lockArrayLenVar);
     }
     
     private void validateNoInvokeDynamic(List<AbstractInsnNode> insnNodes) {
@@ -452,6 +513,43 @@ final class MethodAnalyzer {
             if (insnNode instanceof InvokeDynamicInsnNode) {
                 throw new IllegalArgumentException("INVOKEDYNAMIC instructions are not allowed");
             }
+        }
+    }
+
+    private static final class TypeTracker {
+        private boolean intFound = false;
+        private boolean longFound = false;
+        private boolean floatFound = false;
+        private boolean doubleFound = false;
+        private boolean objectFound = false;
+        
+        public void trackType(Type type) {
+            switch (type.getSort()) {
+                case Type.BOOLEAN:
+                case Type.BYTE:
+                case Type.CHAR:
+                case Type.SHORT:
+                case Type.INT:
+                    intFound = true;
+                    break;
+                case Type.LONG:
+                    longFound = true;
+                    break;
+                case Type.FLOAT:
+                    floatFound = true;
+                    break;
+                case Type.DOUBLE:
+                    doubleFound = true;
+                    break;
+                case Type.OBJECT:
+                case Type.ARRAY:
+                    objectFound = true;
+                    break;
+                case Type.VOID:
+                case Type.METHOD:
+                default:
+                    throw new IllegalArgumentException(); // this should never happen
+                }
         }
     }
 }

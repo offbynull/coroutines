@@ -19,25 +19,16 @@ package com.offbynull.coroutines.instrumenter;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import org.apache.commons.lang3.Validate;
 
-final class CoreVariables {
-    private final Variable continuationArgVar;
-    private final Variable methodStateVar;
+final class StorageContainerVariables {
+    private final Variable containerVar;
     
-    CoreVariables(
-            Variable continuationArgVar,
-            Variable methodStateVar) {
-        Validate.notNull(continuationArgVar);
-        Validate.notNull(methodStateVar);
-        
-        this.continuationArgVar = continuationArgVar;
-        this.methodStateVar = methodStateVar;
+    StorageContainerVariables(Variable containerVar) {
+        Validate.notNull(containerVar);
+
+        this.containerVar = containerVar;
     }
 
-    public Variable getContinuationArgVar() {
-        return continuationArgVar;
-    }
-
-    public Variable getMethodStateVar() {
-        return methodStateVar;
+    public Variable getContainerVar() {
+        return containerVar;
     }
 }

@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.commons.collections4.list.UnmodifiableList;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.MethodNode;
 
 final class MethodProperties {
     private final String methodName;
@@ -33,31 +34,38 @@ final class MethodProperties {
     
     private final CoreVariables coreVars;
     private final CacheVariables cacheVars;
+    private final StorageContainerVariables storageContainerVars;
+    private final StorageVariables localsStorageVars;
+    private final StorageVariables stackStorageVars;
     private final LockVariables lockVars;
 
     MethodProperties(
-            String methodName,
-            Type methodSignature,
+            MethodNode methodNode,
             MarkerType debugMarkerType,
             List<ContinuationPoint> continuationPoints,
             List<SynchronizationPoint> synchPoints,
             CoreVariables coreVars,
             CacheVariables cacheVars,
+            StorageContainerVariables storageContainerVars,
+            StorageVariables localsStorageVars,
+            StorageVariables stackStorageVars,
             LockVariables lockVars) {
-        Validate.notNull(methodName);
-        Validate.notNull(methodSignature);
+        Validate.notNull(methodNode);
         Validate.notNull(debugMarkerType);
         Validate.notNull(continuationPoints);
         Validate.notNull(synchPoints);
         Validate.notNull(coreVars);
         Validate.notNull(cacheVars);
+        Validate.notNull(storageContainerVars);
+        Validate.notNull(localsStorageVars);
+        Validate.notNull(stackStorageVars);
         Validate.notNull(lockVars);
         Validate.noNullElements(continuationPoints);
         Validate.noNullElements(synchPoints);
-        Validate.isTrue(methodSignature.getSort() == Type.METHOD);
 
-        this.methodName = methodName;
-        this.methodSignature = methodSignature;
+        methodName = methodNode.name;
+        methodSignature = Type.getMethodType(methodNode.desc);
+
         this.debugMarkerType = debugMarkerType;
         this.continuationPoints =
                 (UnmodifiableList<ContinuationPoint>) UnmodifiableList.unmodifiableList(new ArrayList<>(continuationPoints));
@@ -65,6 +73,9 @@ final class MethodProperties {
                 (UnmodifiableList<SynchronizationPoint>) UnmodifiableList.unmodifiableList(new ArrayList<>(synchPoints));
         this.coreVars = coreVars;
         this.cacheVars = cacheVars;
+        this.storageContainerVars = storageContainerVars;
+        this.localsStorageVars = localsStorageVars;
+        this.stackStorageVars = stackStorageVars;
         this.lockVars = lockVars;
     }
 
@@ -98,6 +109,18 @@ final class MethodProperties {
 
     public CacheVariables getCacheVariables() {
         return cacheVars;
+    }
+
+    public StorageContainerVariables getStorageContainerVariables() {
+        return storageContainerVars;
+    }
+
+    public StorageVariables getLocalsStorageVariables() {
+        return localsStorageVars;
+    }
+
+    public StorageVariables getStackStorageVariables() {
+        return stackStorageVars;
     }
 
     public LockVariables getLockVariables() {

@@ -20,10 +20,6 @@ import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import org.apache.commons.lang3.Validate;
 
 final class CacheVariables {
-    private final Variable booleanReturnCacheVar;
-    private final Variable byteReturnCacheVar;
-    private final Variable charReturnCacheVar;
-    private final Variable shortReturnCacheVar;
     private final Variable intReturnCacheVar;
     private final Variable longReturnCacheVar;
     private final Variable floatReturnCacheVar;
@@ -32,10 +28,6 @@ final class CacheVariables {
     private final Variable throwableCacheVar;
     
     CacheVariables(
-            Variable booleanReturnCacheVar,
-            Variable byteReturnCacheVar,
-            Variable charReturnCacheVar,
-            Variable shortReturnCacheVar,
             Variable intReturnCacheVar,
             Variable longReturnCacheVar,
             Variable floatReturnCacheVar,
@@ -44,10 +36,6 @@ final class CacheVariables {
             Variable throwableCacheVar) {
         // cache vars CAN BE NULL -- if they weren't created it means it was determined that it wasn't required
 
-        this.booleanReturnCacheVar = booleanReturnCacheVar;
-        this.byteReturnCacheVar = byteReturnCacheVar;
-        this.charReturnCacheVar = charReturnCacheVar;
-        this.shortReturnCacheVar = shortReturnCacheVar;
         this.intReturnCacheVar = intReturnCacheVar;
         this.longReturnCacheVar = longReturnCacheVar;
         this.floatReturnCacheVar = floatReturnCacheVar;
@@ -55,26 +43,6 @@ final class CacheVariables {
         this.objectReturnCacheVar = objectReturnCacheVar;
         
         this.throwableCacheVar = throwableCacheVar;
-    }
-
-    public Variable getBooleanReturnCacheVar() {
-        Validate.validState(booleanReturnCacheVar != null, "Return cache variable of type not assigned");
-        return booleanReturnCacheVar;
-    }
-
-    public Variable getByteReturnCacheVar() {
-        Validate.validState(byteReturnCacheVar != null, "Return cache variable of type not assigned");
-        return byteReturnCacheVar;
-    }
-
-    public Variable getCharReturnCacheVar() {
-        Validate.validState(charReturnCacheVar != null, "Return cache variable of type not assigned");
-        return charReturnCacheVar;
-    }
-
-    public Variable getShortReturnCacheVar() {
-        Validate.validState(shortReturnCacheVar != null, "Return cache variable of type not assigned");
-        return shortReturnCacheVar;
     }
 
     public Variable getIntReturnCacheVar() {

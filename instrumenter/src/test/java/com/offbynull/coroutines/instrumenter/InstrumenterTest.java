@@ -42,6 +42,7 @@ import org.junit.rules.ExpectedException;
 public final class InstrumenterTest {
 
     private static final String SANITY_TEST = "SanityTest";
+    private static final String DIFFERENT_STATES_TEST = "MultipleSuspendStatesTest";
     private static final String NORMAL_INVOKE_TEST = "NormalInvokeTest";
     private static final String STATIC_INVOKE_TEST = "StaticInvokeTest";
     private static final String INTERFACE_INVOKE_TEST = "InterfaceInvokeTest";
@@ -71,7 +72,41 @@ public final class InstrumenterTest {
 
     @Test
     public void mustProperlyExecuteSanityTest() throws Exception {
-        performSanityTest(SANITY_TEST);
+        StringBuilder builder = new StringBuilder();
+
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(SANITY_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(SANITY_TEST);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+
+            Assert.assertTrue(runner.execute());
+            Assert.assertFalse(runner.execute());
+            Assert.assertTrue(runner.execute()); // coroutine finished executing here
+            Assert.assertFalse(runner.execute());
+
+            Assert.assertEquals("abab", builder.toString());
+        }
+    }
+
+    @Test
+    public void mustProperlySuspendInDifferentStackAndLocalsStatesTest() throws Exception {
+        StringBuilder builder = new StringBuilder();
+
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(DIFFERENT_STATES_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(DIFFERENT_STATES_TEST);
+            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertTrue(runner.execute());
+            Assert.assertFalse(runner.execute()); // coroutine finished executing here
+
+            Assert.assertEquals("ab", builder.toString());
+        }
     }
 
     @Test
@@ -313,24 +348,6 @@ public final class InstrumenterTest {
         
         LinkedList<MethodState> pending = (LinkedList<MethodState>) FieldUtils.readField(continuation, "pendingMethodStates", true);
         Assert.assertTrue(pending.isEmpty());
-    }
-
-    private void performSanityTest(String testClass) throws Exception {
-        StringBuilder builder = new StringBuilder();
-
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip")) {
-            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(testClass);
-            Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
-
-            CoroutineRunner runner = new CoroutineRunner(coroutine);
-
-            Assert.assertTrue(runner.execute());
-            Assert.assertFalse(runner.execute());
-            Assert.assertTrue(runner.execute()); // coroutine finished executing here
-            Assert.assertFalse(runner.execute());
-
-            Assert.assertEquals("abab", builder.toString());
-        }
     }
 
     private void performCountTest(String testClass) throws Exception {

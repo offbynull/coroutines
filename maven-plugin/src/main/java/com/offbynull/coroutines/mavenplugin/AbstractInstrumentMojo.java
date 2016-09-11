@@ -39,6 +39,9 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
 
     @Parameter(defaultValue = "${java.home}/lib", required = true)
     private String jdkLibsDirectory;
+    
+    @Parameter(property = "coroutines.debugMarkerType", defaultValue = "NONE")
+    private MarkerType debugMarkerType;
 
     /**
      * Instruments all classes in a path recursively.
@@ -99,6 +102,14 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
      */
     protected final MavenProject getProject() {
         return project;
+    }
+
+    /**
+     * Get the debug marker type.
+     * @return debug marker type
+     */
+    protected final MarkerType getDebugMarkerType() {
+        return debugMarkerType;
     }
 
 }

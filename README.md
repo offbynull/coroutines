@@ -348,9 +348,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
 - CHANGED: Performance improvement: Deferred operand stack and local variable table saving until Coroutine suspended.
+- CHANGED: Performance improvement: No longer autoboxing when storing/loading operand stack and local variable table.
 - CHANGED: Performance improvement: No longer autoboxing when caching return value of continuation points.
 - CHANGED: Refactored instrumentation logic.
-- CHANGED: Upgraded to dependencies and plugins.
+- CHANGED: Upgraded dependencies and plugins.
 - ADDED: Debug markers/logging in instrumented code (must explicitly be enabled).
 - ADDED: Increased test coverage.
 

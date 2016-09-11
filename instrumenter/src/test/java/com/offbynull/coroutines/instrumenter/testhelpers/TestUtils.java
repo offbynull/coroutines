@@ -89,7 +89,7 @@ public final class TestUtils {
         for (Entry<String, byte[]> entry : classContents.entrySet()) {
             byte[] content = entry.getValue();
             if (entry.getKey().endsWith(".class")) {
-                content = instrumenter.instrument(content, MarkerType.NONE);
+                content = instrumenter.instrument(content, MarkerType.CONSTANT);
             }
             instrumentedJarEntries.add(new JarEntry(entry.getKey(), content));
         }
