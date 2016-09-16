@@ -31,6 +31,8 @@ import java.util.Set;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.LabelNode;
@@ -302,5 +304,22 @@ public final class SearchUtils {
         }
         
         return null;
+    }
+    
+    /**
+     * Find field within a class by its name.
+     * @param classNode class to search
+     * @param name name to search for
+     * @return found field (or {@code null} if not found)
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code name} is empty
+     */
+    public static FieldNode findField(ClassNode classNode, String name) {
+        Validate.notNull(classNode);
+        Validate.notNull(name);
+        Validate.notEmpty(name);
+        return classNode.fields.stream()
+                .filter(x -> name.equals(x.name))
+                .findAny().orElse(null);
     }
 }

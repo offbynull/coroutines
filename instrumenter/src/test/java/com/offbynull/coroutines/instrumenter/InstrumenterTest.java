@@ -16,13 +16,17 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.getClasspath;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.loadClassesInZipResourceAndInstrument;
+import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipFromResource;
 import com.offbynull.coroutines.user.Continuation;
 import com.offbynull.coroutines.user.Coroutine;
 import com.offbynull.coroutines.user.CoroutineRunner;
 import com.offbynull.coroutines.user.MethodState;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -31,6 +35,7 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
@@ -442,6 +447,24 @@ public final class InstrumenterTest {
         try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(CONSTRUCTOR_INVOKE_TEST + ".zip")) {
             // do nothing, exception will occur
         }
+    }
+
+    @Test
+    public void mustNotDoubleInstrument() throws Exception {
+        byte[] classContent =
+                readZipFromResource(SANITY_TEST + ".zip").entrySet().stream()
+                .filter(x -> x.getKey().endsWith(".class"))
+                .map(x -> x.getValue())
+                .findAny().get();
+        List<File> classpath = getClasspath();
+        classpath.addAll(classpath);
+        
+        Instrumenter instrumenter = new Instrumenter(classpath);
+        
+        byte[] classInstrumented1stPass = instrumenter.instrument(classContent, MarkerType.NONE);
+        byte[] classInstrumented2stPass = instrumenter.instrument(classInstrumented1stPass, MarkerType.NONE);
+        
+        Assert.assertArrayEquals(classInstrumented1stPass, classInstrumented2stPass);
     }
 
     @Test

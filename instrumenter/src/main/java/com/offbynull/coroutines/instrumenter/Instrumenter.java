@@ -18,25 +18,27 @@ package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.asm.ClassInformationRepository;
 import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepository;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findField;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithParameter;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
 import com.offbynull.coroutines.instrumenter.asm.SimpleVerifier;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import com.offbynull.coroutines.user.Continuation;
-import com.offbynull.coroutines.user.Instrumented;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.List;
 import org.apache.commons.lang3.Validate;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
@@ -52,8 +54,23 @@ import org.objectweb.asm.util.TraceMethodVisitor;
  */
 public final class Instrumenter {
 
-    private static final Type INSTRUMENTED_CLASS_TYPE = Type.getType(Instrumented.class);
     private static final Type CONTINUATION_CLASS_TYPE = Type.getType(Continuation.class);
+    
+    // The following consts are used to determine if the class being instrumented is already instrumented + to make sure that if it is
+    // instrumented that it's instrumented with this version of the instrumenter 
+    private static final int INSTRUMENTED_MARKER_FIELD_ACCESS = Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC;
+    private static final Type INSTRUMENTED_MARKER_FIELD_TYPE = Type.LONG_TYPE;
+    private static final String INSTRUMENTED_FIELD_MARKER_NAME = "__COROUTINES_INSTRUMENTATION_VERSION";
+    private static final Long INSTRUMENTED_MARKER_FIELD_VALUE;
+    static {
+        try {
+            // We update serialVersionUIDs in user package whenever we do anything that makes us incompatible with previous versions, so
+            // this is a good value to use to detect which version of the instrumenter we instrumented with
+            INSTRUMENTED_MARKER_FIELD_VALUE = (Long) FieldUtils.readDeclaredStaticField(Continuation.class, "serialVersionUID", true);
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to grab int value from " + Continuation.class.getName() + " serialVersionUID", e);
+        }
+    }
 
     private ClassInformationRepository classRepo;
 
@@ -105,18 +122,35 @@ public final class Instrumenter {
         }
 
         // Has this class already been instrumented? if so, skip it
-        if (classNode.interfaces.contains(INSTRUMENTED_CLASS_TYPE.getInternalName())) {
+        FieldNode instrumentedMarkerField = findField(classNode, INSTRUMENTED_FIELD_MARKER_NAME);
+        if (instrumentedMarkerField != null) {
+            if (INSTRUMENTED_MARKER_FIELD_ACCESS != instrumentedMarkerField.access) {
+                throw new IllegalArgumentException("Instrumentation marker found with wrong access: " + instrumentedMarkerField.access);
+            }
+            if (!INSTRUMENTED_MARKER_FIELD_TYPE.getDescriptor().equals(instrumentedMarkerField.desc)) {
+                throw new IllegalArgumentException("Instrumentation marker found with wrong type: " + instrumentedMarkerField.desc);
+            }
+            if (!INSTRUMENTED_MARKER_FIELD_VALUE.equals(instrumentedMarkerField.value)) {
+                throw new IllegalArgumentException("Instrumentation marker found wrong value: " + instrumentedMarkerField.value);
+            }
+            
             return input.clone();
         }
-
+        
         // Find methods that need to be instrumented. If none are found, skip
         List<MethodNode> methodNodesToInstrument = findMethodsWithParameter(classNode.methods, CONTINUATION_CLASS_TYPE);
         if (methodNodesToInstrument.isEmpty()) {
             return input.clone();
         }
         
-        // Add the "Instrumented" interface to this class so if we ever come back to it, we can skip it
-        classNode.interfaces.add(INSTRUMENTED_CLASS_TYPE.getInternalName());
+        // Add the "Instrumented" marker field to this class so if we ever come back to it, we can skip it
+        instrumentedMarkerField = new FieldNode(
+                INSTRUMENTED_MARKER_FIELD_ACCESS,
+                INSTRUMENTED_FIELD_MARKER_NAME,
+                INSTRUMENTED_MARKER_FIELD_TYPE.getDescriptor(),
+                null,
+                INSTRUMENTED_MARKER_FIELD_VALUE);
+        classNode.fields.add(instrumentedMarkerField);
 
         // Instrument each method that needs to be instrumented
         MethodAnalyzer analyzer = new MethodAnalyzer(classRepo);
