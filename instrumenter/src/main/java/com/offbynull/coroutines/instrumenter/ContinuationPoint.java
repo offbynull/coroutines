@@ -22,6 +22,7 @@ import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 
 interface ContinuationPoint {
+    Integer getLineNumber();
     MethodInsnNode getInvokeInstruction();
     LabelNode getContinueExecutionLabel();
     Frame<BasicValue> getFrame();

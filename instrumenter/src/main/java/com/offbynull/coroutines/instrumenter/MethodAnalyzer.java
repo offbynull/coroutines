@@ -20,6 +20,7 @@ import com.offbynull.coroutines.instrumenter.asm.ClassInformationRepository;
 import static com.offbynull.coroutines.instrumenter.asm.MethodInvokeUtils.getReturnTypeOfInvocation;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findInvocationsOf;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findInvocationsWithParameter;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findLineNumberForInstruction;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findTryCatchBlockNodesEncompassingInstruction;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.searchForOpcodes;
 import com.offbynull.coroutines.instrumenter.asm.SimpleVerifier;
@@ -41,6 +42,7 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
+import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
@@ -136,7 +138,11 @@ final class MethodAnalyzer {
             int instructionIndex = methodNode.instructions.indexOf(suspendInvocationInsnNode);
             Frame<BasicValue> frame = frames[instructionIndex];
             
-            SuspendContinuationPoint suspendPoint = new SuspendContinuationPoint((MethodInsnNode) suspendInvocationInsnNode, frame);
+            LineNumberNode lineNumberNode = findLineNumberForInstruction(methodNode.instructions, suspendInvocationInsnNode);
+            Integer lineNumber = lineNumberNode != null ? lineNumberNode.line : null;
+            
+            SuspendContinuationPoint suspendPoint = new SuspendContinuationPoint(
+                    lineNumber, (MethodInsnNode) suspendInvocationInsnNode, frame);
             continuationPoints.add(suspendPoint);
         }
 
@@ -149,11 +155,16 @@ final class MethodAnalyzer {
                     contInvocationInsnNode).size() > 0;
             Frame<BasicValue> frame = frames[instructionIndex];
             
+            LineNumberNode lineNumberNode = findLineNumberForInstruction(methodNode.instructions, contInvocationInsnNode);
+            Integer lineNumber = lineNumberNode != null ? lineNumberNode.line : null;
+            
             ContinuationPoint continuationPoint;
             if (withinTryCatch) {
-                continuationPoint = new TryCatchInvokeContinuationPoint((MethodInsnNode) contInvocationInsnNode, frame);
+                continuationPoint = new TryCatchInvokeContinuationPoint(
+                        lineNumber, (MethodInsnNode) contInvocationInsnNode, frame);
             } else {
-                continuationPoint = new NormalInvokeContinuationPoint((MethodInsnNode) contInvocationInsnNode, frame);
+                continuationPoint = new NormalInvokeContinuationPoint(
+                        lineNumber, (MethodInsnNode) contInvocationInsnNode, frame);
             }
             continuationPoints.add(continuationPoint);
         }

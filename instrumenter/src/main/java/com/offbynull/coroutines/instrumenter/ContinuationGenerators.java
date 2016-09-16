@@ -69,6 +69,7 @@ import static com.offbynull.coroutines.instrumenter.PackStateGenerators.packStor
 import static com.offbynull.coroutines.instrumenter.PackStateGenerators.unpackStorageArrays;
 import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.saveOperandStack;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.lineNumber;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
 
 final class ContinuationGenerators {
@@ -179,15 +180,26 @@ final class ContinuationGenerators {
         Validate.isTrue(idx >= 0);
         ContinuationPoint continuationPoint = validateAndGetContinuationPoint(props, idx, ContinuationPoint.class);
         
+        Integer lineNumber = continuationPoint.getLineNumber();
+                
+        InsnList restoreInsnList;
         if (continuationPoint instanceof SuspendContinuationPoint) {
-            return restoreStateFromSuspend(props, idx);
+            restoreInsnList = restoreStateFromSuspend(props, idx);
         } else if (continuationPoint instanceof NormalInvokeContinuationPoint) {
-            return restoreStateFromNormalInvocation(props, idx);
+            restoreInsnList = restoreStateFromNormalInvocation(props, idx);
         } else if (continuationPoint instanceof TryCatchInvokeContinuationPoint) {
-            return restoreStateFromInvocationWithinTryCatch(props, idx);
+            restoreInsnList = restoreStateFromInvocationWithinTryCatch(props, idx);
         } else {
             throw new IllegalArgumentException(); // should never happen
         }
+        
+        // Add line number to beginning of instructions (if a line number was detected by the analyzer)
+        return merge(
+                mergeIf(lineNumber != null, () -> new Object[]{
+                    lineNumber(lineNumber)
+                }),
+                restoreInsnList
+        );
     }
     
     private static InsnList restoreStateFromSuspend(MethodProperties props, int idx) {
@@ -505,15 +517,26 @@ final class ContinuationGenerators {
         Validate.isTrue(idx >= 0);
         ContinuationPoint continuationPoint = validateAndGetContinuationPoint(props, idx, ContinuationPoint.class);
         
+        Integer lineNumber = continuationPoint.getLineNumber();
+                
+        InsnList saveInsnList;
         if (continuationPoint instanceof SuspendContinuationPoint) {
-            return saveStateFromSuspend(props, idx);
+            saveInsnList = saveStateFromSuspend(props, idx);
         } else if (continuationPoint instanceof NormalInvokeContinuationPoint) {
-            return saveStateFromNormalInvocation(props, idx);
+            saveInsnList = saveStateFromNormalInvocation(props, idx);
         } else if (continuationPoint instanceof TryCatchInvokeContinuationPoint) {
-            return saveStateFromInvocationWithinTryCatch(props, idx);
+            saveInsnList = saveStateFromInvocationWithinTryCatch(props, idx);
         } else {
             throw new IllegalArgumentException(); // should never happen
         }
+        
+        // Add line number to beginning of instructions (if a line number was detected by the analyzer)
+        return merge(
+                mergeIf(lineNumber != null, () -> new Object[]{
+                    lineNumber(lineNumber)
+                }),
+                saveInsnList
+        );
     }
     
     private static InsnList saveStateFromSuspend(MethodProperties props, int idx) {

@@ -24,19 +24,28 @@ import org.objectweb.asm.tree.analysis.Frame;
 
 final class SuspendContinuationPoint implements ContinuationPoint {
 
+    private final Integer lineNumber;
     private final MethodInsnNode invokeInstruction;
     private final LabelNode continueExecutionLabel;
     private final Frame<BasicValue> frame;
 
     SuspendContinuationPoint(
+            Integer lineNumber,
             MethodInsnNode invokeInstruction,
             Frame<BasicValue> frame) {
+        // lineNumber is null if it doesn't exist
         Validate.notNull(invokeInstruction);
         Validate.notNull(frame);
 
+        this.lineNumber = lineNumber;
         this.invokeInstruction = invokeInstruction;
         this.continueExecutionLabel = new LabelNode();
         this.frame = frame;
+    }
+
+    @Override
+    public Integer getLineNumber() {
+        return lineNumber;
     }
 
     @Override
