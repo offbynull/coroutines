@@ -17,6 +17,9 @@
 package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
+import com.offbynull.coroutines.user.LockState;
+import org.apache.commons.lang3.Validate;
+import org.objectweb.asm.Type;
 
 final class LockVariables {
     private final Variable lockStateVar;
@@ -28,6 +31,9 @@ final class LockVariables {
             Variable counterVar,
             Variable arrayLenVar) {
         // vars can be null -- they'll be null if the analyzer determined tehy aren't required
+        Validate.isTrue(lockStateVar == null || lockStateVar.getType().equals(Type.getType(LockState.class)));
+        Validate.isTrue(counterVar == null || counterVar.getType().equals(Type.INT_TYPE));
+        Validate.isTrue(arrayLenVar == null || arrayLenVar.getType().equals(Type.INT_TYPE));
 
         this.lockStateVar = lockStateVar;
         this.counterVar = counterVar;

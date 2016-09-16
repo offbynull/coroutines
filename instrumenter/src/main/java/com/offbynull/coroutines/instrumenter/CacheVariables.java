@@ -18,6 +18,7 @@ package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import org.apache.commons.lang3.Validate;
+import org.objectweb.asm.Type;
 
 final class CacheVariables {
     private final Variable intReturnCacheVar;
@@ -35,6 +36,12 @@ final class CacheVariables {
             Variable objectReturnCacheVar,
             Variable throwableCacheVar) {
         // cache vars CAN BE NULL -- if they weren't created it means it was determined that it wasn't required
+        Validate.isTrue(intReturnCacheVar == null || intReturnCacheVar.getType().equals(Type.INT_TYPE));
+        Validate.isTrue(longReturnCacheVar == null || longReturnCacheVar.getType().equals(Type.LONG_TYPE));
+        Validate.isTrue(floatReturnCacheVar == null || floatReturnCacheVar.getType().equals(Type.FLOAT_TYPE));
+        Validate.isTrue(doubleReturnCacheVar == null || doubleReturnCacheVar.getType().equals(Type.DOUBLE_TYPE));
+        Validate.isTrue(objectReturnCacheVar == null || objectReturnCacheVar.getType().equals(Type.getType(Object.class)));
+        Validate.isTrue(throwableCacheVar == null || throwableCacheVar.getType().equals(Type.getType(Throwable.class)));
 
         this.intReturnCacheVar = intReturnCacheVar;
         this.longReturnCacheVar = longReturnCacheVar;

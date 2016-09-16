@@ -18,12 +18,14 @@ package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import org.apache.commons.lang3.Validate;
+import org.objectweb.asm.Type;
 
 final class StorageContainerVariables {
     private final Variable containerVar;
     
     StorageContainerVariables(Variable containerVar) {
         Validate.notNull(containerVar);
+        Validate.isTrue(containerVar.getType().equals(Type.getType(Object[].class)));
 
         this.containerVar = containerVar;
     }

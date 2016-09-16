@@ -17,6 +17,8 @@
 package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
+import org.apache.commons.lang3.Validate;
+import org.objectweb.asm.Type;
 
 final class StorageVariables {
     private final Variable intStorageVar;
@@ -32,6 +34,12 @@ final class StorageVariables {
             Variable doubleStorageVar,
             Variable objectStorageVar) {
         // storage vars CAN BE NULL -- if they weren't created it means it was determined that it wasn't required
+        Validate.isTrue(intStorageVar == null || intStorageVar.getType().equals(Type.getType(int[].class)));
+        Validate.isTrue(longStorageVar == null || longStorageVar.getType().equals(Type.getType(long[].class)));
+        Validate.isTrue(floatStorageVar == null || floatStorageVar.getType().equals(Type.getType(float[].class)));
+        Validate.isTrue(doubleStorageVar == null || doubleStorageVar.getType().equals(Type.getType(double[].class)));
+        Validate.isTrue(objectStorageVar == null || objectStorageVar.getType().equals(Type.getType(Object[].class)));
+        
         this.intStorageVar = intStorageVar;
         this.longStorageVar = longStorageVar;
         this.floatStorageVar = floatStorageVar;
