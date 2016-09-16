@@ -261,7 +261,11 @@ final class OperandStackStateGenerators {
      * Generates instructions to save the entire operand stack. Equivalent to calling
      * {@code saveOperandStack(markerType, storageVars, frame, frame.getStackSize())}.
      * <p>
-     * The instructions generated here expect the operand stack to be fully loaded at this point.
+     * The instructions generated here expect the operand stack to be fully loaded. The stack items specified by {@code frame} must actually
+     * all be on the operand stack.
+     * <p>
+     * REMEMBER: The items aren't returned to the operand stack after they've been saved (they have been popped off the stack). If you want
+     * them back on the operand stack, reload using {@code loadOperandStack(markerType, storageVars, frame)}.
      * @param markerType debug marker type
      * @param storageVars variables to store operand stack in to
      * @param frame execution frame at the instruction where the operand stack is to be saved
@@ -275,7 +279,12 @@ final class OperandStackStateGenerators {
     /**
      * Generates instructions to save a certain number of items from the top of the operand stack.
      * <p>
-     * The instructions generated here expect the operand stack to be fully loaded at this point.
+     * The instructions generated here expect the operand stack to be fully loaded. The stack items specified by {@code frame} must actually
+     * all be on the operand stack.
+     * <p>
+     * REMEMBER: The items aren't returned to the operand stack after they've been saved (they have been popped off the stack). If you want
+     * them back on the operand stack, reload using
+     * {@code loadOperandStack(markerType, storageVars, frame, frame.getStackSize() - count, frame.getStackSize() - count, count)}.
      * @param markerType debug marker type
      * @param storageVars variables to store operand stack in to
      * @param frame execution frame at the instruction where the operand stack is to be saved
@@ -421,15 +430,16 @@ final class OperandStackStateGenerators {
             }
         }
 
-        // At this point, the storage array will contain the saved operand stack.
-        
-        // Restore the stack
-        ret.add(debugMarker(markerType, "Reloading stack items"));
-        InsnList reloadInsnList = loadOperandStack(markerType, storageVars, frame,
-                frame.getStackSize() - count,
-                frame.getStackSize() - count,
-                count);
-        ret.add(reloadInsnList);
+        // At this point, the storage array will contain the saved operand stack AND THE STACK WILL HAVE count ITEMS POPPED OFF OF IT.
+        // 
+        // Reload using...
+        // ---------------
+        // ret.add(debugMarker(markerType, "Reloading stack items"));
+        // InsnList reloadInsnList = loadOperandStack(markerType, storageVars, frame,
+        //         frame.getStackSize() - count,
+        //         frame.getStackSize() - count,
+        //         count);
+        // ret.add(reloadInsnList);
 
         return ret;
     }

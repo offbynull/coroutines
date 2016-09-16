@@ -548,7 +548,8 @@ final class ContinuationGenerators {
         return merge(
                 debugMarker(markerType, dbgSig + "Saving SUSPEND " + idx),
                 debugMarker(markerType, dbgSig + "Saving operand stack"),
-                saveOperandStack(markerType, savedStackVars, frame), //DONT FORGET cont object will be at top, needs to be discarded on load
+                saveOperandStack(markerType, savedStackVars, frame), // REMEMBER: STACK IS TOTALLY EMPTY AFTER THIS. ALSO, DON'T FORGET THAT
+                                                                     // Continuation OBJECT WILL BE TOP ITEM, NEEDS TO BE DISCARDED ON LOAD
                 debugMarker(markerType, dbgSig + "Saving locals"),
                 saveLocals(markerType, savedLocalsVars, frame),
                 debugMarker(markerType, dbgSig + "Packing locals and operand stack in to container"),
@@ -629,6 +630,11 @@ final class ContinuationGenerators {
                 debugMarker(markerType, dbgSig + "Saving INVOKE " + idx),
                 debugMarker(markerType, dbgSig + "Saving top " + invokeArgCount + " items of operand stack (args for invoke)"),
                 saveOperandStack(markerType, savedStackVars, frame, invokeArgCount),
+                debugMarker(markerType, dbgSig + "Reloading invoke arguments back on to the stack (for invoke)"),
+                loadOperandStack(markerType, savedStackVars, frame,
+                        frame.getStackSize() - invokeArgCount,
+                        frame.getStackSize() - invokeArgCount,
+                        invokeArgCount),
                 debugMarker(markerType, dbgSig + "Invoking"),
                 cloneInvokeNode(invokeNode), // invoke method  (ADDED MULTIPLE TIMES -- MUST BE CLONED)
                 ifIntegersEqual(// if we're saving after invoke
@@ -638,13 +644,13 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Mode set to save on return"),
                                 debugMarker(markerType, dbgSig + "Popping dummy return value off stack"),
                                 popMethodResult(invokeNode),
-                                debugMarker(markerType, dbgSig + "Reloading invoke arguments back on to the stack"),
+                                debugMarker(markerType, dbgSig + "Reloading invoke arguments back on to the stack (for full save)"),
                                 loadOperandStack(markerType, savedStackVars, frame,
                                         frame.getStackSize() - invokeArgCount,
                                         frame.getStackSize() - invokeArgCount,
                                         invokeArgCount),
                                 debugMarker(markerType, dbgSig + "Saving operand stack"),
-                                saveOperandStack(markerType, savedStackVars, frame),
+                                saveOperandStack(markerType, savedStackVars, frame), // REMEMBER: STACK IS TOTALLY EMPTY AFTER THIS
                                 debugMarker(markerType, dbgSig + "Saving locals"),
                                 saveLocals(markerType, savedLocalsVars, frame),
                                 debugMarker(markerType, dbgSig + "Packing locals and operand stack in to container"),
@@ -710,6 +716,11 @@ final class ContinuationGenerators {
                 debugMarker(markerType, dbgSig + "Saving INVOKE WITHIN TRYCATCH " + idx),
                 debugMarker(markerType, dbgSig + "Saving top " + invokeArgCount + " items of operand stack (args for invoke)"),
                 saveOperandStack(markerType, savedStackVars, frame, invokeArgCount),
+                debugMarker(markerType, dbgSig + "Reloading invoke arguments back on to the stack (for invoke)"),
+                loadOperandStack(markerType, savedStackVars, frame,
+                        frame.getStackSize() - invokeArgCount,
+                        frame.getStackSize() - invokeArgCount,
+                        invokeArgCount),
                 debugMarker(markerType, dbgSig + "Invoking"),
                 cloneInvokeNode(invokeNode), // invoke method  (ADDED MULTIPLE TIMES -- MUST BE CLONED)
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
@@ -724,7 +735,7 @@ final class ContinuationGenerators {
                                         frame.getStackSize() - invokeArgCount,
                                         invokeArgCount),
                                 debugMarker(markerType, dbgSig + "Saving operand stack"),
-                                saveOperandStack(markerType, savedStackVars, frame),
+                                saveOperandStack(markerType, savedStackVars, frame), // REMEMBER: STACK IS TOTALLY EMPTY AFTER THIS
                                 debugMarker(markerType, dbgSig + "Saving locals"),
                                 saveLocals(markerType, savedLocalsVars, frame),
                                 debugMarker(markerType, dbgSig + "Packing locals and operand stack in to container"),
