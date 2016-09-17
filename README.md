@@ -351,6 +351,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - CHANGED: Performance improvement: No longer autoboxing when storing/loading operand stack and local variable table.
 - CHANGED: Performance improvement: No longer autoboxing when caching return value of continuation points.
 - CHANGED: Performance improvement: Operand stack reloads after a save only if it's needed.
+- CHANGED: Performance improvement: Casting of operand stack items only if it's needed.
 - CHANGED: Refactored instrumentation logic.
 - CHANGED: Upgraded dependencies and plugins.
 - CHANGED: Class instrumentation marker changed from an interface to a public constant (constant value defines compatibility).

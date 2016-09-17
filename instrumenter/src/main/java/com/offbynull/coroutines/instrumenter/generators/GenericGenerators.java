@@ -406,7 +406,8 @@ public final class GenericGenerators {
             case Type.OBJECT:
             case Type.ARRAY:
                 ret.add(new VarInsnNode(Opcodes.ALOAD, variable.getIndex()));
-                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, variable.getType().getInternalName()));
+                // If required, do it outside this method
+//                ret.add(new TypeInsnNode(Opcodes.CHECKCAST, variable.getType().getInternalName()));
                 break;
             default:
                 throw new IllegalStateException(); // should never happen, there is code in Variable/VariableTable to make sure invalid
@@ -777,7 +778,7 @@ public final class GenericGenerators {
     public static InsnList throwThrowable() {
         InsnList ret = new InsnList();
         
-//        ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Throwable"));
+//        ret.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Throwable")); // If required, do it outside this method
         ret.add(new InsnNode(Opcodes.ATHROW));
         
         return ret;
