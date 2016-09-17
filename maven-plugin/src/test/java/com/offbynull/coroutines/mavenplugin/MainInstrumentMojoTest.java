@@ -37,7 +37,8 @@ public final class MainInstrumentMojoTest {
         Log log = Mockito.mock(Log.class);
         
         FieldUtils.writeField(fixture, "project", mavenProject, true);
-        FieldUtils.writeField(fixture, "debugMarkerType", MarkerType.NONE, true);
+        FieldUtils.writeField(fixture, "markerType", MarkerType.NONE, true);
+        FieldUtils.writeField(fixture, "debugMode", false, true);
         FieldUtils.writeField(fixture, "log", log, true);
         FieldUtils.writeField(fixture, "jdkLibsDirectory", System.getProperty("java.home") + "/lib", true);
     }

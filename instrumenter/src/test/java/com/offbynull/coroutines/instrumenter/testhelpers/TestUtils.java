@@ -16,6 +16,7 @@
  */
 package com.offbynull.coroutines.instrumenter.testhelpers;
 
+import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepository;
@@ -85,11 +86,12 @@ public final class TestUtils {
         
         // Instrument classes and write out new jar
         Instrumenter instrumenter = new Instrumenter(classpath);
+        InstrumentationSettings settings = new InstrumentationSettings(MarkerType.CONSTANT, false);
         List<JarEntry> instrumentedJarEntries = new ArrayList<>(classContents.size());
         for (Entry<String, byte[]> entry : classContents.entrySet()) {
             byte[] content = entry.getValue();
             if (entry.getKey().endsWith(".class")) {
-                content = instrumenter.instrument(content, MarkerType.CONSTANT);
+                content = instrumenter.instrument(content, settings);
             }
             instrumentedJarEntries.add(new JarEntry(entry.getKey(), content));
         }

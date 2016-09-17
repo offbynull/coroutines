@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,6 +16,7 @@
  */
 package com.offbynull.coroutines.mavenplugin;
 
+import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.File;
@@ -40,24 +41,29 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
     @Parameter(defaultValue = "${java.home}/lib", required = true)
     private String jdkLibsDirectory;
     
-    @Parameter(property = "coroutines.debugMarkerType", defaultValue = "NONE")
-    private MarkerType debugMarkerType;
+    @Parameter(property = "coroutines.markerType", defaultValue = "NONE")
+    private MarkerType markerType;
+    
+    @Parameter(property = "coroutines.debugMode", defaultValue = "false")
+    private boolean debugMode;
 
     /**
      * Instruments all classes in a path recursively.
      * @param log maven logger
-     * @param debugMarkerType debug marker type
-     * @param instrumenter coroutine instrumenter
+     * @param classpath classpath for classes being instrumented
      * @param path directory containing files to instrument
      * @throws MojoExecutionException if any exception occurs
      */
-    protected final void instrumentPath(Log log, MarkerType debugMarkerType, Instrumenter instrumenter, File path)
+    protected final void instrumentPath(Log log, List<String> classpath, File path)
             throws MojoExecutionException {
         try {
+            Instrumenter instrumenter = getInstrumenter(log, classpath);
+            InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode);
+
             for (File classFile : FileUtils.listFiles(path, new String[]{"class"}, true)) {
                 log.info("Instrumenting " + classFile);
                 byte[] input = FileUtils.readFileToByteArray(classFile);
-                byte[] output = instrumenter.instrument(input, debugMarkerType);
+                byte[] output = instrumenter.instrument(input, settings);
                 log.debug("File size changed from " + input.length + " to " + output.length);
                 FileUtils.writeByteArrayToFile(classFile, output);
             }
@@ -73,7 +79,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
      * @return a new {@link Instrumenter}
      * @throws MojoExecutionException if any exception occurs
      */
-    protected final Instrumenter getInstrumenter(Log log, List<String> classpath) throws MojoExecutionException {
+    private Instrumenter getInstrumenter(Log log, List<String> classpath) throws MojoExecutionException {
         List<File> classpathFiles;
         try {
             log.debug("Getting compile classpath");
@@ -105,11 +111,19 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
     }
 
     /**
-     * Get the debug marker type.
-     * @return debug marker type
+     * Get the marker type.
+     * @return marker type
      */
-    protected final MarkerType getDebugMarkerType() {
-        return debugMarkerType;
+    protected final MarkerType getMarkerType() {
+        return markerType;
+    }
+
+    /**
+     * Get debug mode.
+     * @return debug mode
+     */
+    protected final boolean isDebugMode() {
+        return debugMode;
     }
 
 }

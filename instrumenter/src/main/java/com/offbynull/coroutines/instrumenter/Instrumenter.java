@@ -23,7 +23,6 @@ import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithParameter;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
 import com.offbynull.coroutines.instrumenter.asm.SimpleVerifier;
-import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import com.offbynull.coroutines.user.Continuation;
 import java.io.File;
 import java.io.IOException;
@@ -101,14 +100,14 @@ public final class Instrumenter {
     /**
      * Instruments a class.
      * @param input class file contents
-     * @param debugMarkerType type of debugging marker to inject in to the instrumented code
+     * @param settings instrumentation settings
      * @return instrumented class
      * @throws IllegalArgumentException if the class could not be instrumented for some reason
      * @throws NullPointerException if any argument is {@code null}
      */
-    public byte[] instrument(byte[] input, MarkerType debugMarkerType) {
+    public byte[] instrument(byte[] input, InstrumentationSettings settings) {
         Validate.notNull(input);
-        Validate.notNull(debugMarkerType);
+        Validate.notNull(settings);
         Validate.isTrue(input.length > 0);
         
         // Read class as tree model -- because we're using SimpleClassNode, JSR blocks get inlined
@@ -156,11 +155,11 @@ public final class Instrumenter {
         MethodAnalyzer analyzer = new MethodAnalyzer(classRepo);
         MethodInstrumenter instrumenter = new MethodInstrumenter();
         for (MethodNode methodNode : methodNodesToInstrument) {
-            MethodProperties methodProps = analyzer.analyze(classNode, methodNode, debugMarkerType);
+            MethodAttributes methodAttrs = analyzer.analyze(classNode, methodNode, settings);
             
             // If methodProps is null, it means that the analyzer determined that the method doesn't need to be instrumented.
-            if (methodProps != null) {
-                instrumenter.instrument(methodNode, methodProps);
+            if (methodAttrs != null) {
+                instrumenter.instrument(methodNode, methodAttrs);
             }
         }
 

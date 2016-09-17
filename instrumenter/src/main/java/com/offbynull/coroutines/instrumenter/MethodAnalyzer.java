@@ -26,7 +26,6 @@ import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.searchForOpc
 import com.offbynull.coroutines.instrumenter.asm.SimpleVerifier;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
-import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import com.offbynull.coroutines.user.Continuation;
 import com.offbynull.coroutines.user.LockState;
 import com.offbynull.coroutines.user.MethodState;
@@ -63,14 +62,14 @@ final class MethodAnalyzer {
         this.classInfoRepo = classInfoRepo;
     }
 
-    public MethodProperties analyze(ClassNode classNode, MethodNode methodNode, MarkerType debugMarkerType) {
+    public MethodAttributes analyze(ClassNode classNode, MethodNode methodNode, InstrumentationSettings settings) {
         ///////////////////////////////////////////////////////////////////////////////////////////
         // VALIDATE INPUTS
         ///////////////////////////////////////////////////////////////////////////////////////////
         
         Validate.notNull(classNode);
         Validate.notNull(methodNode);
-        Validate.notNull(debugMarkerType);
+        Validate.notNull(settings);
         
         // Sanity check to make sure class
         Validate.isTrue(classNode.methods.contains(methodNode), "Method does not belong to class");
@@ -324,9 +323,9 @@ final class MethodAnalyzer {
         // RETURN RESULTS OF ANALYSIS
         ///////////////////////////////////////////////////////////////////////////////////////////
 
-        return new MethodProperties(
+        return new MethodAttributes(
                 methodNode,
-                debugMarkerType,
+                settings,
                 continuationPoints,
                 synchPoints,
                 coreVars,

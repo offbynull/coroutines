@@ -16,7 +16,6 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
-import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.collections4.list.UnmodifiableList;
@@ -24,10 +23,10 @@ import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.MethodNode;
 
-final class MethodProperties {
+final class MethodAttributes {
     private final String methodName;
     private final Type methodSignature;
-    private final MarkerType debugMarkerType;
+    private final InstrumentationSettings settings;
 
     private final UnmodifiableList<ContinuationPoint> continuationPoints;
     private final UnmodifiableList<SynchronizationPoint> synchPoints;
@@ -39,9 +38,9 @@ final class MethodProperties {
     private final StorageVariables stackStorageVars;
     private final LockVariables lockVars;
 
-    MethodProperties(
+    MethodAttributes(
             MethodNode methodNode,
-            MarkerType debugMarkerType,
+            InstrumentationSettings settings,
             List<ContinuationPoint> continuationPoints,
             List<SynchronizationPoint> synchPoints,
             CoreVariables coreVars,
@@ -51,7 +50,7 @@ final class MethodProperties {
             StorageVariables stackStorageVars,
             LockVariables lockVars) {
         Validate.notNull(methodNode);
-        Validate.notNull(debugMarkerType);
+        Validate.notNull(settings);
         Validate.notNull(continuationPoints);
         Validate.notNull(synchPoints);
         Validate.notNull(coreVars);
@@ -66,7 +65,7 @@ final class MethodProperties {
         methodName = methodNode.name;
         methodSignature = Type.getMethodType(methodNode.desc);
 
-        this.debugMarkerType = debugMarkerType;
+        this.settings = settings;
         this.continuationPoints =
                 (UnmodifiableList<ContinuationPoint>) UnmodifiableList.unmodifiableList(new ArrayList<>(continuationPoints));
         this.synchPoints =
@@ -91,9 +90,10 @@ final class MethodProperties {
         return methodSignature.getReturnType();
     }
 
-    public MarkerType getDebugMarkerType() {
-        return debugMarkerType;
+    public InstrumentationSettings getSettings() {
+        return settings;
     }
+
 
     public UnmodifiableList<ContinuationPoint> getContinuationPoints() {
         return continuationPoints;

@@ -67,9 +67,9 @@ import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.d
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.createMonitorContainer;
 import static com.offbynull.coroutines.instrumenter.PackStateGenerators.packStorageArrays;
 import static com.offbynull.coroutines.instrumenter.PackStateGenerators.unpackStorageArrays;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.lineNumber;
 import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.saveOperandStack;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.lineNumber;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
 
 final class ContinuationGenerators {
@@ -96,19 +96,19 @@ final class ContinuationGenerators {
         // do nothing
     }
     
-    public static InsnList entryPointLoader(MethodProperties props) {
-        Validate.notNull(props);
+    public static InsnList entryPointLoader(MethodAttributes attrs) {
+        Validate.notNull(attrs);
 
-        Variable contArg = props.getCoreVariables().getContinuationArgVar();
-        Variable methodStateVar = props.getCoreVariables().getMethodStateVar();
-        Variable storageContainerVar = props.getStorageContainerVariables().getContainerVar();
+        Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
+        Variable methodStateVar = attrs.getCoreVariables().getMethodStateVar();
+        Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
         
-        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
 
-        int numOfContinuationPoints = props.getContinuationPoints().size();
+        int numOfContinuationPoints = attrs.getContinuationPoints().size();
 
-        MarkerType markerType = props.getDebugMarkerType();
-        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
+        MarkerType markerType = attrs.getSettings().getMarkerType();
+        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
         
         LabelNode startOfMethodLabelNode = new LabelNode();
         return merge(
@@ -127,7 +127,7 @@ final class ContinuationGenerators {
                                 // create lockstate if method actually has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[] {
                                         debugMarker(markerType, "Creating monitors container"),
-                                        createMonitorContainer(props),
+                                        createMonitorContainer(attrs),
                                 }),
                                 debugMarker(markerType, dbgSig + "Jump to start of method point"),
                                 jumpTo(startOfMethodLabelNode)
@@ -161,7 +161,7 @@ final class ContinuationGenerators {
                                         ),
                                         0,
                                         IntStream.range(0, numOfContinuationPoints)
-                                                .mapToObj(idx -> restoreState(props, idx))
+                                                .mapToObj(idx -> restoreState(attrs, idx))
                                                 .toArray((x) -> new InsnList[x])
                                 )
                                 // jump to not required here, switch above either throws exception or jumps to restore point
@@ -175,51 +175,45 @@ final class ContinuationGenerators {
 
 
 
-    public static InsnList restoreState(MethodProperties props, int idx) {
-        Validate.notNull(props);
+    public static InsnList restoreState(MethodAttributes attrs, int idx) {
+        Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
-        ContinuationPoint continuationPoint = validateAndGetContinuationPoint(props, idx, ContinuationPoint.class);
-        
-        Integer lineNumber = continuationPoint.getLineNumber();
+        ContinuationPoint continuationPoint = validateAndGetContinuationPoint(attrs, idx, ContinuationPoint.class);
                 
         InsnList restoreInsnList;
         if (continuationPoint instanceof SuspendContinuationPoint) {
-            restoreInsnList = restoreStateFromSuspend(props, idx);
+            restoreInsnList = restoreStateFromSuspend(attrs, idx);
         } else if (continuationPoint instanceof NormalInvokeContinuationPoint) {
-            restoreInsnList = restoreStateFromNormalInvocation(props, idx);
+            restoreInsnList = restoreStateFromNormalInvocation(attrs, idx);
         } else if (continuationPoint instanceof TryCatchInvokeContinuationPoint) {
-            restoreInsnList = restoreStateFromInvocationWithinTryCatch(props, idx);
+            restoreInsnList = restoreStateFromInvocationWithinTryCatch(attrs, idx);
         } else {
             throw new IllegalArgumentException(); // should never happen
         }
         
-        // Add line number to beginning of instructions (if a line number was detected by the analyzer)
-        return merge(
-                mergeIf(lineNumber != null, () -> new Object[]{
-                    lineNumber(lineNumber)
-                }),
-                restoreInsnList
-        );
+        return restoreInsnList;
     }
     
-    private static InsnList restoreStateFromSuspend(MethodProperties props, int idx) {
-        Validate.notNull(props);
+    private static InsnList restoreStateFromSuspend(MethodAttributes attrs, int idx) {
+        Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
-        SuspendContinuationPoint cp = validateAndGetContinuationPoint(props, idx, SuspendContinuationPoint.class);
+        SuspendContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, SuspendContinuationPoint.class);
+        
+        Integer lineNumber = cp.getLineNumber();
 
-        Variable contArg = props.getCoreVariables().getContinuationArgVar();
-        StorageVariables savedLocalsVars = props.getLocalsStorageVariables();
-        StorageVariables savedStackVars = props.getStackStorageVariables();
+        Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
+        StorageVariables savedLocalsVars = attrs.getLocalsStorageVariables();
+        StorageVariables savedStackVars = attrs.getStackStorageVariables();
         
-        Variable storageContainerVar = props.getStorageContainerVariables().getContainerVar();
+        Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
         
-        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
         
         Frame<BasicValue> frame = cp.getFrame();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
-        MarkerType markerType = props.getDebugMarkerType();
-        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
+        MarkerType markerType = attrs.getSettings().getMarkerType();
+        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
         
         //          enterLocks(lockState);
         //          restoreOperandStack(stack);
@@ -234,10 +228,15 @@ final class ContinuationGenerators {
                 loadOperandStack(markerType, savedStackVars, frame),
                 debugMarker(markerType, dbgSig + "Restoring locals"),
                 loadLocals(markerType, savedLocalsVars, frame),
+                mergeIf(lineNumber != null, () -> new Object[] {
+                    // We add the line number AFTER locals have been restored, so if you put in a break point at the specified line number
+                    // the local vars will all show up.
+                    lineNumber(lineNumber)
+                }),
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                         debugMarker(markerType, dbgSig + "Entering monitors"),
-                        enterStoredMonitors(props),
+                        enterStoredMonitors(attrs),
                 }),
                 debugMarker(markerType, dbgSig + "Popping off continuation object from operand stack"),
                 pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
@@ -253,21 +252,23 @@ final class ContinuationGenerators {
         );
     }
     
-    private static InsnList restoreStateFromNormalInvocation(MethodProperties props, int idx) {
-        Validate.notNull(props);
+    private static InsnList restoreStateFromNormalInvocation(MethodAttributes attrs, int idx) {
+        Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
-        NormalInvokeContinuationPoint cp = validateAndGetContinuationPoint(props, idx, NormalInvokeContinuationPoint.class);
+        NormalInvokeContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, NormalInvokeContinuationPoint.class);
         
-        Variable contArg = props.getCoreVariables().getContinuationArgVar();
-        Variable methodStateVar = props.getCoreVariables().getMethodStateVar();
-        StorageVariables savedLocalsVars = props.getLocalsStorageVariables();
-        StorageVariables savedStackVars = props.getStackStorageVariables();
+        Integer lineNumber = cp.getLineNumber();
         
-        Variable storageContainerVar = props.getStorageContainerVariables().getContainerVar();
+        Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
+        Variable methodStateVar = attrs.getCoreVariables().getMethodStateVar();
+        StorageVariables savedLocalsVars = attrs.getLocalsStorageVariables();
+        StorageVariables savedStackVars = attrs.getStackStorageVariables();
         
-        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
         
-        Type returnType = props.getMethodReturnType();
+        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
+        
+        Type returnType = attrs.getMethodReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
@@ -276,10 +277,11 @@ final class ContinuationGenerators {
         Type invokeReturnType = getReturnTypeOfInvocation(invokeNode);        
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         
-        Variable returnCacheVar = getReturnCacheVar(props, invokeReturnType); // will be null if void
+        Variable returnCacheVar = getReturnCacheVar(attrs, invokeReturnType); // will be null if void
         
-        MarkerType markerType = props.getDebugMarkerType();
-        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
+        MarkerType markerType = attrs.getSettings().getMarkerType();
+        boolean debugMode = attrs.getSettings().isDebugMode();
+        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
         
         //          enterLocks(lockState);
         //              // Load up enough of the stack to invoke the method. The invocation here needs to be wrapped in a try catch because
@@ -308,10 +310,22 @@ final class ContinuationGenerators {
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Entering monitors"),
-                    enterStoredMonitors(props), // we MUST re-enter montiors before going further
+                    enterStoredMonitors(attrs), // we MUST re-enter montiors before going further
                 }),
                 debugMarker(markerType, dbgSig + "Restoring top " + invokeArgCount + " items of operand stack (just enough to invoke)"),
                 loadOperandStack(markerType, savedStackVars, frame, 0, frame.getStackSize() - invokeArgCount, invokeArgCount),
+                mergeIf(debugMode, () -> new Object[]{
+                    // If in debug mode, load up the locals. This is useful if you're stepping through your coroutine in a debugger... you
+                    // can look at method frames above the current one and introspect the variables (what the user expects if they're
+                    // running in a debugger).
+                    debugMarker(markerType, dbgSig + "Restoring locals (for the purpose of introspecting locals if being run in debugger)"),
+                    loadLocals(markerType, savedLocalsVars, frame),
+                }),
+                mergeIf(lineNumber != null, () -> new Object[]{
+                    // We add the line number AFTER locals have been restored, so if you put in a break point at the specified line number
+                    // the local vars will all show up (REMEMBER: they'll show up only if debugMode is set).
+                    lineNumber(lineNumber)
+                }),
                 debugMarker(markerType, dbgSig + "Invoking"),
                 cloneInvokeNode(invokeNode), // invoke method  (ADDED MULTIPLE TIMES -- MUST BE CLONED)
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
@@ -324,7 +338,7 @@ final class ContinuationGenerators {
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(props),
+                                    exitStoredMonitors(attrs),
                                 }),
                                 debugMarker(markerType, dbgSig + "Re-pushing method state"),
                                 call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg), loadVar(methodStateVar)),
@@ -350,23 +364,25 @@ final class ContinuationGenerators {
         );
     }
     
-    private static InsnList restoreStateFromInvocationWithinTryCatch(MethodProperties props, int idx) {
-        Validate.notNull(props);
+    private static InsnList restoreStateFromInvocationWithinTryCatch(MethodAttributes attrs, int idx) {
+        Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
-        TryCatchInvokeContinuationPoint cp = validateAndGetContinuationPoint(props, idx, TryCatchInvokeContinuationPoint.class);
+        TryCatchInvokeContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, TryCatchInvokeContinuationPoint.class);
         
-        Variable contArg = props.getCoreVariables().getContinuationArgVar();
-        Variable methodStateVar = props.getCoreVariables().getMethodStateVar();
-        StorageVariables savedLocalsVars = props.getLocalsStorageVariables();
-        StorageVariables savedStackVars = props.getStackStorageVariables();
+        Integer lineNumber = cp.getLineNumber();
         
-        Variable storageContainerVar = props.getStorageContainerVariables().getContainerVar();
+        Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
+        Variable methodStateVar = attrs.getCoreVariables().getMethodStateVar();
+        StorageVariables savedLocalsVars = attrs.getLocalsStorageVariables();
+        StorageVariables savedStackVars = attrs.getStackStorageVariables();
+        
+        Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
 
-        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
         
-        Variable throwableVar = props.getCacheVariables().getThrowableCacheVar();
+        Variable throwableVar = attrs.getCacheVariables().getThrowableCacheVar();
         
-        Type returnType = props.getMethodReturnType();
+        Type returnType = attrs.getMethodReturnType();
         
         // tryCatchBlock() invocation further on in this method will populate TryCatchBlockNode fields
         TryCatchBlockNode newTryCatchBlockNode = cp.getTryCatchBlock();
@@ -379,10 +395,11 @@ final class ContinuationGenerators {
         Type invokeReturnType = getReturnTypeOfInvocation(invokeNode);        
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         
-        Variable returnCacheVar = getReturnCacheVar(props, invokeReturnType); // will be null if void
+        Variable returnCacheVar = getReturnCacheVar(attrs, invokeReturnType); // will be null if void
         
-        MarkerType markerType = props.getDebugMarkerType();
-        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
+        MarkerType markerType = attrs.getSettings().getMarkerType();
+        boolean debugMode = attrs.getSettings().isDebugMode();
+        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
         
         //          enterLocks(lockState);
         //          continuation.addPending(methodState); // method state should be loaded from Continuation.saved
@@ -419,10 +436,22 @@ final class ContinuationGenerators {
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Entering monitors"),
-                    enterStoredMonitors(props), // we MUST re-enter montiors before going further
+                    enterStoredMonitors(attrs), // we MUST re-enter montiors before going further
                 }),
                 debugMarker(markerType, dbgSig + "Restoring top " + invokeArgCount + " items of operand stack (just enough to invoke)"),
                 loadOperandStack(markerType, savedStackVars, frame, 0, frame.getStackSize() - invokeArgCount, invokeArgCount),
+                mergeIf(debugMode, () -> new Object[]{
+                    // If in debug mode, load up the locals. This is useful if you're stepping through your coroutine in a debugger... you
+                    // can look at method frames above the current one and introspect the variables (what the user expects if they're
+                    // running in a debugger).
+                    debugMarker(markerType, dbgSig + "Restoring locals (for the purpose of introspecting locals if being run in debugger)"),
+                    loadLocals(markerType, savedLocalsVars, frame),
+                }),
+                mergeIf(lineNumber != null, () -> new Object[]{
+                    // We add the line number AFTER locals have been restored, so if you put in a break point at the specified line number
+                    // the local vars will all show up (REMEMBER: they'll show up only if debugMode is set).
+                    lineNumber(lineNumber)
+                }),
                 tryCatchBlock(newTryCatchBlockNode,
                         null,
                         merge(// try
@@ -451,7 +480,7 @@ final class ContinuationGenerators {
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(props),
+                                    exitStoredMonitors(attrs),
                                 }),
                                 debugMarker(markerType, dbgSig + "Re-pushing method state"),
                                 call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg), loadVar(methodStateVar)),
@@ -482,8 +511,8 @@ final class ContinuationGenerators {
     
     
     
-    private static Variable getReturnCacheVar(MethodProperties props, Type type) {
-        Validate.notNull(props);
+    private static Variable getReturnCacheVar(MethodAttributes attrs, Type type) {
+        Validate.notNull(attrs);
         Validate.notNull(type);
 
         switch (type.getSort()) {
@@ -492,16 +521,16 @@ final class ContinuationGenerators {
             case Type.CHAR:
             case Type.SHORT:
             case Type.INT:
-                return props.getCacheVariables().getIntReturnCacheVar();
+                return attrs.getCacheVariables().getIntReturnCacheVar();
             case Type.LONG:
-                return props.getCacheVariables().getLongReturnCacheVar();
+                return attrs.getCacheVariables().getLongReturnCacheVar();
             case Type.FLOAT:
-                return props.getCacheVariables().getFloatReturnCacheVar();
+                return attrs.getCacheVariables().getFloatReturnCacheVar();
             case Type.DOUBLE:
-                return props.getCacheVariables().getDoubleReturnCacheVar();
+                return attrs.getCacheVariables().getDoubleReturnCacheVar();
             case Type.ARRAY:
             case Type.OBJECT:
-                return props.getCacheVariables().getObjectReturnCacheVar();
+                return attrs.getCacheVariables().getObjectReturnCacheVar();
             case Type.VOID:
                 return null;
             default:
@@ -512,52 +541,48 @@ final class ContinuationGenerators {
     
     
     
-    public static InsnList saveState(MethodProperties props, int idx) {
-        Validate.notNull(props);
+    public static InsnList saveState(MethodAttributes attrs, int idx) {
+        Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
-        ContinuationPoint continuationPoint = validateAndGetContinuationPoint(props, idx, ContinuationPoint.class);
+        ContinuationPoint continuationPoint = validateAndGetContinuationPoint(attrs, idx, ContinuationPoint.class);
         
-        Integer lineNumber = continuationPoint.getLineNumber();
+        
                 
         InsnList saveInsnList;
         if (continuationPoint instanceof SuspendContinuationPoint) {
-            saveInsnList = saveStateFromSuspend(props, idx);
+            saveInsnList = saveStateFromSuspend(attrs, idx);
         } else if (continuationPoint instanceof NormalInvokeContinuationPoint) {
-            saveInsnList = saveStateFromNormalInvocation(props, idx);
+            saveInsnList = saveStateFromNormalInvocation(attrs, idx);
         } else if (continuationPoint instanceof TryCatchInvokeContinuationPoint) {
-            saveInsnList = saveStateFromInvocationWithinTryCatch(props, idx);
+            saveInsnList = saveStateFromInvocationWithinTryCatch(attrs, idx);
         } else {
             throw new IllegalArgumentException(); // should never happen
         }
         
-        // Add line number to beginning of instructions (if a line number was detected by the analyzer)
-        return merge(
-                mergeIf(lineNumber != null, () -> new Object[]{
-                    lineNumber(lineNumber)
-                }),
-                saveInsnList
-        );
+        return saveInsnList;
     }
     
-    private static InsnList saveStateFromSuspend(MethodProperties props, int idx) {
-        Validate.notNull(props);
+    private static InsnList saveStateFromSuspend(MethodAttributes attrs, int idx) {
+        Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
-        SuspendContinuationPoint cp = validateAndGetContinuationPoint(props, idx, SuspendContinuationPoint.class);
+        SuspendContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, SuspendContinuationPoint.class);
+        
+        Integer lineNumber = cp.getLineNumber();
 
-        Variable contArg = props.getCoreVariables().getContinuationArgVar();
-        StorageVariables savedLocalsVars = props.getLocalsStorageVariables();
-        StorageVariables savedStackVars = props.getStackStorageVariables();
-        Variable storageContainerVar = props.getStorageContainerVariables().getContainerVar();
+        Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
+        StorageVariables savedLocalsVars = attrs.getLocalsStorageVariables();
+        StorageVariables savedStackVars = attrs.getStackStorageVariables();
+        Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
         
-        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
         
-        Type returnType = props.getMethodReturnType();
+        Type returnType = attrs.getMethodReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
-        MarkerType markerType = props.getDebugMarkerType();
-        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
+        MarkerType markerType = attrs.getSettings().getMarkerType();
+        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
         
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocals();
@@ -569,6 +594,9 @@ final class ContinuationGenerators {
         //
         //          restorePoint_<number>_continue: // at this label: empty exec stack / uninit exec var table
         return merge(
+                mergeIf(lineNumber != null, () -> new Object[]{
+                    lineNumber(lineNumber)
+                }),
                 debugMarker(markerType, dbgSig + "Saving SUSPEND " + idx),
                 debugMarker(markerType, dbgSig + "Saving operand stack"),
                 saveOperandStack(markerType, savedStackVars, frame), // REMEMBER: STACK IS TOTALLY EMPTY AFTER THIS. ALSO, DON'T FORGET THAT
@@ -596,7 +624,7 @@ final class ContinuationGenerators {
                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                    exitStoredMonitors(props),
+                    exitStoredMonitors(attrs),
                 }),
                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                 returnDummy(returnType), // return dummy value
@@ -608,26 +636,28 @@ final class ContinuationGenerators {
         );
     }
     
-    private static InsnList saveStateFromNormalInvocation(MethodProperties props, int idx) {
-        Validate.notNull(props);
+    private static InsnList saveStateFromNormalInvocation(MethodAttributes attrs, int idx) {
+        Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
-        NormalInvokeContinuationPoint cp = validateAndGetContinuationPoint(props, idx, NormalInvokeContinuationPoint.class);
-
-        Variable contArg = props.getCoreVariables().getContinuationArgVar();
-        StorageVariables savedLocalsVars = props.getLocalsStorageVariables();
-        StorageVariables savedStackVars = props.getStackStorageVariables();
-        Variable storageContainerVar = props.getStorageContainerVariables().getContainerVar();
+        NormalInvokeContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, NormalInvokeContinuationPoint.class);
         
-        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Integer lineNumber = cp.getLineNumber();
 
-        Type returnType = props.getMethodReturnType();
+        Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
+        StorageVariables savedLocalsVars = attrs.getLocalsStorageVariables();
+        StorageVariables savedStackVars = attrs.getStackStorageVariables();
+        Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
+        
+        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
+
+        Type returnType = attrs.getMethodReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
-        MarkerType markerType = props.getDebugMarkerType();
-        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
+        MarkerType markerType = attrs.getSettings().getMarkerType();
+        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
         
         //          Object[] duplicatedArgs = saveOperandStack(<method param count>); -- Why do we do this? because when we want to save the
         //                                                                            -- args to this method when we call
@@ -650,6 +680,9 @@ final class ContinuationGenerators {
         
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         return merge(
+                mergeIf(lineNumber != null, () -> new Object[]{
+                    lineNumber(lineNumber)
+                }),
                 debugMarker(markerType, dbgSig + "Saving INVOKE " + idx),
                 debugMarker(markerType, dbgSig + "Saving top " + invokeArgCount + " items of operand stack (args for invoke)"),
                 saveOperandStack(markerType, savedStackVars, frame, invokeArgCount),
@@ -681,7 +714,7 @@ final class ContinuationGenerators {
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(props),
+                                    exitStoredMonitors(attrs),
                                 }),
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                                 call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg),
@@ -710,32 +743,37 @@ final class ContinuationGenerators {
         );
     }
     
-    private static InsnList saveStateFromInvocationWithinTryCatch(MethodProperties props, int idx) {
-        Validate.notNull(props);
+    private static InsnList saveStateFromInvocationWithinTryCatch(MethodAttributes attrs, int idx) {
+        Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
-        TryCatchInvokeContinuationPoint cp = validateAndGetContinuationPoint(props, idx, TryCatchInvokeContinuationPoint.class);
-
-        Variable contArg = props.getCoreVariables().getContinuationArgVar();
-        StorageVariables savedLocalsVars = props.getLocalsStorageVariables();
-        StorageVariables savedStackVars = props.getStackStorageVariables();
-        Variable storageContainerVar = props.getStorageContainerVariables().getContainerVar();
+        TryCatchInvokeContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, TryCatchInvokeContinuationPoint.class);
         
-        Variable lockStateVar = props.getLockVariables().getLockStateVar();
+        Integer lineNumber = cp.getLineNumber();
 
-        Variable throwableVar = props.getCacheVariables().getThrowableCacheVar();
+        Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
+        StorageVariables savedLocalsVars = attrs.getLocalsStorageVariables();
+        StorageVariables savedStackVars = attrs.getStackStorageVariables();
+        Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
+        
+        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
 
-        Type returnType = props.getMethodReturnType();
+        Variable throwableVar = attrs.getCacheVariables().getThrowableCacheVar();
+
+        Type returnType = attrs.getMethodReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         LabelNode exceptionExecutionLabelNode = cp.getExceptionExecutionLabel();
         
-        MarkerType markerType = props.getDebugMarkerType();
-        String dbgSig = props.getMethodName() + props.getMethodSignature().getDescriptor() + ":";
+        MarkerType markerType = attrs.getSettings().getMarkerType();
+        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
 
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         return merge(
+                mergeIf(lineNumber != null, () -> new Object[]{
+                    lineNumber(lineNumber)
+                }),
                 debugMarker(markerType, dbgSig + "Saving INVOKE WITHIN TRYCATCH " + idx),
                 debugMarker(markerType, dbgSig + "Saving top " + invokeArgCount + " items of operand stack (args for invoke)"),
                 saveOperandStack(markerType, savedStackVars, frame, invokeArgCount),
@@ -766,7 +804,7 @@ final class ContinuationGenerators {
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(props),
+                                    exitStoredMonitors(attrs),
                                 }),
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                                 call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg),

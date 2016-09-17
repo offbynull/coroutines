@@ -16,6 +16,7 @@
  */
 package com.offbynull.coroutines.antplugin;
 
+import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.File;
@@ -49,7 +50,9 @@ import org.apache.tools.ant.Task;
  */
 public final class InstrumentTask extends Task {
 
-    private String debugMarkerType = MarkerType.NONE.name();
+    private String markerType = MarkerType.NONE.name();
+    
+    private boolean debugMode = false;
 
     private String classpath;
 
@@ -71,11 +74,19 @@ public final class InstrumentTask extends Task {
     }
 
     /**
-     * Sets the debugging marker type -- required by instrumenter when instrumenting class files. Defaults to NONE.
-     * @param debugMarkerType debug marker type (must be a value from {@link MarkerType})
+     * Sets the marker type. Defaults to NONE.
+     * @param markerType debug marker type (must be a value from {@link MarkerType})
      */
-    public void setDebugMarkerType(String debugMarkerType) {
-        this.debugMarkerType = debugMarkerType;
+    public void setMarkerType(String markerType) {
+        this.markerType = markerType;
+    }
+
+    /**
+     * Sets the debug mode. Defaults to {@code false}.
+     * @param debugMode debug mode
+     */
+    public void setDebugMode(boolean debugMode) {
+        this.debugMode = debugMode;
     }
 
     /**
@@ -143,8 +154,10 @@ public final class InstrumentTask extends Task {
             throw new BuildException("JDK libs directory is not a directory: " + jdkLibsDirectory.getAbsolutePath());
         }
 
-        // Get the debug marker type enum
-        MarkerType debugMarkerTypeEnum = MarkerType.valueOf(debugMarkerType);
+        // Check instrumentation settings (sanity check, should default to null)
+        if (markerType == null) {
+            throw new BuildException("Marker type not set");
+        }
 
         List<File> combinedClasspath;
         try {
@@ -168,21 +181,24 @@ public final class InstrumentTask extends Task {
             instrumenter = new Instrumenter(combinedClasspath);
             
             log("Processing " + sourceDirectory.getAbsolutePath() + " ... ", Project.MSG_INFO);
-            instrumentPath(debugMarkerTypeEnum, instrumenter);
+            instrumentPath(instrumenter);
         } catch (Exception ex) {
             throw new BuildException("Failed to instrument", ex);
         }
     }
 
-    private void instrumentPath(MarkerType debugMarkerTypeEnum, Instrumenter instrumenter) throws IOException {
+    private void instrumentPath(Instrumenter instrumenter) throws IOException {
         for (File inputFile : FileUtils.listFiles(sourceDirectory, new String[]{"class"}, true)) {
             Path relativePath = sourceDirectory.toPath().relativize(inputFile.toPath());
             Path outputFilePath = targetDirectory.toPath().resolve(relativePath);
             File outputFile = outputFilePath.toFile();
 
+            MarkerType markerTypeEnum = MarkerType.valueOf(markerType);
+            InstrumentationSettings settings = new InstrumentationSettings(markerTypeEnum, debugMode);
+            
             log("Instrumenting " + inputFile, Project.MSG_INFO);
             byte[] input = FileUtils.readFileToByteArray(inputFile);
-            byte[] output = instrumenter.instrument(input, debugMarkerTypeEnum);
+            byte[] output = instrumenter.instrument(input, settings);
             log("File size changed from " + input.length + " to " + output.length, Project.MSG_DEBUG);
             FileUtils.writeByteArrayToFile(outputFile, output);
         }

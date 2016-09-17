@@ -26,12 +26,12 @@ final class InternalUtils {
     
     @SuppressWarnings("unchecked")
     static <T extends ContinuationPoint> T validateAndGetContinuationPoint(
-            MethodProperties props, int idx, Class<T> expectedType) {
-        Validate.notNull(props);
+            MethodAttributes attrs, int idx, Class<T> expectedType) {
+        Validate.notNull(attrs);
         Validate.notNull(expectedType);
         Validate.isTrue(idx >= 0);
         
-        List<ContinuationPoint> continuationPoints = props.getContinuationPoints();
+        List<ContinuationPoint> continuationPoints = attrs.getContinuationPoints();
         Validate.isTrue(idx < continuationPoints.size());
         
         ContinuationPoint continuationPoint = continuationPoints.get(idx);

@@ -30,44 +30,44 @@ import org.apache.commons.lang3.Validate;
 
 final class MethodInstrumenter {
 
-    public void instrument(MethodNode methodNode, MethodProperties props) {
+    public void instrument(MethodNode methodNode, MethodAttributes attrs) {
         Validate.notNull(methodNode);
-        Validate.notNull(props);
+        Validate.notNull(attrs);
 
         // These sanity checks need to exist. The methodNode.instructions.insertBefore/remove methods don't actually check to make sure the
         // instructions they're operating on belong to the method. This is here to make sure that the properties and methodNode match.
-        props.getContinuationPoints().stream()
+        attrs.getContinuationPoints().stream()
                 .map(x -> x.getInvokeInstruction())
                 .forEach(x -> methodNode.instructions.contains(x));
-        props.getSynchronizationPoints().stream()
+        attrs.getSynchronizationPoints().stream()
                 .map(x -> x.getMonitorInstruction())
                 .forEach(x -> methodNode.instructions.contains(x));
 
         // Add trycatch nodes
-        props.getContinuationPoints().stream()
+        attrs.getContinuationPoints().stream()
                 .filter(x -> x instanceof TryCatchInvokeContinuationPoint)
                 .map(x -> (TryCatchInvokeContinuationPoint) x)
                 .map(x -> x.getTryCatchBlock())
                 .forEach(x -> methodNode.tryCatchBlocks.add(0, x));
         
         // Add loading code (this includes continuation restore points)
-        InsnList entryPoint = entryPointLoader(props);
+        InsnList entryPoint = entryPointLoader(attrs);
         methodNode.instructions.insert(entryPoint);
         
         // Add continuation save points
-        List<ContinuationPoint> continuationPoints = props.getContinuationPoints();
+        List<ContinuationPoint> continuationPoints = attrs.getContinuationPoints();
         for (int i = 0; i < continuationPoints.size(); i++) {
             ContinuationPoint cp = continuationPoints.get(i);
 
             AbstractInsnNode nodeToReplace = cp.getInvokeInstruction();
-            InsnList insnsToReplaceWith = saveState(props, i);
+            InsnList insnsToReplaceWith = saveState(attrs, i);
             
             methodNode.instructions.insertBefore(nodeToReplace, insnsToReplaceWith);
             methodNode.instructions.remove(nodeToReplace);
         }
         
         // Add synchronization save points
-        List<SynchronizationPoint> synchPoints = props.getSynchronizationPoints();
+        List<SynchronizationPoint> synchPoints = attrs.getSynchronizationPoints();
         for (int i = 0; i < synchPoints.size(); i++) {
             SynchronizationPoint sp = synchPoints.get(i);
 
@@ -75,10 +75,10 @@ final class MethodInstrumenter {
             InsnList insnsToReplaceWith;
             switch (nodeToReplace.getOpcode()) {
                 case Opcodes.MONITORENTER:
-                    insnsToReplaceWith = enterMonitorAndStore(props);
+                    insnsToReplaceWith = enterMonitorAndStore(attrs);
                     break;
                 case Opcodes.MONITOREXIT:
-                    insnsToReplaceWith = exitMonitorAndDelete(props);
+                    insnsToReplaceWith = exitMonitorAndDelete(attrs);
                     break;
                 default:
                     throw new IllegalStateException(); //should never happen

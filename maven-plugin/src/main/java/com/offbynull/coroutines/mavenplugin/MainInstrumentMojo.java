@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,7 +16,6 @@
  */
 package com.offbynull.coroutines.mavenplugin;
 
-import com.offbynull.coroutines.instrumenter.Instrumenter;
 import java.io.File;
 import java.util.List;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
@@ -73,9 +72,8 @@ public final class MainInstrumentMojo extends AbstractInstrumentMojo {
         } catch (DependencyResolutionRequiredException ex) {
             throw new MojoExecutionException("Dependency resolution problem", ex);
         }
-        
-        Instrumenter instrumenter = getInstrumenter(log, classpath);
+
         log.info("Processing main output folder ... ");
-        instrumentPath(log, getDebugMarkerType(), instrumenter, mainOutputFolder);
+        instrumentPath(log, classpath, mainOutputFolder);
     }
 }
