@@ -353,7 +353,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - CHANGED: Performance improvement: Operand stack reloads after a save only if it's needed.
 - CHANGED: Refactored instrumentation logic.
 - CHANGED: Upgraded dependencies and plugins.
-- CHANGED: Class instrumentation marker changed from an interface to a public constant. Constant value defines compatibility. Instrumented classes with different constant values will not be compatible with each other.
+- CHANGED: Class instrumentation marker changed from an interface to a public constant (constant value defines compatibility).
 - ADDED: Debug markers/logging in instrumented code (must explicitly be enabled).
 - ADDED: Increased test coverage.
 
