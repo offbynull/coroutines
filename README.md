@@ -59,10 +59,18 @@ Then, add the Maven plugin so that your classes get instrumented when you build.
     <artifactId>maven-plugin</artifactId>
     <version>1.1.1</version>
     <executions>
+        <!-- Instruments test classes during the process-test-classes phase -->
         <execution>
+            <id>test-coroutines-instrument-id</id>
+            <goals>
+                <goal>test-instrument</goal>
+            </goals>
+        </execution>
+        <!-- Instruments main classes during the process-classes phase -->
+        <execution>
+            <id>coroutines-instrument-id</id>
             <goals>
                 <goal>instrument</goal>
-                <goal>test-instrument</goal>
             </goals>
         </execution>
     </executions>
