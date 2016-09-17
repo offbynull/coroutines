@@ -20,12 +20,9 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.collections4.list.UnmodifiableList;
 import org.apache.commons.lang3.Validate;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.MethodNode;
 
 final class MethodAttributes {
-    private final String methodName;
-    private final Type methodSignature;
+    private final MethodSignature signature;
     private final InstrumentationSettings settings;
 
     private final UnmodifiableList<ContinuationPoint> continuationPoints;
@@ -39,7 +36,7 @@ final class MethodAttributes {
     private final LockVariables lockVars;
 
     MethodAttributes(
-            MethodNode methodNode,
+            MethodSignature signature,
             InstrumentationSettings settings,
             List<ContinuationPoint> continuationPoints,
             List<SynchronizationPoint> synchPoints,
@@ -49,7 +46,7 @@ final class MethodAttributes {
             StorageVariables localsStorageVars,
             StorageVariables stackStorageVars,
             LockVariables lockVars) {
-        Validate.notNull(methodNode);
+        Validate.notNull(signature);
         Validate.notNull(settings);
         Validate.notNull(continuationPoints);
         Validate.notNull(synchPoints);
@@ -62,9 +59,7 @@ final class MethodAttributes {
         Validate.noNullElements(continuationPoints);
         Validate.noNullElements(synchPoints);
 
-        methodName = methodNode.name;
-        methodSignature = Type.getMethodType(methodNode.desc);
-
+        this.signature = signature;
         this.settings = settings;
         this.continuationPoints =
                 (UnmodifiableList<ContinuationPoint>) UnmodifiableList.unmodifiableList(new ArrayList<>(continuationPoints));
@@ -78,16 +73,8 @@ final class MethodAttributes {
         this.lockVars = lockVars;
     }
 
-    public String getMethodName() {
-        return methodName;
-    }
-
-    public Type getMethodSignature() {
-        return methodSignature;
-    }
-
-    public Type getMethodReturnType() {
-        return methodSignature.getReturnType();
+    public MethodSignature getSignature() {
+        return signature;
     }
 
     public InstrumentationSettings getSettings() {

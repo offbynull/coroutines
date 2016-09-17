@@ -322,9 +322,11 @@ final class MethodAnalyzer {
         ///////////////////////////////////////////////////////////////////////////////////////////
         // RETURN RESULTS OF ANALYSIS
         ///////////////////////////////////////////////////////////////////////////////////////////
+        
+        MethodSignature signature = new MethodSignature(classNode.name, methodNode.name, Type.getMethodType(methodNode.desc));
 
         return new MethodAttributes(
-                methodNode,
+                signature,
                 settings,
                 continuationPoints,
                 synchPoints,

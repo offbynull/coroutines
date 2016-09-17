@@ -71,6 +71,7 @@ import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators
 import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.saveOperandStack;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
+import org.objectweb.asm.tree.VarInsnNode;
 
 final class ContinuationGenerators {
     
@@ -108,7 +109,7 @@ final class ContinuationGenerators {
         int numOfContinuationPoints = attrs.getContinuationPoints().size();
 
         MarkerType markerType = attrs.getSettings().getMarkerType();
-        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
+        String dbgSig = getLogPrefix(attrs);
         
         LabelNode startOfMethodLabelNode = new LabelNode();
         return merge(
@@ -213,7 +214,7 @@ final class ContinuationGenerators {
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
         MarkerType markerType = attrs.getSettings().getMarkerType();
-        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
+        String dbgSig = getLogPrefix(attrs);
         
         //          enterLocks(lockState);
         //          restoreOperandStack(stack);
@@ -268,7 +269,7 @@ final class ContinuationGenerators {
         
         Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
         
-        Type returnType = attrs.getMethodReturnType();
+        Type returnType = attrs.getSignature().getReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
@@ -281,7 +282,7 @@ final class ContinuationGenerators {
         
         MarkerType markerType = attrs.getSettings().getMarkerType();
         boolean debugMode = attrs.getSettings().isDebugMode();
-        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
+        String dbgSig = getLogPrefix(attrs);
         
         //          enterLocks(lockState);
         //              // Load up enough of the stack to invoke the method. The invocation here needs to be wrapped in a try catch because
@@ -356,7 +357,7 @@ final class ContinuationGenerators {
                 loadLocals(markerType, savedLocalsVars, frame),
                 mergeIf(returnCacheVar != null, () -> new Object[] {// load return (if returnCacheVar is null means ret type is void)
                     debugMarker(markerType, dbgSig + "Loading invocation return value"),
-                    loadVar(returnCacheVar)
+                    loadReturnCacheVar(returnCacheVar, invokeReturnType)
                 }),
                 debugMarker(markerType, dbgSig + "Restore complete. Jumping to post-invocation point"),
                 jumpTo(continueExecLabelNode),
@@ -382,7 +383,7 @@ final class ContinuationGenerators {
         
         Variable throwableVar = attrs.getCacheVariables().getThrowableCacheVar();
         
-        Type returnType = attrs.getMethodReturnType();
+        Type returnType = attrs.getSignature().getReturnType();
         
         // tryCatchBlock() invocation further on in this method will populate TryCatchBlockNode fields
         TryCatchBlockNode newTryCatchBlockNode = cp.getTryCatchBlock();
@@ -399,7 +400,7 @@ final class ContinuationGenerators {
         
         MarkerType markerType = attrs.getSettings().getMarkerType();
         boolean debugMode = attrs.getSettings().isDebugMode();
-        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
+        String dbgSig = getLogPrefix(attrs);
         
         //          enterLocks(lockState);
         //          continuation.addPending(methodState); // method state should be loaded from Continuation.saved
@@ -498,7 +499,7 @@ final class ContinuationGenerators {
                 loadLocals(markerType, savedLocalsVars, frame),
                 mergeIf(returnCacheVar != null, () -> new Object[] {// load return (if returnCacheVar is null means ret type is void)
                     debugMarker(markerType, dbgSig + "Loading invocation return value"),
-                    loadVar(returnCacheVar)
+                    loadReturnCacheVar(returnCacheVar, invokeReturnType)
                 }),
                 jumpTo(continueExecLabelNode),
                 debugMarker(markerType, dbgSig + "Continuing execution...")
@@ -533,6 +534,38 @@ final class ContinuationGenerators {
                 return attrs.getCacheVariables().getObjectReturnCacheVar();
             case Type.VOID:
                 return null;
+            default:
+                throw new IllegalArgumentException("Bad type");
+        }
+    }
+    
+    private static InsnList loadReturnCacheVar(Variable var, Type type) {
+        Validate.notNull(var);
+        Validate.notNull(type);
+
+        // The "object cache" variable the analyzer allocates is set to type "Object", so if it try to load it back up again using loadVar()
+        // and it gets accessed it'll crap out saying that type "Object" isn't a "SomeTypeHere" type (where SomeTypeHere is the original
+        // type of the return var). We can avoid CHECKCAST enitrely because the type of the return is known when we save it, so the JVM
+        // will retain that info when it goes from the stack to the locals and then back to the stack.
+        
+        switch (type.getSort()) {
+            case Type.BOOLEAN:
+            case Type.BYTE:
+            case Type.CHAR:
+            case Type.SHORT:
+            case Type.INT:
+            case Type.LONG:
+            case Type.FLOAT:
+            case Type.DOUBLE:
+                return loadVar(var);
+            case Type.ARRAY:
+            case Type.OBJECT:
+                return merge(
+                        new VarInsnNode(Opcodes.ALOAD, var.getIndex())
+//                        new TypeInsnNode(Opcodes.CHECKCAST, type.getInternalName()) // DO NOT CAST~~!!!!!
+                );
+            case Type.VOID:
+                return merge();
             default:
                 throw new IllegalArgumentException("Bad type");
         }
@@ -576,13 +609,13 @@ final class ContinuationGenerators {
         
         Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
         
-        Type returnType = attrs.getMethodReturnType();
+        Type returnType = attrs.getSignature().getReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
         MarkerType markerType = attrs.getSettings().getMarkerType();
-        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
+        String dbgSig = getLogPrefix(attrs);
         
         //          Object[] stack = saveOperandStack();
         //          Object[] locals = saveLocals();
@@ -650,14 +683,14 @@ final class ContinuationGenerators {
         
         Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
 
-        Type returnType = attrs.getMethodReturnType();
+        Type returnType = attrs.getSignature().getReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
         MarkerType markerType = attrs.getSettings().getMarkerType();
-        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
+        String dbgSig = getLogPrefix(attrs);
         
         //          Object[] duplicatedArgs = saveOperandStack(<method param count>); -- Why do we do this? because when we want to save the
         //                                                                            -- args to this method when we call
@@ -759,7 +792,7 @@ final class ContinuationGenerators {
 
         Variable throwableVar = attrs.getCacheVariables().getThrowableCacheVar();
 
-        Type returnType = attrs.getMethodReturnType();
+        Type returnType = attrs.getSignature().getReturnType();
         
         Frame<BasicValue> frame = cp.getFrame();
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
@@ -767,7 +800,7 @@ final class ContinuationGenerators {
         LabelNode exceptionExecutionLabelNode = cp.getExceptionExecutionLabel();
         
         MarkerType markerType = attrs.getSettings().getMarkerType();
-        String dbgSig = attrs.getMethodName() + attrs.getMethodSignature().getDescriptor() + ":";
+        String dbgSig = getLogPrefix(attrs);
 
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         return merge(
@@ -938,5 +971,11 @@ final class ContinuationGenerators {
         }
 
         return ret;
+    }
+    
+    private static String getLogPrefix(MethodAttributes attrs) {
+        return attrs.getSignature().getClassName() + "-"
+                + attrs.getSignature().getMethodName() + "-"
+                + attrs.getSignature().getMethodDescriptor() + " >>> ";
     }
 }
