@@ -138,30 +138,29 @@ started
 3
 ```
 
+Any method that takes in a **Continuation** type as a parameter will be instrumented by the plugin to work as part of a coroutine. The entry-point for your coroutine must implement the **Coroutine** interface. **CoroutineRunner.execute()** is used to start / resume execution of your coroutine, while **Continuation.suspend()** suspends the execution of your coroutine.
 
-### Explanation
+**:warning: THINGS TO AVOID :warning:**
 
-The entry-point for your coroutine must implement the *Coroutine* interface.
-
-* *CoroutineRunner.execute()* starts or resumes execution of your coroutine.
-* *Continuation.suspend()* suspends the execution of your coroutine.
-* Any method that takes in a *Continuation* type as a parameter will be instrumented by the plugin to work as part of a coroutine. 
-
-Aside from that, some important things to be aware of:
-
-* The *Continuation* object is not meant to be retained. Never set it to a field or otherwise pass it to methods that aren't intended to run as part of a coroutine.
-* The only methods on *Continuation* that you should be calling are *suspend()*, *getContext()*, and *setContext()*. All other methods are for internal use only.
-
+1. The **Continuation** object is not meant to be retained. Never set it to a field or otherwise pass it to a method that isn't intended to run as part of a coroutine.
+1. The only methods on **Continuation** that you should be calling are **suspend()**, **getContext()**, and **setContext()**. All other methods are for internal use only.
 
 ## FAQ
 
 #### How much overhead am I adding?
 
-It depends. Instrumentation adds loading and saving code to each method that's intended to run as part of a coroutine, so your class files will become larger and that extra code will take time to execute. I personally haven't noticed any drastic slowdowns in my own projects, but be aware that highly recursive coroutines / heavy call depths may end up consuming a lot of resources thereby causing noticeable performance loss.
+It depends. Instrumentation adds loading and saving code to each method that's intended to run as part of a coroutine, so your class files will become larger and that extra code will take time to execute. I personally haven't noticed any drastic slowdowns in my own projects.
+
+Version 1.2.0 of the instrumenter generates much more efficient suspend/resume logic. If you have non-trivial coroutines running in tight loops, you will likely notice some performance gain.
 
 #### What projects make use of Coroutines?
 
-The Coroutines project was originally made for use in (and is heavily used by) the [Peernetic](https://github.com/offbynull/peernetic) project. Peernetic is a Java actor-based P2P computing framework specifically designed to facilitate development and testing of distributed and P2P algorithms. The use of Coroutines makes actor logic easily understandable/readable. See the Javadoc header in [this file](https://github.com/offbynull/peernetic/blob/2143d4b208d1107a933e06868e53811a2c7608c4/core/src/main/java/com/offbynull/peernetic/core/actor/CoroutineActor.java) for an overview of why this is.
+| Project | Description |
+|---------|-------------|
+| [Peernetic](https://github.com/offbynull/peernetic) | The Coroutines project was originally made for use in (and is heavily used by) the Peernetic project. Peernetic is a Java actor-based P2P computing framework specifically designed to facilitate development and testing of distributed and P2P algorithms. The use of Coroutines makes actor logic easily understandable/readable. See the Javadoc header in [this file](https://github.com/offbynull/peernetic/blob/2143d4b208d1107a933e06868e53811a2c7608c4/core/src/main/java/com/offbynull/peernetic/core/actor/CoroutineActor.java) for an overview of why this is. |
+| [Towards Resilient Java Computational Programs](https://hal.archives-ouvertes.fr/hal-01316493/document) | Towards Resilient Java Computational Programs<br>The 46th Annual IEEE/IFIP International Conference on Dependable Systems and Networks<br>Jun 2016, Toulouse, France<br>Authors: Quyen L. Nguyen, Dr. Arun K. Sood |
+
+If you know of any other projects please let me know and I'll update this section.
 
 #### What restrictions are there?
 
