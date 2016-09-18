@@ -156,7 +156,7 @@ Any method that takes in a **Continuation** type as a parameter will be instrume
 
 It depends. Instrumentation adds loading and saving code to each method that's intended to run as part of a coroutine, so your class files will become larger and that extra code will take time to execute. I personally haven't noticed any drastic slowdowns in my own projects.
 
-Version 1.2.0 of the instrumenter generates much more efficient suspend/resume logic. If you have non-trivial coroutines running in tight loops, you will likely notice some performance gain.
+Version 1.2.0 of the instrumenter generates much more efficient suspend/resume logic.
 
 #### What projects make use of Coroutines?
 
