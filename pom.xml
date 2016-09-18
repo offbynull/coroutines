@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.offbynull.coroutines</groupId>
     <artifactId>parent</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1-SNAPSHOT</version>
     <packaging>pom</packaging>
     
     <name>${project.groupId}:${project.artifactId}</name>
@@ -30,7 +30,7 @@
         <connection>scm:git:https://github.com/offbynull/coroutines.git</connection>
         <developerConnection>scm:git:https://github.com/offbynull/coroutines.git</developerConnection>
         <url>https://github.com/offbynull/coroutines</url>
-        <tag>parent-1.2.0</tag>
+        <tag>HEAD</tag>
     </scm>
     
     <distributionManagement>
