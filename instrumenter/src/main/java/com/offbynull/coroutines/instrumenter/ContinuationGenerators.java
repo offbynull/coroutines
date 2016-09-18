@@ -66,10 +66,11 @@ import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerTy
 import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.debugMarker;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.createMonitorContainer;
 import static com.offbynull.coroutines.instrumenter.PackStateGenerators.packStorageArrays;
-import static com.offbynull.coroutines.instrumenter.PackStateGenerators.unpackStorageArrays;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.lineNumber;
 import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.loadOperandStack;
 import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.saveOperandStack;
+import static com.offbynull.coroutines.instrumenter.PackStateGenerators.unpackLocalsStorageArrays;
+import static com.offbynull.coroutines.instrumenter.PackStateGenerators.unpackOperandStackStorageArrays;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
 
 final class ContinuationGenerators {
@@ -230,8 +231,10 @@ final class ContinuationGenerators {
         //          goto restorePoint_<number>_continue;
         return merge(
                 debugMarker(markerType, dbgSig + "Restoring SUSPEND " + idx),
-                debugMarker(markerType, dbgSig + "Unpacking method state data"),
-                unpackStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars, savedStackVars),
+                debugMarker(markerType, dbgSig + "Unpacking operand stack storage variables"),
+                unpackOperandStackStorageArrays(markerType, frame, storageContainerVar, savedStackVars),
+                debugMarker(markerType, dbgSig + "Unpacking locals storage variables"),
+                unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
                 debugMarker(markerType, dbgSig + "Restoring operand stack"),
                 loadOperandStack(markerType, savedStackVars, frame),
                 debugMarker(markerType, dbgSig + "Restoring locals"),
@@ -314,20 +317,23 @@ final class ContinuationGenerators {
         //          goto restorePoint_<number>_continue;
         return merge(
                 debugMarker(markerType, dbgSig + "Restoring INVOKE " + idx),
-                debugMarker(markerType, dbgSig + "Unpacking method state data"),
-                unpackStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars, savedStackVars),
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Entering monitors"),
                     enterStoredMonitors(attrs), // we MUST re-enter montiors before going further
                 }),
+                // Only unpack operand stack storage vars, we unpack the locals afterwards if we need to
+                debugMarker(markerType, dbgSig + "Unpacking operand stack storage variables"),
+                unpackOperandStackStorageArrays(markerType, frame, storageContainerVar, savedStackVars),
                 debugMarker(markerType, dbgSig + "Restoring top " + invokeArgCount + " items of operand stack (just enough to invoke)"),
                 loadOperandStack(markerType, savedStackVars, frame, 0, frame.getStackSize() - invokeArgCount, invokeArgCount),
                 mergeIf(debugMode, () -> new Object[]{
                     // If in debug mode, load up the locals. This is useful if you're stepping through your coroutine in a debugger... you
                     // can look at method frames above the current one and introspect the variables (what the user expects if they're
                     // running in a debugger).
-                    debugMarker(markerType, dbgSig + "Restoring locals (for the purpose of introspecting locals if being run in debugger)"),
+                    debugMarker(markerType, dbgSig + "Unpacking locals storage variables (for debugMode)"),
+                    unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
+                    debugMarker(markerType, dbgSig + "Restoring locals (for debugMode)"),
                     loadLocals(markerType, savedLocalsVars, frame),
                 }),
                 mergeIf(lineNumber != null, () -> new Object[]{
@@ -357,6 +363,8 @@ final class ContinuationGenerators {
                     debugMarker(markerType, dbgSig + "Saving invocation return value"),
                     saveVar(returnCacheVar)
                 }),
+                debugMarker(markerType, dbgSig + "Unpacking locals storage variables"),
+                unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
                 debugMarker(markerType, dbgSig + "Restoring operand stack (without invoke args)"),
                 loadOperandStack(markerType, savedStackVars, frame, 0, 0, frame.getStackSize() - invokeArgCount),
                 debugMarker(markerType, dbgSig + "Restoring locals"),
@@ -440,20 +448,23 @@ final class ContinuationGenerators {
         
         return merge(
                 debugMarker(markerType, dbgSig + "Restoring INVOKE WITHIN TRYCATCH " + idx),
-                debugMarker(markerType, dbgSig + "Unpacking method state data"),
-                unpackStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars, savedStackVars),
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Entering monitors"),
                     enterStoredMonitors(attrs), // we MUST re-enter montiors before going further
                 }),
+                // Only unpack operand stack storage vars, we unpack the locals afterwards if we need to
+                debugMarker(markerType, dbgSig + "Unpacking operand stack storage variables"),
+                unpackOperandStackStorageArrays(markerType, frame, storageContainerVar, savedStackVars),
                 debugMarker(markerType, dbgSig + "Restoring top " + invokeArgCount + " items of operand stack (just enough to invoke)"),
                 loadOperandStack(markerType, savedStackVars, frame, 0, frame.getStackSize() - invokeArgCount, invokeArgCount),
                 mergeIf(debugMode, () -> new Object[]{
                     // If in debug mode, load up the locals. This is useful if you're stepping through your coroutine in a debugger... you
                     // can look at method frames above the current one and introspect the variables (what the user expects if they're
                     // running in a debugger).
-                    debugMarker(markerType, dbgSig + "Restoring locals (for the purpose of introspecting locals if being run in debugger)"),
+                    debugMarker(markerType, dbgSig + "Unpacking locals storage variables (for debugMode)"),
+                    unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
+                    debugMarker(markerType, dbgSig + "Restoring locals (for debugMode)"),
                     loadLocals(markerType, savedLocalsVars, frame),
                 }),
                 mergeIf(lineNumber != null, () -> new Object[]{
@@ -471,6 +482,8 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Throwable caught"),
                                 debugMarker(markerType, dbgSig + "Saving caught throwable"),
                                 saveVar(throwableVar),
+                                debugMarker(markerType, dbgSig + "Unpacking locals storage variables"),
+                                unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
                                 debugMarker(markerType, dbgSig + "Restoring operand stack (without invoke args)"),
                                 loadOperandStack(markerType, savedStackVars, frame, 0, 0, frame.getStackSize() - invokeArgCount),
                                 debugMarker(markerType, dbgSig + "Restoring locals"),
@@ -504,6 +517,8 @@ final class ContinuationGenerators {
                     debugMarker(markerType, dbgSig + "Saving invocation return value"),
                     saveVar(returnCacheVar)
                 }),
+                debugMarker(markerType, dbgSig + "Unpacking locals storage variables"),
+                unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
                 debugMarker(markerType, dbgSig + "Restoring operand stack (without invoke args)"),
                 loadOperandStack(markerType, savedStackVars, frame, 0, 0, frame.getStackSize() - invokeArgCount),
                 debugMarker(markerType, dbgSig + "Restoring locals"),

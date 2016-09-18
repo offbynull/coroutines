@@ -182,25 +182,18 @@ final class PackStateGenerators {
         );
     }
     
-    public static InsnList unpackStorageArrays(MarkerType markerType, Frame<BasicValue> frame, Variable containerVar,
-            StorageVariables localsStorageVars, StorageVariables operandStackStorageVars) {
+    public static InsnList unpackLocalsStorageArrays(MarkerType markerType, Frame<BasicValue> frame, Variable containerVar,
+            StorageVariables localsStorageVars) {
         Validate.notNull(markerType);
         Validate.notNull(containerVar);
         Validate.notNull(localsStorageVars);
-        Validate.notNull(operandStackStorageVars);
         
         Variable localsIntsVar = localsStorageVars.getIntStorageVar();
         Variable localsFloatsVar = localsStorageVars.getFloatStorageVar();
         Variable localsLongsVar = localsStorageVars.getLongStorageVar();
         Variable localsDoublesVar = localsStorageVars.getDoubleStorageVar();
         Variable localsObjectsVar = localsStorageVars.getObjectStorageVar();
-        Variable stackIntsVar = operandStackStorageVars.getIntStorageVar();
-        Variable stackFloatsVar = operandStackStorageVars.getFloatStorageVar();
-        Variable stackLongsVar = operandStackStorageVars.getLongStorageVar();
-        Variable stackDoublesVar = operandStackStorageVars.getDoubleStorageVar();
-        Variable stackObjectsVar = operandStackStorageVars.getObjectStorageVar();
         
-        StorageSizes stackSizes = OperandStackStateGenerators.computeSizes(frame, 0, frame.getStackSize());
         StorageSizes localsSizes = LocalsStateGenerators.computeSizes(frame);
         
         // Why are we using size > 0 vs checking to see if var != null?
@@ -272,7 +265,54 @@ final class PackStateGenerators {
                     new InsnNode(Opcodes.AALOAD),                                                      // [val]
                     new TypeInsnNode(Opcodes.CHECKCAST, localsObjectsVar.getType().getInternalName()), // [val] REQ BY JVM SO TYPE IS KNOWN
                     new VarInsnNode(Opcodes.ASTORE, localsObjectsVar.getIndex()),                      // []
-                }),
+                })
+        );
+    }
+    
+    public static InsnList unpackOperandStackStorageArrays(MarkerType markerType, Frame<BasicValue> frame, Variable containerVar,
+            StorageVariables operandStackStorageVars) {
+        Validate.notNull(markerType);
+        Validate.notNull(containerVar);
+        Validate.notNull(operandStackStorageVars);
+        
+        Variable stackIntsVar = operandStackStorageVars.getIntStorageVar();
+        Variable stackFloatsVar = operandStackStorageVars.getFloatStorageVar();
+        Variable stackLongsVar = operandStackStorageVars.getLongStorageVar();
+        Variable stackDoublesVar = operandStackStorageVars.getDoubleStorageVar();
+        Variable stackObjectsVar = operandStackStorageVars.getObjectStorageVar();
+        
+        StorageSizes stackSizes = OperandStackStateGenerators.computeSizes(frame, 0, frame.getStackSize());
+        
+        // Why are we using size > 0 vs checking to see if var != null?
+        //
+        // REMEMBER THAT the analyzer will determine the variable slots to create for storage array based on its scan of EVERY
+        // continuation/suspend point in the method. Imagine the method that we're instrumenting is this...
+        //
+        // public void example(Continuation c, String arg1) {
+        //     String var1 = "hi";
+        //     c.suspend();     
+        //
+        //     System.out.println(var1);
+        //     int var2 = 5;
+        //     c.suspend();
+        //
+        //     System.out.println(var1 + var2);
+        // }
+        //
+        // There are two continuation/suspend points. The analyzer determines that method will need to assign variable slots for
+        // localsObjectsVar+localsIntsVar. All the other locals vars will be null.
+        //
+        // If we ended up using var != null instead of size > 0, things would mess up on the first suspend(). The only variable initialized
+        // at the first suspend is var1. As such, LocalStateGenerator ONLY CREATES AN ARRAY FOR localsObjectsVar. It doesn't touch
+        // localsIntsVar because, at the first suspend(), var2 is UNINITALIZED. Nothing has been set to that variable slot.
+        //
+        //
+        // The same thing applies to the operand stack. It doesn't make sense to create arrays for operand stack types that don't exist yet
+        // at a continuation point, even though they may exist at other continuation points furhter down
+
+        // Storage arrays from locals container
+        return merge(
+                debugMarker(markerType, "Unpacking storage arrays for operand stack from an Object[]"),
                 mergeIf(stackSizes.getIntsSize() > 0, () -> new Object[] {
                     debugMarker(markerType, "Getting stack ints from to container"),
                     new VarInsnNode(Opcodes.ALOAD, containerVar.getIndex()),                           // [Object[]]
