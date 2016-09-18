@@ -6,11 +6,11 @@ Inspired by the [Apache Commons Javaflow](http://commons.apache.org/sandbox/comm
 
 Why use Coroutines over Javaflow? The Couroutines project is a new Java coroutines implementation written from scratch that aims to solve some of the issues that Javaflow has. The Coroutines project provides several distinct advantages:
 
-* Saves and loads method state faster than Javaflow <sub>[1]</sub>
-* Provides both a Maven plugin and an Ant plugin <sub>[2]</sub>
-* Proper support for Java 8 bytecode <sub>[3]</sub>
-* Proper support for synchronized blocks <sub>[4]</sub>
-* Modular project structure and the code is readable, tested, and well commented <sub>[5]</sub>
+* Saves and loads method state faster than Javaflow [<sub>[1]</sub>](#footnotes)
+* Provides both a Maven plugin and an Ant plugin [<sub>[2]</sub>](#footnotes)
+* Proper support for Java 8 bytecode [<sub>[3]</sub>](#footnotes)
+* Proper support for synchronized blocks [<sub>[4]</sub>](#footnotes)
+* Modular project structure and the code is readable, tested, and well commented [<sub>[5]</sub>](#footnotes)
 
 In addition, Javaflow appears to be largely unmaintained at present.
 
