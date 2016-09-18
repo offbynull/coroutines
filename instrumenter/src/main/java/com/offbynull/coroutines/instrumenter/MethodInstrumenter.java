@@ -26,6 +26,7 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.enterMonitorAndStore;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.exitMonitorAndDelete;
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import org.apache.commons.lang3.Validate;
 
 final class MethodInstrumenter {
@@ -68,6 +69,8 @@ final class MethodInstrumenter {
         
         // Add synchronization save points
         List<SynchronizationPoint> synchPoints = attrs.getSynchronizationPoints();
+        MarkerType markerType = attrs.getSettings().getMarkerType();
+        LockVariables lockVars = attrs.getLockVariables();
         for (int i = 0; i < synchPoints.size(); i++) {
             SynchronizationPoint sp = synchPoints.get(i);
 
@@ -75,10 +78,10 @@ final class MethodInstrumenter {
             InsnList insnsToReplaceWith;
             switch (nodeToReplace.getOpcode()) {
                 case Opcodes.MONITORENTER:
-                    insnsToReplaceWith = enterMonitorAndStore(attrs);
+                    insnsToReplaceWith = enterMonitorAndStore(markerType, lockVars);
                     break;
                 case Opcodes.MONITOREXIT:
-                    insnsToReplaceWith = exitMonitorAndDelete(attrs);
+                    insnsToReplaceWith = exitMonitorAndDelete(markerType, lockVars);
                     break;
                 default:
                     throw new IllegalStateException(); //should never happen

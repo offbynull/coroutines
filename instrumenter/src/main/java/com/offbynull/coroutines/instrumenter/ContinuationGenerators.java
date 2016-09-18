@@ -111,7 +111,8 @@ final class ContinuationGenerators {
         Variable methodStateVar = attrs.getCoreVariables().getMethodStateVar();
         Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
         
-        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
+        LockVariables lockVars = attrs.getLockVariables();
+        Variable lockStateVar = lockVars.getLockStateVar();
 
         int numOfContinuationPoints = attrs.getContinuationPoints().size();
 
@@ -135,7 +136,7 @@ final class ContinuationGenerators {
                                 // create lockstate if method actually has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[] {
                                         debugMarker(markerType, "Creating monitors container"),
-                                        createMonitorContainer(attrs),
+                                        createMonitorContainer(markerType, lockVars),
                                 }),
                                 debugMarker(markerType, dbgSig + "Jump to start of method point"),
                                 jumpTo(startOfMethodLabelNode)
@@ -210,13 +211,13 @@ final class ContinuationGenerators {
         Integer lineNumber = cp.getLineNumber();
 
         Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
-        Variable methodStateVar = attrs.getCoreVariables().getMethodStateVar();
         StorageVariables savedLocalsVars = attrs.getLocalsStorageVariables();
         StorageVariables savedStackVars = attrs.getStackStorageVariables();
         
         Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
         
-        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
+        LockVariables lockVars = attrs.getLockVariables();
+        Variable lockStateVar = lockVars.getLockStateVar();
         
         Frame<BasicValue> frame = cp.getFrame();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
@@ -247,7 +248,7 @@ final class ContinuationGenerators {
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                         debugMarker(markerType, dbgSig + "Entering monitors"),
-                        enterStoredMonitors(attrs),
+                        enterStoredMonitors(markerType, lockVars),
                 }),
                 debugMarker(markerType, dbgSig + "Popping off continuation object from operand stack"),
                 pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
@@ -277,8 +278,9 @@ final class ContinuationGenerators {
         StorageVariables savedStackVars = attrs.getStackStorageVariables();
         
         Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
-        
-        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
+
+        LockVariables lockVars = attrs.getLockVariables();
+        Variable lockStateVar = lockVars.getLockStateVar();
         
         Type returnType = attrs.getSignature().getReturnType();
         
@@ -320,7 +322,7 @@ final class ContinuationGenerators {
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Entering monitors"),
-                    enterStoredMonitors(attrs), // we MUST re-enter montiors before going further
+                    enterStoredMonitors(markerType, lockVars), // we MUST re-enter montiors before going further
                 }),
                 // Only unpack operand stack storage vars, we unpack the locals afterwards if we need to
                 debugMarker(markerType, dbgSig + "Unpacking operand stack storage variables"),
@@ -353,7 +355,7 @@ final class ContinuationGenerators {
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(attrs),
+                                    exitStoredMonitors(markerType, lockVars),
                                 }),
                                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
@@ -395,7 +397,8 @@ final class ContinuationGenerators {
         
         Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
 
-        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
+        LockVariables lockVars = attrs.getLockVariables();
+        Variable lockStateVar = lockVars.getLockStateVar();
         
         Variable throwableVar = attrs.getCacheVariables().getThrowableCacheVar();
         
@@ -451,7 +454,7 @@ final class ContinuationGenerators {
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Entering monitors"),
-                    enterStoredMonitors(attrs), // we MUST re-enter montiors before going further
+                    enterStoredMonitors(markerType, lockVars), // we MUST re-enter montiors before going further
                 }),
                 // Only unpack operand stack storage vars, we unpack the locals afterwards if we need to
                 debugMarker(markerType, dbgSig + "Unpacking operand stack storage variables"),
@@ -507,7 +510,7 @@ final class ContinuationGenerators {
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(attrs),
+                                    exitStoredMonitors(markerType, lockVars),
                                 }),
                                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
@@ -580,7 +583,8 @@ final class ContinuationGenerators {
         StorageVariables savedStackVars = attrs.getStackStorageVariables();
         Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
         
-        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
+        LockVariables lockVars = attrs.getLockVariables();
+        Variable lockStateVar = lockVars.getLockStateVar();
         
         Type returnType = attrs.getSignature().getReturnType();
         
@@ -630,7 +634,7 @@ final class ContinuationGenerators {
                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                    exitStoredMonitors(attrs),
+                    exitStoredMonitors(markerType, lockVars),
                 }),
                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                 returnDummy(returnType), // return dummy value
@@ -654,7 +658,8 @@ final class ContinuationGenerators {
         StorageVariables savedStackVars = attrs.getStackStorageVariables();
         Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
         
-        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
+        LockVariables lockVars = attrs.getLockVariables();
+        Variable lockStateVar = lockVars.getLockStateVar();
 
         Type returnType = attrs.getSignature().getReturnType();
         
@@ -720,7 +725,7 @@ final class ContinuationGenerators {
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(attrs),
+                                    exitStoredMonitors(markerType, lockVars),
                                 }),
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
@@ -761,7 +766,8 @@ final class ContinuationGenerators {
         StorageVariables savedStackVars = attrs.getStackStorageVariables();
         Variable storageContainerVar = attrs.getStorageContainerVariables().getContainerVar();
         
-        Variable lockStateVar = attrs.getLockVariables().getLockStateVar();
+        LockVariables lockVars = attrs.getLockVariables();
+        Variable lockStateVar = lockVars.getLockStateVar();
 
         Variable throwableVar = attrs.getCacheVariables().getThrowableCacheVar();
 
@@ -810,7 +816,7 @@ final class ContinuationGenerators {
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(attrs),
+                                    exitStoredMonitors(markerType, lockVars),
                                 }),
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
