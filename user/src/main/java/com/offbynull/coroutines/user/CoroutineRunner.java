@@ -54,14 +54,15 @@ public final class CoroutineRunner implements Serializable {
     public boolean execute() {
         try {
             coroutine.run(continuation);
-            continuation.finishedExecutionCycle();
+            continuation.successExecutionCycle();
         } catch (Exception e) {
+            continuation.failedExecutionCycle();
             throw new CoroutineException("Exception thrown during execution", e);
         }
         
         // if mode was not set to SAVING after return, it means the method finished executing
         if (continuation.getMode() != Continuation.MODE_SAVING) {
-            continuation.reset(); // clear methodstates + set to normal, this is not explicitly nessecary at this point but set anyways
+            continuation.reset(); // clear methodstates + set to normal
             return false;
         } else {
             continuation.setMode(Continuation.MODE_LOADING); // set to loading for next invokation

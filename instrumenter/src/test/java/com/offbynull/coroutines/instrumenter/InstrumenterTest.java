@@ -334,7 +334,7 @@ public final class InstrumenterTest {
     }
 
     @Test
-    public void mustHaveEmptyPendingMethodStatesOnException() throws Exception {
+    public void mustHaveResetLoadingStateOnException() throws Exception {
         StringBuilder builder = new StringBuilder();
         Continuation continuation = null;
         boolean hit = false;
@@ -357,14 +357,24 @@ public final class InstrumenterTest {
 
         Assert.assertTrue(hit);
         
-        LinkedList<MethodState> pending = (LinkedList<MethodState>) FieldUtils.readField(continuation, "pendingMethodStates", true);
-        Assert.assertTrue(pending.isEmpty());
+        MethodState firstPointer = (MethodState) FieldUtils.readField(continuation, "firstPointer", true);
+        MethodState nextLoadPointer = (MethodState) FieldUtils.readField(continuation, "nextLoadPointer", true);
+        MethodState nextUnloadPointer = (MethodState) FieldUtils.readField(continuation, "nextUnloadPointer", true);
+        MethodState firstCutpointPointer = (MethodState) FieldUtils.readField(continuation, "firstCutpointPointer", true);
+        Assert.assertEquals(2, continuation.getSize());
+        Assert.assertNotNull(continuation.getSaved(0));
+        Assert.assertNotNull(continuation.getSaved(1));
+        Assert.assertNotNull(firstPointer);
+        Assert.assertNotNull(nextLoadPointer);
+        Assert.assertTrue(firstPointer == nextLoadPointer);
+        Assert.assertNull(nextUnloadPointer);
+        Assert.assertNull(firstCutpointPointer);
     }
 
     private void performCountTest(String testClass, InstrumentationSettings settings) throws Exception {
         StringBuilder builder = new StringBuilder();
 
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip")) {
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip", settings)) {
             Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(testClass);
             Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
 
@@ -406,7 +416,7 @@ public final class InstrumenterTest {
     private void performDoubleCountTest(String testClass, InstrumentationSettings settings) throws Exception {
         StringBuilder builder = new StringBuilder();
 
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip")) {
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip", settings)) {
             Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(testClass);
             Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
 
@@ -478,7 +488,7 @@ public final class InstrumenterTest {
     public void mustProperlySuspendInTryCatchFinally() throws Exception {
         StringBuilder builder = new StringBuilder();
 
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(EXCEPTION_SUSPEND_TEST + ".zip")) {
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(EXCEPTION_SUSPEND_TEST + ".zip", new InstrumentationSettings(MarkerType.STDOUT, false))) {
             Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(EXCEPTION_SUSPEND_TEST);
             Coroutine coroutine = ConstructorUtils.invokeConstructor(cls, builder);
 

@@ -31,6 +31,9 @@ public final class MethodState implements Serializable {
     private final Object[] data;
     private final LockState lockState;
 
+    private MethodState next;
+    private MethodState previous;
+
     /**
      * Do not use -- for internal use only.
      * <p>
@@ -81,6 +84,61 @@ public final class MethodState implements Serializable {
      */
     public LockState getLockState() {
         return lockState;
+    }
+
+
+
+    
+    
+    
+    
+    
+    
+    
+    /**
+     * Do not use -- for internal use only.
+     * <p>
+     * Get the next method state.
+     * @return next method state
+     */
+    MethodState getNext() {
+        return next;
+    }
+
+    /**
+     * Do not use -- for internal use only.
+     * <p>
+     * Set the next method state.
+     * @param next next method state
+     */
+    void setNext(MethodState next) {
+        this.next = next;
+        if (next != null) {
+            next.previous = this;
+        }
+    }
+
+    /**
+     * Do not use -- for internal use only.
+     * <p>
+     * Get the previous method state.
+     * @return previous method state
+     */
+    MethodState getPrevious() {
+        return previous;
+    }
+
+    /**
+     * Do not use -- for internal use only.
+     * <p>
+     * Set the previous method state.
+     * @param previous previous method state
+     */
+    void setPrevious(MethodState previous) {
+        this.previous = previous;
+        if (previous != null) {
+            previous.next = this;
+        }
     }
     
 }

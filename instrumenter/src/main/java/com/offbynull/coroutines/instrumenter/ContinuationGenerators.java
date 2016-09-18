@@ -78,10 +78,17 @@ final class ContinuationGenerators {
             = MethodUtils.getAccessibleMethod(Continuation.class, "getMode");
     private static final Method CONTINUATION_SETMODE_METHOD
             = MethodUtils.getAccessibleMethod(Continuation.class, "setMode", Integer.TYPE);
-    private static final Method CONTINUATION_POPMETHODSTATE_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "popMethodState");
-    private static final Method CONTINUATION_PUSHMETHODSTATE_METHOD
-            = MethodUtils.getAccessibleMethod(Continuation.class, "pushMethodState", MethodState.class);
+
+    // Need a primer on how to handle method states with the Continuation class? There are comments in the Continuation class that describe
+    // how things should work.
+    private static final Method CONTINUATION_LOADNEXTMETHODSTATE_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "loadNextMethodState");
+    private static final Method CONTINUATION_UNLOADCURRENTMETHODSTATE_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "unloadCurrentMethodState");
+    private static final Method CONTINUATION_UNLOADMETHODSTATETOBEFORE_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "unloadMethodStateToBefore", MethodState.class);
+    private static final Method CONTINUATION_PUSHNEWMETHODSTATE_METHOD
+            = MethodUtils.getAccessibleMethod(Continuation.class, "pushNewMethodState", MethodState.class);
 
     private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
             = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, LockState.class);
@@ -138,8 +145,8 @@ final class ContinuationGenerators {
                         ),
                         merge(
                                 debugMarker(markerType, dbgSig + "Case 2 -- Loading state"),
-                                debugMarker(markerType, dbgSig + "Popping method state"),
-                                call(CONTINUATION_POPMETHODSTATE_METHOD, loadVar(contArg)),
+                                debugMarker(markerType, dbgSig + "Loading method state"),
+                                call(CONTINUATION_LOADNEXTMETHODSTATE_METHOD, loadVar(contArg)),
                                 saveVar(methodStateVar),
                                 debugMarker(markerType, dbgSig + "Getting method state data"),
                                 call(METHODSTATE_GETDATA_METHOD, loadVar(methodStateVar)),
@@ -202,6 +209,7 @@ final class ContinuationGenerators {
         Integer lineNumber = cp.getLineNumber();
 
         Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
+        Variable methodStateVar = attrs.getCoreVariables().getMethodStateVar();
         StorageVariables savedLocalsVars = attrs.getLocalsStorageVariables();
         StorageVariables savedStackVars = attrs.getStackStorageVariables();
         
@@ -246,9 +254,11 @@ final class ContinuationGenerators {
                        // of stack pointing to that continuation object
                 debugMarker(markerType, dbgSig + "Setting mode to normal"),
                 call(CONTINUATION_SETMODE_METHOD, loadVar(contArg), loadIntConst(MODE_NORMAL)),
+                // We've successfully completed our restore and we're continuing the invocation, so we need "discard" this method state
+                debugMarker(markerType, dbgSig + "Discarding saved method state"),
+                call(CONTINUATION_UNLOADCURRENTMETHODSTATE_METHOD, loadVar(contArg)),
                 debugMarker(markerType, dbgSig + "Restore complete. Jumping to post-invocation point"),
-                jumpTo(continueExecLabelNode),
-                debugMarker(markerType, dbgSig + "Continuing execution...")
+                jumpTo(continueExecLabelNode)
         );
     }
     
@@ -260,7 +270,6 @@ final class ContinuationGenerators {
         Integer lineNumber = cp.getLineNumber();
         
         Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
-        Variable methodStateVar = attrs.getCoreVariables().getMethodStateVar();
         StorageVariables savedLocalsVars = attrs.getLocalsStorageVariables();
         StorageVariables savedStackVars = attrs.getStackStorageVariables();
         
@@ -277,7 +286,7 @@ final class ContinuationGenerators {
         Type invokeReturnType = getReturnTypeOfInvocation(invokeNode);        
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         
-        Variable returnCacheVar = getReturnCacheVar(attrs, invokeReturnType); // will be null if void
+        Variable returnCacheVar = attrs.getCacheVariables().getReturnCacheVar(invokeReturnType); // will be null if void
         
         MarkerType markerType = attrs.getSettings().getMarkerType();
         boolean debugMode = attrs.getSettings().isDebugMode();
@@ -340,8 +349,6 @@ final class ContinuationGenerators {
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
                                     exitStoredMonitors(attrs),
                                 }),
-                                debugMarker(markerType, dbgSig + "Re-pushing method state"),
-                                call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg), loadVar(methodStateVar)),
                                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
                         )
@@ -358,9 +365,11 @@ final class ContinuationGenerators {
                     debugMarker(markerType, dbgSig + "Loading invocation return value"),
                     loadVar(returnCacheVar)
                 }),
+                // We've successfully completed our restore and we're continuing the invocation, so we need "discard" this method state
+                debugMarker(markerType, dbgSig + "Discarding saved method state"),
+                call(CONTINUATION_UNLOADCURRENTMETHODSTATE_METHOD, loadVar(contArg)),
                 debugMarker(markerType, dbgSig + "Restore complete. Jumping to post-invocation point"),
-                jumpTo(continueExecLabelNode),
-                debugMarker(markerType, dbgSig + "Continuing execution...")
+                jumpTo(continueExecLabelNode)
         );
     }
     
@@ -395,7 +404,7 @@ final class ContinuationGenerators {
         Type invokeReturnType = getReturnTypeOfInvocation(invokeNode);        
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
         
-        Variable returnCacheVar = getReturnCacheVar(attrs, invokeReturnType); // will be null if void
+        Variable returnCacheVar = attrs.getCacheVariables().getReturnCacheVar(invokeReturnType); // will be null if void
         
         MarkerType markerType = attrs.getSettings().getMarkerType();
         boolean debugMode = attrs.getSettings().isDebugMode();
@@ -466,6 +475,11 @@ final class ContinuationGenerators {
                                 loadOperandStack(markerType, savedStackVars, frame, 0, 0, frame.getStackSize() - invokeArgCount),
                                 debugMarker(markerType, dbgSig + "Restoring locals"),
                                 loadLocals(markerType, savedLocalsVars, frame),
+                                // We caught an exception, which means that everything that was invoked after us is pretty much gone and
+                                // we're continuing the invocation as if we restore, we need to "discard" this method state along with
+                                // everything after it.
+                                debugMarker(markerType, dbgSig + "Discarding saved method states up until this point (unwinding)"),
+                                call(CONTINUATION_UNLOADMETHODSTATETOBEFORE_METHOD, loadVar(contArg), loadVar(methodStateVar)),
                                 debugMarker(markerType, dbgSig + "Restore complete. Jumping to rethrow point (within orig trycatch block)"),
                                 jumpTo(exceptionExecutionLabelNode)
                         )
@@ -482,8 +496,6 @@ final class ContinuationGenerators {
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
                                     exitStoredMonitors(attrs),
                                 }),
-                                debugMarker(markerType, dbgSig + "Re-pushing method state"),
-                                call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg), loadVar(methodStateVar)),
                                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
                         )
@@ -500,8 +512,10 @@ final class ContinuationGenerators {
                     debugMarker(markerType, dbgSig + "Loading invocation return value"),
                     loadVar(returnCacheVar)
                 }),
-                jumpTo(continueExecLabelNode),
-                debugMarker(markerType, dbgSig + "Continuing execution...")
+                debugMarker(markerType, dbgSig + "Discarding saved method state"),
+                call(CONTINUATION_UNLOADCURRENTMETHODSTATE_METHOD, loadVar(contArg)),
+                debugMarker(markerType, dbgSig + "Restore complete. Jumping to post-invocation point"),
+                jumpTo(continueExecLabelNode)
         );
     }
 
@@ -511,32 +525,7 @@ final class ContinuationGenerators {
     
     
     
-    private static Variable getReturnCacheVar(MethodAttributes attrs, Type type) {
-        Validate.notNull(attrs);
-        Validate.notNull(type);
 
-        switch (type.getSort()) {
-            case Type.BOOLEAN:
-            case Type.BYTE:
-            case Type.CHAR:
-            case Type.SHORT:
-            case Type.INT:
-                return attrs.getCacheVariables().getIntReturnCacheVar();
-            case Type.LONG:
-                return attrs.getCacheVariables().getLongReturnCacheVar();
-            case Type.FLOAT:
-                return attrs.getCacheVariables().getFloatReturnCacheVar();
-            case Type.DOUBLE:
-                return attrs.getCacheVariables().getDoubleReturnCacheVar();
-            case Type.ARRAY:
-            case Type.OBJECT:
-                return attrs.getCacheVariables().getObjectReturnCacheVar();
-            case Type.VOID:
-                return null;
-            default:
-                throw new IllegalArgumentException("Bad type");
-        }
-    }
     
 
     
@@ -608,7 +597,7 @@ final class ContinuationGenerators {
                 debugMarker(markerType, dbgSig + "Packing locals and operand stack in to container"),
                 packStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars, savedStackVars),
                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
-                call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg),
+                call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
                         construct(METHODSTATE_INIT_METHOD,
                                 loadIntConst(idx),
                                 loadVar(storageContainerVar),
@@ -719,7 +708,7 @@ final class ContinuationGenerators {
                                     exitStoredMonitors(attrs),
                                 }),
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
-                                call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg),
+                                call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(idx),
                                                 loadVar(storageContainerVar),
@@ -809,7 +798,7 @@ final class ContinuationGenerators {
                                     exitStoredMonitors(attrs),
                                 }),
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
-                                call(CONTINUATION_PUSHMETHODSTATE_METHOD, loadVar(contArg),
+                                call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadIntConst(idx),
                                                 loadVar(storageContainerVar),
@@ -832,7 +821,9 @@ final class ContinuationGenerators {
                 
                 
                 addLabel(exceptionExecutionLabelNode),
-                debugMarker(markerType, dbgSig + "Rethrowing throwable"),
+                // Since we're rethrowing from original try/catch, if the throwable is of the expected type it'll get handled. If not it'll
+                // get thrown up the chain (which is normal behaviour).
+                debugMarker(markerType, dbgSig + "Rethrowing throwable from original try/catch"),
                 loadVar(throwableVar),
                 throwThrowable(),
                 

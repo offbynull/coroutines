@@ -81,4 +81,30 @@ final class CacheVariables {
         Validate.validState(throwableCacheVar != null, "Throwable cache variable of type not assigned");
         return throwableCacheVar;
     }
+    
+    public Variable getReturnCacheVar(Type type) {
+        Validate.notNull(type);
+
+        switch (type.getSort()) {
+            case Type.BOOLEAN:
+            case Type.BYTE:
+            case Type.CHAR:
+            case Type.SHORT:
+            case Type.INT:
+                return getIntReturnCacheVar();
+            case Type.LONG:
+                return getLongReturnCacheVar();
+            case Type.FLOAT:
+                return getFloatReturnCacheVar();
+            case Type.DOUBLE:
+                return getDoubleReturnCacheVar();
+            case Type.ARRAY:
+            case Type.OBJECT:
+                return getObjectReturnCacheVar();
+            case Type.VOID:
+                return null;
+            default:
+                throw new IllegalArgumentException("Bad type");
+        }
+    }
 }

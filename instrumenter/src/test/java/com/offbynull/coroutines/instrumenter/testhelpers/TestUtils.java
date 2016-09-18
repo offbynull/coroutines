@@ -61,13 +61,25 @@ public final class TestUtils {
     }
     
     /**
-     * Opens up a ZIP resource, instruments the classes within, and returns a {@link URLClassLoader} object with access to those classes.
+     * Equivalent to calling {@code loadClassesInZipResourceAndInstrument(path, new InstrumentationSettings(MarkerType.CONSTANT, false))}.
      * @param path path of zip resource
      * @return class loader able to access instrumented classes
      * @throws NullPointerException if any argument is {@code null}
      * @throws IOException if an IO error occurs
      */
     public static URLClassLoader loadClassesInZipResourceAndInstrument(String path) throws IOException {
+        return loadClassesInZipResourceAndInstrument(path, new InstrumentationSettings(MarkerType.CONSTANT, false));
+    }
+
+        /**
+     * Opens up a ZIP resource, instruments the classes within, and returns a {@link URLClassLoader} object with access to those classes.
+     * @param path path of zip resource
+     * @param settings instrumentation settings
+     * @return class loader able to access instrumented classes
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IOException if an IO error occurs
+     */
+    public static URLClassLoader loadClassesInZipResourceAndInstrument(String path, InstrumentationSettings settings) throws IOException {
         Validate.notNull(path);
         
         // Load original class
@@ -86,7 +98,6 @@ public final class TestUtils {
         
         // Instrument classes and write out new jar
         Instrumenter instrumenter = new Instrumenter(classpath);
-        InstrumentationSettings settings = new InstrumentationSettings(MarkerType.CONSTANT, false);
         List<JarEntry> instrumentedJarEntries = new ArrayList<>(classContents.size());
         for (Entry<String, byte[]> entry : classContents.entrySet()) {
             byte[] content = entry.getValue();
