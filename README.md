@@ -59,21 +59,25 @@ Then, add the Maven plugin so that your classes get instrumented when you build.
     <artifactId>maven-plugin</artifactId>
     <version>1.1.1</version>
     <executions>
-        <!-- Instruments test classes during the process-test-classes phase -->
-        <execution>
-            <id>test-coroutines-instrument-id</id>
-            <goals>
-                <goal>test-instrument</goal>
-            </goals>
-        </execution>
-        <!-- Instruments main classes during the process-classes phase -->
+        <!-- Instruments main classes at process-classes phase -->        
         <execution>
             <id>coroutines-instrument-id</id>
             <goals>
                 <goal>instrument</goal>
             </goals>
         </execution>
+        <!-- Instruments test classes at process-test-classes phase -->
+        <execution>
+            <id>test-coroutines-instrument-id</id>
+            <goals>
+                <goal>test-instrument</goal>
+            </goals>
+        </execution>
     </executions>
+    <configuration>
+        <!-- Uncomment if you'll be stepping through your coroutines in an IDE. -->
+        <!-- <debugMode>true</debugMode> -->
+    </configuration>
 </plugin>
 ```
 
@@ -94,6 +98,7 @@ Then, bind it to the target of your choice.
 ```xml
 <target name="-post-compile">
     <!-- The classpath attribute is a semicolon delimited list of the classpath required by your code. -->
+    <!-- Add the attribute debugMode="true" if you'll be stepping through your coroutines in an IDE. -->
     <InstrumentTask classpath="" sourceDirectory="build" targetDirectory="build"/>
 </target>
 ```
