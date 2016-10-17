@@ -18,7 +18,6 @@ package com.offbynull.coroutines.instrumenter;
 
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.call;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.construct;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.forEach;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadVar;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.merge;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.saveVar;
@@ -37,6 +36,7 @@ import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.forEachLoop;
 
 final class SynchronizationGenerators {
 
@@ -55,15 +55,17 @@ final class SynchronizationGenerators {
     
     /**
      * Generates instruction to that creates a new {@link LockState} object and saves it to the lockstate variable.
-     * @param markerType debug marker type
+     * @param settings instrumenter settings
      * @param lockVars variables for lock/synchpoint functionality
      * @return instructions to push a new {@link LockState} object
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if lock variables aren't set (the method doesn't contain any monitorenter/monitorexit instructions)
      */
-    public static InsnList createMonitorContainer(MarkerType markerType, LockVariables lockVars) {
-        Validate.notNull(markerType);
+    public static InsnList createMonitorContainer(InstrumentationSettings settings, LockVariables lockVars) {
+        Validate.notNull(settings);
         Validate.notNull(lockVars);
+        
+        MarkerType markerType = settings.getMarkerType();
 
         Variable lockStateVar = lockVars.getLockStateVar();
         Validate.isTrue(lockStateVar != null);  // extra sanity check, if no synch points this should be null
@@ -77,16 +79,18 @@ final class SynchronizationGenerators {
 
     /**
      * Generates instruction to enter all monitors in the {@link LockState} object sitting in the lockstate variable.
-     * @param markerType debug marker type
+     * @param settings instrumenter settings
      * @param lockVars variables for lock/synchpoint functionality
      * @return instructions to enter all monitors in the {@link LockState} object
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if lock variables aren't set (the method doesn't contain any monitorenter/monitorexit instructions)
      */
-    public static InsnList enterStoredMonitors(MarkerType markerType, LockVariables lockVars) {
-        Validate.notNull(markerType);
+    public static InsnList enterStoredMonitors(InstrumentationSettings settings, LockVariables lockVars) {
+        Validate.notNull(settings);
         Validate.notNull(lockVars);
 
+        MarkerType markerType = settings.getMarkerType();
+        
         Variable lockStateVar = lockVars.getLockStateVar();
         Variable counterVar = lockVars.getCounterVar();
         Variable arrayLenVar = lockVars.getArrayLenVar();
@@ -94,7 +98,7 @@ final class SynchronizationGenerators {
         Validate.isTrue(counterVar != null);
         Validate.isTrue(arrayLenVar != null);
 
-        return forEach(counterVar, arrayLenVar,
+        return forEachLoop(counterVar, arrayLenVar,
                 merge(
                         debugMarker(markerType, "Loading monitors to enter"),
                         call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar))
@@ -108,16 +112,18 @@ final class SynchronizationGenerators {
     
     /**
      * Generates instruction to exit all monitors in the {@link LockState} object sitting in the lockstate variable.
-     * @param markerType debug marker type
+     * @param settings instrumenter settings
      * @param lockVars variables for lock/synchpoint functionality
      * @return instructions to exit all monitors in the {@link LockState} object
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if lock variables aren't set (the method doesn't contain any monitorenter/monitorexit instructions)
      */
-    public static InsnList exitStoredMonitors(MarkerType markerType, LockVariables lockVars) {
-        Validate.notNull(markerType);
+    public static InsnList exitStoredMonitors(InstrumentationSettings settings, LockVariables lockVars) {
+        Validate.notNull(settings);
         Validate.notNull(lockVars);
 
+        MarkerType markerType = settings.getMarkerType();
+        
         Variable lockStateVar = lockVars.getLockStateVar();
         Variable counterVar = lockVars.getCounterVar();
         Variable arrayLenVar = lockVars.getArrayLenVar();
@@ -125,7 +131,7 @@ final class SynchronizationGenerators {
         Validate.isTrue(counterVar != null);
         Validate.isTrue(arrayLenVar != null);
 
-        return forEach(counterVar, arrayLenVar,
+        return forEachLoop(counterVar, arrayLenVar,
                 merge(
                         debugMarker(markerType, "Loading monitors to exit"),
                         call(LOCKSTATE_TOARRAY_METHOD, loadVar(lockStateVar))
@@ -140,16 +146,18 @@ final class SynchronizationGenerators {
     /**
      * Generates instruction to enter a monitor (top item on the stack) and store it in the {@link LockState} object sitting in the
      * lockstate variable.
-     * @param markerType debug marker type
+     * @param settings instrumenter settings
      * @param lockVars variables for lock/synchpoint functionality
      * @return instructions to enter a monitor and store it in the {@link LockState} object
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if lock variables aren't set (the method doesn't contain any monitorenter/monitorexit instructions)
      */
-    public static InsnList enterMonitorAndStore(MarkerType markerType, LockVariables lockVars) {
-        Validate.notNull(markerType);
+    public static InsnList enterMonitorAndStore(InstrumentationSettings settings, LockVariables lockVars) {
+        Validate.notNull(settings);
         Validate.notNull(lockVars);
 
+        MarkerType markerType = settings.getMarkerType();
+        
         Variable lockStateVar = lockVars.getLockStateVar();
         Validate.isTrue(lockStateVar != null);
 
@@ -178,16 +186,18 @@ final class SynchronizationGenerators {
     /**
      * Generates instruction to exit a monitor (top item on the stack) and remove it from the {@link LockState} object sitting in the
      * lockstate variable.
-     * @param markerType debug marker type
+     * @param settings instrumenter settings
      * @param lockVars variables for lock/synchpoint functionality
      * @return instructions to exit a monitor and remove it from the {@link LockState} object
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if lock variables aren't set (the method doesn't contain any monitorenter/monitorexit instructions)
      */
-    public static InsnList exitMonitorAndDelete(MarkerType markerType, LockVariables lockVars) {
-        Validate.notNull(markerType);
+    public static InsnList exitMonitorAndDelete(InstrumentationSettings settings, LockVariables lockVars) {
+        Validate.notNull(settings);
         Validate.notNull(lockVars);
 
+        MarkerType markerType = settings.getMarkerType();
+        
         Variable lockStateVar = lockVars.getLockStateVar();
         Validate.isTrue(lockStateVar != null);
 

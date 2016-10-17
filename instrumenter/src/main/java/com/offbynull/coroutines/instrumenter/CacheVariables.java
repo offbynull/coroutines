@@ -17,6 +17,7 @@
 package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
+import com.offbynull.coroutines.user.MethodState;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Type;
 
@@ -27,6 +28,7 @@ final class CacheVariables {
     private final Variable doubleReturnCacheVar;
     private final Variable objectReturnCacheVar;
     private final Variable throwableCacheVar;
+    private final Variable tempMethodStateVar;
     
     CacheVariables(
             Variable intReturnCacheVar,
@@ -34,7 +36,8 @@ final class CacheVariables {
             Variable floatReturnCacheVar,
             Variable doubleReturnCacheVar,
             Variable objectReturnCacheVar,
-            Variable throwableCacheVar) {
+            Variable throwableCacheVar,
+            Variable tempMethodStateVar) {
         // cache vars CAN BE NULL -- if they weren't created it means it was determined that it wasn't required
         Validate.isTrue(intReturnCacheVar == null || intReturnCacheVar.getType().equals(Type.INT_TYPE));
         Validate.isTrue(longReturnCacheVar == null || longReturnCacheVar.getType().equals(Type.LONG_TYPE));
@@ -42,6 +45,7 @@ final class CacheVariables {
         Validate.isTrue(doubleReturnCacheVar == null || doubleReturnCacheVar.getType().equals(Type.DOUBLE_TYPE));
         Validate.isTrue(objectReturnCacheVar == null || objectReturnCacheVar.getType().equals(Type.getType(Object.class)));
         Validate.isTrue(throwableCacheVar == null || throwableCacheVar.getType().equals(Type.getType(Throwable.class)));
+        Validate.isTrue(tempMethodStateVar == null || tempMethodStateVar.getType().equals(Type.getType(MethodState.class)));
 
         this.intReturnCacheVar = intReturnCacheVar;
         this.longReturnCacheVar = longReturnCacheVar;
@@ -50,6 +54,7 @@ final class CacheVariables {
         this.objectReturnCacheVar = objectReturnCacheVar;
         
         this.throwableCacheVar = throwableCacheVar;
+        this.tempMethodStateVar = tempMethodStateVar;
     }
 
     public Variable getIntReturnCacheVar() {
@@ -78,8 +83,13 @@ final class CacheVariables {
     }
 
     public Variable getThrowableCacheVar() {
-        Validate.validState(throwableCacheVar != null, "Throwable cache variable of type not assigned");
+        Validate.validState(throwableCacheVar != null, "Throwable cache variable not assigned");
         return throwableCacheVar;
+    }
+
+    public Variable getTempMethodStateVar() {
+        Validate.validState(tempMethodStateVar != null, "Temporary MethodState variable not assigned");
+        return tempMethodStateVar;
     }
     
     public Variable getReturnCacheVar(Type type) {

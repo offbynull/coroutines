@@ -371,6 +371,7 @@ final class MethodAnalyzer {
         Variable doubleReturnCacheVar = null;
         Variable objectReturnCacheVar = null;
         Variable throwableCacheVar = null;
+        Variable tempMethodStateVar = null;
         if (invocationReturnTypes.intFound) {
             intReturnCacheVar = varTable.acquireExtra(Integer.TYPE);
         }
@@ -388,6 +389,7 @@ final class MethodAnalyzer {
         }
         if (invocationFoundWrappedInTryCatch) {
             throwableCacheVar = varTable.acquireExtra(Throwable.class);
+            tempMethodStateVar = varTable.acquireExtra(MethodState.class);
         }
 
         return new CacheVariables(
@@ -396,7 +398,8 @@ final class MethodAnalyzer {
                 floatReturnCacheVar,
                 doubleReturnCacheVar,
                 objectReturnCacheVar,
-                throwableCacheVar);
+                throwableCacheVar,
+                tempMethodStateVar);
     }
     
     private StorageVariables allocateStorageVariableSlots(

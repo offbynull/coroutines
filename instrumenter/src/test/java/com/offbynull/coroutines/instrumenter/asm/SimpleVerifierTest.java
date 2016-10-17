@@ -34,7 +34,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.objectweb.asm.ClassReader;
@@ -48,10 +47,10 @@ import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.returnVoid;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.throwRuntimeException;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
+import static org.junit.Assert.assertEquals;
 
 public class SimpleVerifierTest {
 
@@ -168,7 +167,7 @@ public class SimpleVerifierTest {
         
         
         // ensure that that the local variable for the collection we created in the switch blocks is an abstract type
-        Assert.assertEquals("java/util/AbstractCollection", basicValue.getType().getInternalName());
+        assertEquals("java/util/AbstractCollection", basicValue.getType().getInternalName());
     }
 
 }

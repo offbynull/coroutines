@@ -46,6 +46,9 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
     
     @Parameter(property = "coroutines.debugMode", defaultValue = "false")
     private boolean debugMode;
+    
+    @Parameter(property = "coroutines.customFrameAllocator", defaultValue = "false")
+    private boolean customFrameAllocator;
 
     /**
      * Instruments all classes in a path recursively.
@@ -58,7 +61,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
             throws MojoExecutionException {
         try {
             Instrumenter instrumenter = getInstrumenter(log, classpath);
-            InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode);
+            InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode, customFrameAllocator);
 
             for (File classFile : FileUtils.listFiles(path, new String[]{"class"}, true)) {
                 log.info("Instrumenting " + classFile);

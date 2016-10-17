@@ -16,17 +16,24 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.allocateDoubleArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.allocateFloatArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.allocateIntArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.allocateLongArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.allocateObjectArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.freeDoubleArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.freeFloatArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.freeIntArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.freeLongArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.freeObjectArray;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.debugMarker;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.merge;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.mergeIf;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.IntInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
@@ -44,16 +51,18 @@ final class LocalsStateGenerators {
 
     /**
      * Generates instructions to load the local variables table.
-     * @param markerType debug marker type
+     * @param settings instrumenter settings
      * @param storageVars variables to load locals from
      * @param frame execution frame at the instruction for which the local variables table is to be restored
      * @return instructions to load the local variables table from an array
      * @throws NullPointerException if any argument is {@code null}
      */
-    public static InsnList loadLocals(MarkerType markerType, StorageVariables storageVars, Frame<BasicValue> frame) {
-        Validate.notNull(markerType);
+    public static InsnList loadLocals(InstrumentationSettings settings, StorageVariables storageVars, Frame<BasicValue> frame) {
+        Validate.notNull(settings);
         Validate.notNull(storageVars);
         Validate.notNull(frame);
+        
+        MarkerType markerType = settings.getMarkerType();
 
         Variable intsVar = storageVars.getIntStorageVar();
         Variable floatsVar = storageVars.getFloatStorageVar();
@@ -157,16 +166,18 @@ final class LocalsStateGenerators {
     
     /**
      * Generates instructions to save the local variables table.
-     * @param markerType debug marker type
+     * @param settings instrumenter settings
      * @param storageVars variables to store locals in to
      * @param frame execution frame at the instruction where the local variables table is to be saved
      * @return instructions to save the local variables table in to an array
      * @throws NullPointerException if any argument is {@code null}
      */
-    public static InsnList saveLocals(MarkerType markerType, StorageVariables storageVars, Frame<BasicValue> frame) {
-        Validate.notNull(markerType);
+    public static InsnList saveLocals(InstrumentationSettings settings, StorageVariables storageVars, Frame<BasicValue> frame) {
+        Validate.notNull(settings);
         Validate.notNull(storageVars);
         Validate.notNull(frame);
+        
+        MarkerType markerType = settings.getMarkerType();
 
         Variable intsVar = storageVars.getIntStorageVar();
         Variable floatsVar = storageVars.getFloatStorageVar();
@@ -180,45 +191,9 @@ final class LocalsStateGenerators {
         int doublesCounter = 0;
         int objectsCounter = 0;
 
-        StorageSizes storageSizes = computeSizes(frame);
-        
-
         InsnList ret = new InsnList();
-                
-        // Create storage arrays and save them in respective storage vars
-        ret.add(merge(
-                debugMarker(markerType, "Saving locals"),
-                mergeIf(intsVar != null, () -> new Object[] {
-                    debugMarker(markerType, "Generating ints container (" + storageSizes.getIntsSize() + ")"),
-                    new LdcInsnNode(storageSizes.getIntsSize()),
-                    new IntInsnNode(Opcodes.NEWARRAY, Opcodes.T_INT),
-                    new VarInsnNode(Opcodes.ASTORE, intsVar.getIndex())
-                }),
-                mergeIf(floatsVar != null, () -> new Object[] {
-                    debugMarker(markerType, "Generating floats container (" + storageSizes.getFloatsSize() + ")"),
-                    new LdcInsnNode(storageSizes.getFloatsSize()),
-                    new IntInsnNode(Opcodes.NEWARRAY, Opcodes.T_FLOAT),
-                    new VarInsnNode(Opcodes.ASTORE, floatsVar.getIndex())
-                }),
-                mergeIf(longsVar != null, () -> new Object[] {
-                    debugMarker(markerType, "Generating longs container (" + storageSizes.getLongsSize() + ")"),
-                    new LdcInsnNode(storageSizes.getLongsSize()),
-                    new IntInsnNode(Opcodes.NEWARRAY, Opcodes.T_LONG),
-                    new VarInsnNode(Opcodes.ASTORE, longsVar.getIndex())
-                }),
-                mergeIf(doublesVar != null, () -> new Object[] {
-                    debugMarker(markerType, "Generating doubles container (" + storageSizes.getDoublesSize() + ")"),
-                    new LdcInsnNode(storageSizes.getDoublesSize()),
-                    new IntInsnNode(Opcodes.NEWARRAY, Opcodes.T_DOUBLE),
-                    new VarInsnNode(Opcodes.ASTORE, doublesVar.getIndex())
-                }),
-                mergeIf(objectsVar != null, () -> new Object[] {
-                    debugMarker(markerType, "Generating objects container (" + storageSizes.getObjectsSize() + ")"),
-                    new LdcInsnNode(storageSizes.getObjectsSize()),
-                    new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"),
-                    new VarInsnNode(Opcodes.ASTORE, objectsVar.getIndex())
-                })
-        ));
+
+        ret.add(debugMarker(markerType, "Saving locals"));
 
         // Save the locals
         for (int i = 0; i < frame.getLocals(); i++) {
@@ -293,6 +268,166 @@ final class LocalsStateGenerators {
                 default:
                     throw new IllegalStateException();
             }
+        }
+        
+        return ret;
+    }
+    
+    /**
+     * Generates instructions to create the storage arrays required for storing the local variables table.
+     * @param settings instrumenter settings
+     * @param contVar variable containing the continuation object
+     * @param storageVars variables to store locals in to
+     * @param frame execution frame at the instruction where the local variables table is to be saved
+     * @return instructions to allocate the locals storage arrays
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList allocateLocalsStorageArrays(InstrumentationSettings settings, Variable contVar, StorageVariables storageVars,
+            Frame<BasicValue> frame) {
+        Validate.notNull(settings);
+        Validate.notNull(contVar);
+        Validate.notNull(storageVars);
+        Validate.notNull(frame);
+        
+        MarkerType markerType = settings.getMarkerType();
+        
+        Variable intsVar = storageVars.getIntStorageVar();
+        Variable floatsVar = storageVars.getFloatStorageVar();
+        Variable longsVar = storageVars.getLongStorageVar();
+        Variable doublesVar = storageVars.getDoubleStorageVar();
+        Variable objectsVar = storageVars.getObjectStorageVar();
+
+        StorageSizes storageSizes = computeSizes(frame);
+        
+        InsnList ret = new InsnList();
+        ret.add(debugMarker(markerType, "Allocating arrays for locals"));
+        
+        // Why are we using size > 0 vs checking to see if var != null?
+        //
+        // REMEMBER THAT the analyzer will determine the variable slots to create for storage array based on its scan of EVERY
+        // continuation/suspend point in the method. Imagine the method that we're instrumenting is this...
+        //
+        // public void example(Continuation c, String arg1) {
+        //     String var1 = "hi";
+        //     c.suspend();     
+        //
+        //     System.out.println(var1);
+        //     int var2 = 5;
+        //     c.suspend();
+        //
+        //     System.out.println(var1 + var2);
+        // }
+        //
+        // There are two continuation/suspend points. The analyzer determines that method will need to assign variable slots for
+        // localsObjectsVar+localsIntsVar. All the other locals vars will be null.
+        //
+        // If we ended up using var != null instead of size > 0, things would mess up on the first suspend(). The only variable initialized
+        // at the first suspend is var1. As such, LocalStateGenerator ONLY CREATES AN ARRAY FOR localsObjectsVar. It doesn't touch
+        // localsIntsVar because, at the first suspend(), var2 is UNINITALIZED. Nothing has been set to that variable slot.
+        //
+        //
+        // The same thing applies to the operand stack. It doesn't make sense to create arrays for operand stack types that don't exist yet
+        // at a continuation point, even though they may exist at other continuation points furhter down
+        
+        if (storageSizes.getIntsSize() > 0) {
+            ret.add(debugMarker(markerType, "Allocating locals int array (" + storageSizes.getIntsSize() +  ")"));
+            ret.add(allocateIntArray(settings, contVar, intsVar, storageSizes.getIntsSize()));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping locals int array allocation because size is 0 (nothing will be stored in here)"));
+        }
+        
+        if (storageSizes.getFloatsSize() > 0) {
+            ret.add(debugMarker(markerType, "Allocating locals float array (" + storageSizes.getFloatsSize() +  ")"));
+            ret.add(allocateFloatArray(settings, contVar, floatsVar, storageSizes.getFloatsSize()));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping locals float array allocation because size is 0 (nothing will be stored in here)"));
+        }
+        
+        if (storageSizes.getLongsSize() > 0) {
+            ret.add(debugMarker(markerType, "Allocating locals long array (" + storageSizes.getLongsSize() +  ")"));
+            ret.add(allocateLongArray(settings, contVar, longsVar, storageSizes.getLongsSize()));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping locals long array allocation because size is 0 (nothing will be stored in here)"));
+        }
+        
+        if (storageSizes.getDoublesSize() > 0) {
+            ret.add(debugMarker(markerType, "Allocating locals double array (" + storageSizes.getDoublesSize() +  ")"));
+            ret.add(allocateDoubleArray(settings, contVar, doublesVar, storageSizes.getDoublesSize()));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping locals double array allocation because size is 0 (nothing will be stored in here)"));
+        }
+        
+        if (storageSizes.getObjectsSize() > 0) {
+            ret.add(debugMarker(markerType, "Allocating locals Object array (" + storageSizes.getObjectsSize() +  ")"));
+            ret.add(allocateObjectArray(settings, contVar, objectsVar, storageSizes.getObjectsSize()));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping locals Object array allocation because size is 0 (nothing will be stored in here)"));
+        }
+        
+        return ret;
+    }
+    
+    /**
+     * Generates instructions to free the storage arrays required for storing the local variables table.
+     * @param settings instrumenter settings
+     * @param contVar variable containing the continuation object
+     * @param storageVars variables to store locals in to
+     * @param frame execution frame at the instruction where the local variables table is to be saved
+     * @return instructions to free the locals storage arrays
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList freeLocalsStorageArrays(InstrumentationSettings settings, Variable contVar, StorageVariables storageVars,
+            Frame<BasicValue> frame) {
+        Validate.notNull(settings);
+        Validate.notNull(contVar);
+        Validate.notNull(storageVars);
+        Validate.notNull(frame);
+        MarkerType markerType = settings.getMarkerType();
+        
+        Variable intsVar = storageVars.getIntStorageVar();
+        Variable floatsVar = storageVars.getFloatStorageVar();
+        Variable longsVar = storageVars.getLongStorageVar();
+        Variable doublesVar = storageVars.getDoubleStorageVar();
+        Variable objectsVar = storageVars.getObjectStorageVar();
+        
+        StorageSizes storageSizes = computeSizes(frame);
+        
+        InsnList ret = new InsnList();
+        ret.add(debugMarker(markerType, "Freeing arrays for locals"));
+        
+        if (storageSizes.getIntsSize() > 0) {
+            ret.add(debugMarker(markerType, "Freeing locals int array"));
+            ret.add(freeIntArray(settings, contVar, intsVar));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping locals int array free because size is 0 (never created)"));
+        }
+        
+        if (storageSizes.getFloatsSize() > 0) {
+            ret.add(debugMarker(markerType, "Freeing locals float array"));
+            ret.add(freeFloatArray(settings, contVar, floatsVar));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping locals float array free because size is 0 (never created)"));
+        }
+        
+        if (storageSizes.getLongsSize() > 0) {
+            ret.add(debugMarker(markerType, "Freeing locals long array"));
+            ret.add(freeLongArray(settings, contVar, longsVar));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping locals long array free because size is 0 (never created)"));
+        }
+        
+        if (storageSizes.getDoublesSize() > 0) {
+            ret.add(debugMarker(markerType, "Freeing locals double array"));
+            ret.add(freeDoubleArray(settings, contVar, doublesVar));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping locals double array free because size is 0 (never created)"));
+        }
+        
+        if (storageSizes.getObjectsSize() > 0) {
+            ret.add(debugMarker(markerType, "Freeing locals Object array"));
+            ret.add(freeObjectArray(settings, contVar, objectsVar));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping locals Object array free because size is 0 (never created)"));
         }
         
         return ret;

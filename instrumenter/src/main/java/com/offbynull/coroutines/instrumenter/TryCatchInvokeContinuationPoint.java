@@ -29,7 +29,8 @@ class TryCatchInvokeContinuationPoint implements ContinuationPoint {
     private final MethodInsnNode invokeInstruction;
     private final LabelNode continueExecutionLabel;
     private final LabelNode exceptionExecutionLabel;
-    private final TryCatchBlockNode tryCatchBlock;
+    private final TryCatchBlockNode originalTryCatchBlockNode;
+    private final TryCatchBlockNode invokeTryCatchBlockNode;
     private final Frame<BasicValue> frame;
 
     TryCatchInvokeContinuationPoint(
@@ -42,9 +43,10 @@ class TryCatchInvokeContinuationPoint implements ContinuationPoint {
 
         this.lineNumber = lineNumber;
         this.invokeInstruction = invokeInstruction;
+        this.originalTryCatchBlockNode = new TryCatchBlockNode(null, null, null, null);
+        this.invokeTryCatchBlockNode = new TryCatchBlockNode(null, null, null, null);
         this.continueExecutionLabel = new LabelNode();
         this.exceptionExecutionLabel = new LabelNode();
-        this.tryCatchBlock = new TryCatchBlockNode(null, null, null, null);
         this.frame = frame;
     }
 
@@ -67,8 +69,12 @@ class TryCatchInvokeContinuationPoint implements ContinuationPoint {
         return exceptionExecutionLabel;
     }
 
-    public TryCatchBlockNode getTryCatchBlock() {
-        return tryCatchBlock;
+    public TryCatchBlockNode getOriginaltTryCatchBlockNode() {
+        return originalTryCatchBlockNode;
+    }
+
+    public TryCatchBlockNode getInvokeTryCatchBlockNode() {
+        return invokeTryCatchBlockNode;
     }
 
     @Override

@@ -53,6 +53,8 @@ public final class InstrumentTask extends Task {
     private String markerType = MarkerType.NONE.name();
     
     private boolean debugMode = false;
+    
+    private boolean customFrameAllocator = false;
 
     private String classpath;
 
@@ -87,6 +89,14 @@ public final class InstrumentTask extends Task {
      */
     public void setDebugMode(boolean debugMode) {
         this.debugMode = debugMode;
+    }
+
+    /**
+     * Sets the flag to use a custom frame allocator. Defaults to {@code false}.
+     * @param customFrameAllocator custom frame allocator flag
+     */
+    public void setCustomFrameAllocator(boolean customFrameAllocator) {
+        this.customFrameAllocator = customFrameAllocator;
     }
 
     /**
@@ -194,7 +204,7 @@ public final class InstrumentTask extends Task {
             File outputFile = outputFilePath.toFile();
 
             MarkerType markerTypeEnum = MarkerType.valueOf(markerType);
-            InstrumentationSettings settings = new InstrumentationSettings(markerTypeEnum, debugMode);
+            InstrumentationSettings settings = new InstrumentationSettings(markerTypeEnum, debugMode, customFrameAllocator);
             
             log("Instrumenting " + inputFile, Project.MSG_INFO);
             byte[] input = FileUtils.readFileToByteArray(inputFile);

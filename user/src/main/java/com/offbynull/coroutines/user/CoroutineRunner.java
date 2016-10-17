@@ -23,21 +23,33 @@ import java.io.Serializable;
  * @author Kasra Faghihi
  */
 public final class CoroutineRunner implements Serializable {
-    private static final long serialVersionUID = 3L;
+    private static final long serialVersionUID = 4L;
     
-    private Coroutine coroutine;
-    private Continuation continuation = new Continuation();
+    private final Coroutine coroutine;
+    private final Continuation continuation;
 
     /**
-     * Constructs a {@link CoroutineRunner} object.
+     * Constructs a {@link CoroutineRunner} object. Equivalent to calling {@code new CoroutineRunner(coroutine, null)}.
      * @param coroutine coroutine to run
      * @throws NullPointerException if any argument is {@code null}
      */
     public CoroutineRunner(Coroutine coroutine) {
+        this(coroutine, null);
+    }
+
+    /**
+     * Constructs a {@link CoroutineRunner} object with a custom memory allocator for frame saving.
+     * @param coroutine coroutine to run
+     * @param allocator memory allocator for frames
+     * @throws NullPointerException if {@code coroutine} is {@code null}
+     */
+    public CoroutineRunner(Coroutine coroutine, FrameAllocator allocator) {
         if (coroutine == null) {
             throw new NullPointerException();
         }
         this.coroutine = coroutine;
+        this.continuation = new Continuation();
+        this.continuation.setAllocator(allocator);
     }
 
     /**

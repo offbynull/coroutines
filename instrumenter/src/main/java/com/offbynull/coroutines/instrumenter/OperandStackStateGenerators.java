@@ -16,17 +16,25 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.allocateDoubleArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.allocateFloatArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.allocateIntArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.allocateLongArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.allocateObjectArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.freeDoubleArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.freeFloatArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.freeIntArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.freeLongArray;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.freeObjectArray;
+import static com.offbynull.coroutines.instrumenter.LocalsStateGenerators.computeSizes;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.debugMarker;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.merge;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.mergeIf;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.IntInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
@@ -88,20 +96,20 @@ final class OperandStackStateGenerators {
     
     /**
      * Generates instructions to load the entire operand stack. Equivalent to calling
-     * {@code loadOperandStack(markerType, storageVars, frame, 0, 0, frame.getStackSize())}.
-     * @param markerType debug marker type
+     * {@code loadOperandStack(settings, storageVars, frame, 0, 0, frame.getStackSize())}.
+     * @param settings instrumenter settings
      * @param storageVars variables to load operand stack from
      * @param frame execution frame at the instruction where the operand stack is to be loaded
      * @return instructions to load the operand stack from the storage variables
      * @throws NullPointerException if any argument is {@code null}
      */
-    public static InsnList loadOperandStack(MarkerType markerType, StorageVariables storageVars, Frame<BasicValue> frame) {
-        return loadOperandStack(markerType, storageVars, frame, 0, 0, frame.getStackSize());
+    public static InsnList loadOperandStack(InstrumentationSettings settings, StorageVariables storageVars, Frame<BasicValue> frame) {
+        return loadOperandStack(settings, storageVars, frame, 0, 0, frame.getStackSize());
     }
 
     /**
      * Generates instructions to load a certain number of items to the top of the operand stack.
-     * @param markerType debug marker type
+     * @param settings instrumenter settings
      * @param storageVars variables to load operand stack from
      * @param frame execution frame at the instruction where the operand stack is to be loaded
      * @param storageStackStartIdx stack position where {@code storageVars} starts from
@@ -113,11 +121,11 @@ final class OperandStackStateGenerators {
      * in the storage vars (stack items before {@code storageStackStartIdx}), or if you're trying to load too many items on the stack (such
      * that it goes past {@code frame.getStackSize()})
      */
-    public static InsnList loadOperandStack(MarkerType markerType, StorageVariables storageVars, Frame<BasicValue> frame,
+    public static InsnList loadOperandStack(InstrumentationSettings settings, StorageVariables storageVars, Frame<BasicValue> frame,
             int storageStackStartIdx,  // stack idx which the storage was started at
             int storageStackLoadIdx,   // stack idx we should start loading at
             int count) {
-        Validate.notNull(markerType);
+        Validate.notNull(settings);
         Validate.notNull(storageVars);
         Validate.notNull(frame);
         // no negs allowed
@@ -127,6 +135,8 @@ final class OperandStackStateGenerators {
         Validate.isTrue(storageStackLoadIdx >= storageStackStartIdx);
         Validate.isTrue(storageStackStartIdx + count <= frame.getStackSize());
         Validate.isTrue(storageStackStartIdx + count >= 0); // likely will never overflow unless crazy high count passedin, but just in case
+        
+        MarkerType markerType = settings.getMarkerType();
         
         Variable intsVar = storageVars.getIntStorageVar();
         Variable floatsVar = storageVars.getFloatStorageVar();
@@ -259,21 +269,21 @@ final class OperandStackStateGenerators {
 
     /**
      * Generates instructions to save the entire operand stack. Equivalent to calling
-     * {@code saveOperandStack(markerType, storageVars, frame, frame.getStackSize())}.
+     * {@code saveOperandStack(settings, storageVars, frame, frame.getStackSize())}.
      * <p>
      * The instructions generated here expect the operand stack to be fully loaded. The stack items specified by {@code frame} must actually
      * all be on the operand stack.
      * <p>
      * REMEMBER: The items aren't returned to the operand stack after they've been saved (they have been popped off the stack). If you want
-     * them back on the operand stack, reload using {@code loadOperandStack(markerType, storageVars, frame)}.
-     * @param markerType debug marker type
+     * them back on the operand stack, reload using {@code loadOperandStack(setings, storageVars, frame)}.
+     * @param settings instrumenter settings
      * @param storageVars variables to store operand stack in to
      * @param frame execution frame at the instruction where the operand stack is to be saved
      * @return instructions to save the operand stack to the storage variables
      * @throws NullPointerException if any argument is {@code null}
      */
-    public static InsnList saveOperandStack(MarkerType markerType, StorageVariables storageVars, Frame<BasicValue> frame) {
-        return saveOperandStack(markerType, storageVars, frame, frame.getStackSize());
+    public static InsnList saveOperandStack(InstrumentationSettings settings, StorageVariables storageVars, Frame<BasicValue> frame) {
+        return saveOperandStack(settings, storageVars, frame, frame.getStackSize());
     }
 
     /**
@@ -284,23 +294,24 @@ final class OperandStackStateGenerators {
      * <p>
      * REMEMBER: The items aren't returned to the operand stack after they've been saved (they have been popped off the stack). If you want
      * them back on the operand stack, reload using
-     * {@code loadOperandStack(markerType, storageVars, frame, frame.getStackSize() - count, frame.getStackSize() - count, count)}.
-     * @param markerType debug marker type
+     * {@code loadOperandStack(settings, storageVars, frame, frame.getStackSize() - count, frame.getStackSize() - count, count)}.
+     * @param settings instrumenter settings
      * @param storageVars variables to store operand stack in to
      * @param frame execution frame at the instruction where the operand stack is to be saved
      * @param count number of items to store from the stack
      * @return instructions to save the operand stack to the storage variables
      * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if {@code size} is larger than the number of items in the stack at {@code frame} (or is negative),
-     * or if {@code count} is larger than {@code top} (or is negative)
+     * @throws IllegalArgumentException if {@code count} is larger than {@code frame.getStackSize()}
      */
-    public static InsnList saveOperandStack(MarkerType markerType, StorageVariables storageVars, Frame<BasicValue> frame, int count) {
-        Validate.notNull(markerType);
+    public static InsnList saveOperandStack(InstrumentationSettings settings, StorageVariables storageVars, Frame<BasicValue> frame,
+            int count) {
+        Validate.notNull(settings);
         Validate.notNull(storageVars);
         Validate.notNull(frame);
         Validate.isTrue(count >= 0);
         Validate.isTrue(count <= frame.getStackSize());
 
+        MarkerType markerType = settings.getMarkerType();
 
         Variable intsVar = storageVars.getIntStorageVar();
         Variable floatsVar = storageVars.getFloatStorageVar();
@@ -318,41 +329,8 @@ final class OperandStackStateGenerators {
 
 
         InsnList ret = new InsnList();
-                
-        // Create stack storage arrays and save them
-        ret.add(merge(
-                debugMarker(markerType, "Saving operand stack (" + count + " items)"),
-                mergeIf(storageSizes.getIntsSize() > 0, () -> new Object[] {
-                    debugMarker(markerType, "Generating ints container (" + storageSizes.getIntsSize() + ")"),
-                    new LdcInsnNode(storageSizes.getIntsSize()),
-                    new IntInsnNode(Opcodes.NEWARRAY, Opcodes.T_INT),
-                    new VarInsnNode(Opcodes.ASTORE, intsVar.getIndex())
-                }),
-                mergeIf(storageSizes.getFloatsSize() > 0, () -> new Object[] {
-                    debugMarker(markerType, "Generating floats container (" + storageSizes.getFloatsSize() + ")"),
-                    new LdcInsnNode(storageSizes.getFloatsSize()),
-                    new IntInsnNode(Opcodes.NEWARRAY, Opcodes.T_FLOAT),
-                    new VarInsnNode(Opcodes.ASTORE, floatsVar.getIndex())
-                }),
-                mergeIf(storageSizes.getLongsSize() > 0, () -> new Object[] {
-                    debugMarker(markerType, "Generating longs container (" + storageSizes.getLongsSize() + ")"),
-                    new LdcInsnNode(storageSizes.getLongsSize()),
-                    new IntInsnNode(Opcodes.NEWARRAY, Opcodes.T_LONG),
-                    new VarInsnNode(Opcodes.ASTORE, longsVar.getIndex())
-                }),
-                mergeIf(storageSizes.getDoublesSize() > 0, () -> new Object[] {
-                    debugMarker(markerType, "Generating doubles container (" + storageSizes.getDoublesSize() + ")"),
-                    new LdcInsnNode(storageSizes.getDoublesSize()),
-                    new IntInsnNode(Opcodes.NEWARRAY, Opcodes.T_DOUBLE),
-                    new VarInsnNode(Opcodes.ASTORE, doublesVar.getIndex())
-                }),
-                mergeIf(storageSizes.getObjectsSize() > 0, () -> new Object[] {
-                    debugMarker(markerType, "Generating objects container (" + storageSizes.getObjectsSize() + ")"),
-                    new LdcInsnNode(storageSizes.getObjectsSize()),
-                    new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"),
-                    new VarInsnNode(Opcodes.ASTORE, objectsVar.getIndex())
-                })
-        ));
+
+        ret.add(debugMarker(markerType, "Saving operand stack (" + count + " items)"));
 
         // Save the stack
         int start = frame.getStackSize() - 1;
@@ -434,8 +412,8 @@ final class OperandStackStateGenerators {
         // 
         // Reload using...
         // ---------------
-        // ret.add(debugMarker(markerType, "Reloading stack items"));
-        // InsnList reloadInsnList = loadOperandStack(markerType, storageVars, frame,
+        // ret.add(debugMarker(settings, "Reloading stack items"));
+        // InsnList reloadInsnList = loadOperandStack(settings, storageVars, frame,
         //         frame.getStackSize() - count,
         //         frame.getStackSize() - count,
         //         count);
@@ -444,6 +422,209 @@ final class OperandStackStateGenerators {
         return ret;
     }
     
+    /**
+     * Generates instructions to create the storage arrays required for storing the entire operand stack. Equivalent to calling
+     * {@code allocateOperandStackStorageArrays(settings, storageVars, frame, frame.getStackSize())}.
+     * @param settings instrumenter settings
+     * @param contVar variable containing the continuation object
+     * @param storageVars variables to store operand stack in to
+     * @param frame execution frame at the instruction where the operand stack is to be saved
+     * @return instructions to allocate the operand stack storage arrays
+     * @throws IllegalArgumentException if {@code count} is larger than {@code frame.getStackSize()}
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList allocateOperandStackStorageArrays(InstrumentationSettings settings, Variable contVar,
+            StorageVariables storageVars, Frame<BasicValue> frame) {
+        return allocateOperandStackStorageArrays(settings, contVar, storageVars, frame, frame.getStackSize());
+    }
+    
+    /**
+     * Generates instructions to create the storage arrays required for storing a certain number of items from the top of the operand stack.
+     * @param settings instrumenter settings
+     * @param contVar variable containing the continuation object
+     * @param storageVars variables to store operand stack in to
+     * @param frame execution frame at the instruction where the operand stack is to be saved
+     * @param count number of items to store from the stack
+     * @return instructions to allocate the operand stack storage arrays
+     * @throws IllegalArgumentException if {@code count} is larger than {@code frame.getStackSize()}
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList allocateOperandStackStorageArrays(InstrumentationSettings settings, Variable contVar,
+            StorageVariables storageVars, Frame<BasicValue> frame, int count) {
+        Validate.notNull(settings);
+        Validate.notNull(contVar);
+        Validate.notNull(storageVars);
+        Validate.notNull(frame);
+        Validate.isTrue(count >= 0);
+        Validate.isTrue(count <= frame.getStackSize());
+        
+        MarkerType markerType = settings.getMarkerType();
+        
+        Variable intsVar = storageVars.getIntStorageVar();
+        Variable floatsVar = storageVars.getFloatStorageVar();
+        Variable longsVar = storageVars.getLongStorageVar();
+        Variable doublesVar = storageVars.getDoubleStorageVar();
+        Variable objectsVar = storageVars.getObjectStorageVar();
+
+        StorageSizes storageSizes = computeSizes(frame, frame.getStackSize() - count, count);
+        
+        InsnList ret = new InsnList();
+        ret.add(debugMarker(markerType, "Allocating arrays for operand stack"));
+        
+        // Why are we using size > 0 vs checking to see if var != null?
+        //
+        // REMEMBER THAT the analyzer will determine the variable slots to create for storage array based on its scan of EVERY
+        // continuation/suspend point in the method. Imagine the method that we're instrumenting is this...
+        //
+        // public void example(Continuation c, String arg1) {
+        //     String var1 = "hi";
+        //     c.suspend();     
+        //
+        //     System.out.println(var1);
+        //     int var2 = 5;
+        //     c.suspend();
+        //
+        //     System.out.println(var1 + var2);
+        // }
+        //
+        // There are two continuation/suspend points. The analyzer determines that method will need to assign variable slots for
+        // localsObjectsVar+localsIntsVar. All the other locals vars will be null.
+        //
+        // If we ended up using var != null instead of size > 0, things would mess up on the first suspend(). The only variable initialized
+        // at the first suspend is var1. As such, LocalStateGenerator ONLY CREATES AN ARRAY FOR localsObjectsVar. It doesn't touch
+        // localsIntsVar because, at the first suspend(), var2 is UNINITALIZED. Nothing has been set to that variable slot.
+        //
+        //
+        // The same thing applies to the operand stack. It doesn't make sense to create arrays for operand stack types that don't exist yet
+        // at a continuation point, even though they may exist at other continuation points furhter down
+        
+        if (storageSizes.getIntsSize() > 0) {
+            ret.add(debugMarker(markerType, "Allocating operand stack int array (" + storageSizes.getIntsSize() +  ")"));
+            ret.add(allocateIntArray(settings, contVar, intsVar, storageSizes.getIntsSize()));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping operand stack int array allocation because size is 0"
+                    + " (nothing will be stored in here)"));
+        }
+        
+        if (storageSizes.getFloatsSize() > 0) {
+            ret.add(debugMarker(markerType, "Allocating operand stack float array (" + storageSizes.getFloatsSize() +  ")"));
+            ret.add(allocateFloatArray(settings, contVar, floatsVar, storageSizes.getFloatsSize()));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping operand stack float array allocation because size is 0"
+                    + " (nothing will be stored in here)"));
+        }
+        
+        if (storageSizes.getLongsSize() > 0) {
+            ret.add(debugMarker(markerType, "Allocating operand stack long array (" + storageSizes.getLongsSize() +  ")"));
+            ret.add(allocateLongArray(settings, contVar, longsVar, storageSizes.getLongsSize()));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping operand stack long array allocation because size is 0"
+                    + " (nothing will be stored in here)"));
+        }
+        
+        if (storageSizes.getDoublesSize() > 0) {
+            ret.add(debugMarker(markerType, "Allocating operand stack double array (" + storageSizes.getDoublesSize() +  ")"));
+            ret.add(allocateDoubleArray(settings, contVar, doublesVar, storageSizes.getDoublesSize()));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping operand stack double array allocation because size is 0"
+                    + " (nothing will be stored in here)"));
+        }
+        
+        if (storageSizes.getObjectsSize() > 0) {
+            ret.add(debugMarker(markerType, "Allocating operand stack Object array (" + storageSizes.getObjectsSize() +  ")"));
+            ret.add(allocateObjectArray(settings, contVar, objectsVar, storageSizes.getObjectsSize()));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping operand stack Object array allocation because size is 0"
+                    + " (nothing will be stored in here)"));
+        }
+        
+        return ret;
+    }
+    
+    /**
+     * Generates instructions to free the storage arrays required for storing the operand stack.
+     * @param settings instrumenter settings
+     * @param contVar variable containing the continuation object
+     * @param storageVars variables to store operand stack in to
+     * @param frame execution frame at the instruction where the operand stack is to be saved
+     * @param count number of stack items to that the storage arrays were generated for
+     * @return instructions to allocate the operand stack storage arrays
+     * @throws IllegalArgumentException if {@code count} is larger than {@code frame.getStackSize()}
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList freeOperandStackStorageArrays(InstrumentationSettings settings, Variable contVar, StorageVariables storageVars,
+            Frame<BasicValue> frame) {
+        return freeOperandStackStorageArrays(settings, contVar, storageVars, frame, frame.getStackSize());
+    }
+    
+    /**
+     * Generates instructions to free the storage arrays required for storing some predetermined number of items from the top of the operand
+     * stack.
+     * @param settings instrumenter settings
+     * @param contVar variable containing the continuation object
+     * @param storageVars variables to store operand stack in to
+     * @param frame execution frame at the instruction where the operand stack is to be saved
+     * @param count number of stack items to that the storage arrays were generated for
+     * @return instructions to allocate the operand stack storage arrays
+     * @throws IllegalArgumentException if {@code count} is larger than {@code frame.getStackSize()}
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList freeOperandStackStorageArrays(InstrumentationSettings settings, Variable contVar, StorageVariables storageVars,
+            Frame<BasicValue> frame, int count) {
+        Validate.notNull(settings);
+        Validate.notNull(contVar);
+        Validate.notNull(storageVars);
+        Validate.notNull(frame);
+        MarkerType markerType = settings.getMarkerType();
+        
+        Variable intsVar = storageVars.getIntStorageVar();
+        Variable floatsVar = storageVars.getFloatStorageVar();
+        Variable longsVar = storageVars.getLongStorageVar();
+        Variable doublesVar = storageVars.getDoubleStorageVar();
+        Variable objectsVar = storageVars.getObjectStorageVar();
+        
+        StorageSizes storageSizes = computeSizes(frame, frame.getStackSize() - count, count);
+        
+        InsnList ret = new InsnList();
+        ret.add(debugMarker(markerType, "Freeing arrays for operand stack"));
+        
+        if (storageSizes.getIntsSize() > 0) {
+            ret.add(debugMarker(markerType, "Freeing operand stack int array"));
+            ret.add(freeIntArray(settings, contVar, intsVar));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping operand stack int array free because size is 0 (never created)"));
+        }
+        
+        if (storageSizes.getFloatsSize() > 0) {
+            ret.add(debugMarker(markerType, "Freeing operand stack float array"));
+            ret.add(freeFloatArray(settings, contVar, floatsVar));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping operand stack float array free because size is 0 (never created)"));
+        }
+        
+        if (storageSizes.getLongsSize() > 0) {
+            ret.add(debugMarker(markerType, "Freeing operand stack long array"));
+            ret.add(freeLongArray(settings, contVar, longsVar));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping operand stack long array free because size is 0 (never created)"));
+        }
+        
+        if (storageSizes.getDoublesSize() > 0) {
+            ret.add(debugMarker(markerType, "Freeing operand stack double array"));
+            ret.add(freeDoubleArray(settings, contVar, doublesVar));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping operand stack double array free because size is 0 (never created)"));
+        }
+        
+        if (storageSizes.getObjectsSize() > 0) {
+            ret.add(debugMarker(markerType, "Freeing operand stack Object array"));
+            ret.add(freeObjectArray(settings, contVar, objectsVar));
+        } else {
+            ret.add(debugMarker(markerType, "Skipping operand stack Object array free because size is 0 (never created)"));
+        }
+        
+        return ret;
+    }
 
     /**
      * Compute sizes required for the storage arrays that will contain the operand stack at this frame.

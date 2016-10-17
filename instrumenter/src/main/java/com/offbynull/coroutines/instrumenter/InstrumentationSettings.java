@@ -17,6 +17,8 @@
 package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
+import com.offbynull.coroutines.user.Coroutine;
+import com.offbynull.coroutines.user.CoroutineRunner;
 import org.apache.commons.lang3.Validate;
 
 /**
@@ -26,17 +28,20 @@ import org.apache.commons.lang3.Validate;
 public final class InstrumentationSettings {
     private final MarkerType markerType;
     private final boolean debugMode;
+    private final boolean customFrameAllocator;
 
     /**
      * Constructs a {@link InstrumentationSettings} object.
      * @param markerType marker type
-     * @param debugMode debug mode
+     * @param debugMode debug mode flag
+     * @param customFrameAllocator custom frame allocator flag
      * @throws NullPointerException if any argument is {@code null}
      */
-    public InstrumentationSettings(MarkerType markerType, boolean debugMode) {
+    public InstrumentationSettings(MarkerType markerType, boolean debugMode, boolean customFrameAllocator) {
         Validate.notNull(markerType);
         this.markerType = markerType;
         this.debugMode = debugMode;
+        this.customFrameAllocator = customFrameAllocator;
     }
 
     /**
@@ -56,4 +61,15 @@ public final class InstrumentationSettings {
     public boolean isDebugMode() {
         return debugMode;
     }
+
+    /**
+     * Get custom frame allocator flag. If {@code true}, the custom frame allocator assigned to the {@link CoroutineRunner} /
+     * {@link Coroutine} will be used to generate the arrays that the frame gets stored to. If {@code false}, normal array allocation will
+     * occur (via the new keyword).
+     * @return custom frame allocator flag
+     */
+    public boolean isCustomFrameAllocator() {
+        return customFrameAllocator;
+    }
+    
 }

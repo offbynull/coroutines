@@ -20,7 +20,6 @@ import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepository;
-import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -59,19 +58,8 @@ public final class TestUtils {
     private TestUtils() {
         // do nothing
     }
-    
-    /**
-     * Equivalent to calling {@code loadClassesInZipResourceAndInstrument(path, new InstrumentationSettings(MarkerType.CONSTANT, false))}.
-     * @param path path of zip resource
-     * @return class loader able to access instrumented classes
-     * @throws NullPointerException if any argument is {@code null}
-     * @throws IOException if an IO error occurs
-     */
-    public static URLClassLoader loadClassesInZipResourceAndInstrument(String path) throws IOException {
-        return loadClassesInZipResourceAndInstrument(path, new InstrumentationSettings(MarkerType.CONSTANT, false));
-    }
 
-        /**
+    /**
      * Opens up a ZIP resource, instruments the classes within, and returns a {@link URLClassLoader} object with access to those classes.
      * @param path path of zip resource
      * @param settings instrumentation settings

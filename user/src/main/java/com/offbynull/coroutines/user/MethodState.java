@@ -25,7 +25,7 @@ import java.io.Serializable;
  * @author Kasra Faghihi
  */
 public final class MethodState implements Serializable {
-    private static final long serialVersionUID = 3L;
+    private static final long serialVersionUID = 4L;
     
     private final int continuationPoint;
     private final Object[] data;
@@ -101,7 +101,7 @@ public final class MethodState implements Serializable {
      * Get the next method state.
      * @return next method state
      */
-    MethodState getNext() {
+    public MethodState getNext() {
         return next;
     }
 
@@ -111,7 +111,7 @@ public final class MethodState implements Serializable {
      * Set the next method state.
      * @param next next method state
      */
-    void setNext(MethodState next) {
+    public void setNext(MethodState next) {
         this.next = next;
         if (next != null) {
             next.previous = this;
@@ -124,7 +124,7 @@ public final class MethodState implements Serializable {
      * Get the previous method state.
      * @return previous method state
      */
-    MethodState getPrevious() {
+    public MethodState getPrevious() {
         return previous;
     }
 
@@ -134,7 +134,7 @@ public final class MethodState implements Serializable {
      * Set the previous method state.
      * @param previous previous method state
      */
-    void setPrevious(MethodState previous) {
+    public void setPrevious(MethodState previous) {
         this.previous = previous;
         if (previous != null) {
             previous.next = this;

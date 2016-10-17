@@ -598,6 +598,110 @@ public final class GenericGenerators {
     }
 
     /**
+     * Compares an objects against null.
+     * @param lhs left hand side instruction list -- must leave an object on the stack
+     * @param action action to perform if results of {@code lhs} is null
+     * @return instructions instruction list to perform some action if the object is null
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList ifObjectNull(InsnList lhs, InsnList action) {
+        Validate.notNull(lhs);
+        Validate.notNull(action);
+        
+        
+        InsnList ret = new InsnList();
+        
+        LabelNode notEqualLabelNode = new LabelNode();
+        
+        ret.add(lhs);
+        ret.add(new JumpInsnNode(Opcodes.IFNONNULL, notEqualLabelNode));
+        ret.add(action);
+        ret.add(notEqualLabelNode);
+        
+        return ret;
+    }
+
+    /**
+     * Compares an objects against null.
+     * @param lhs left hand side instruction list -- must leave an object on the stack
+     * @param nullAction action to perform if results of {@code lhs} is null
+     * @param nonNullAction action to perform if results of {@code lhs} is not null
+     * @return instructions instruction list to perform some action if the object is null
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList ifObjectNull(InsnList lhs, InsnList nullAction, InsnList nonNullAction) {
+        Validate.notNull(lhs);
+        Validate.notNull(nullAction);
+        Validate.notNull(nonNullAction);
+        
+        
+        InsnList ret = new InsnList();
+        
+        LabelNode notNullLabelNode = new LabelNode();
+        LabelNode doneLabelNode = new LabelNode();
+        
+        ret.add(lhs);
+        ret.add(new JumpInsnNode(Opcodes.IFNONNULL, notNullLabelNode));
+        ret.add(nullAction);
+        ret.add(new JumpInsnNode(Opcodes.GOTO, doneLabelNode));
+        ret.add(notNullLabelNode);
+        ret.add(nonNullAction);
+        ret.add(doneLabelNode);
+        
+        return ret;
+    }
+
+    /**
+     * Compares an objects against not null.
+     * @param lhs left hand side instruction list -- must leave an object on the stack
+     * @param action action to perform if results of {@code lhs} is not null
+     * @return instructions instruction list to perform some action if the object is not null
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList ifObjectNotNull(InsnList lhs, InsnList action) {
+        Validate.notNull(lhs);
+        Validate.notNull(action);
+        
+        
+        InsnList ret = new InsnList();
+        
+        LabelNode notEqualLabelNode = new LabelNode();
+        
+        ret.add(lhs);
+        ret.add(new JumpInsnNode(Opcodes.IFNULL, notEqualLabelNode));
+        ret.add(action);
+        ret.add(notEqualLabelNode);
+        
+        return ret;
+    }
+
+    /**
+     * While some condition is true, performs an action. In other words, this is a while loop.
+     * @param condition condition instruction list -- must leave a boolean on the stack
+     * @param action action instruction list -- instructions to perform in the loop
+     * @return instructions for while loop
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList whileLoop(InsnList condition, InsnList action) {
+        Validate.notNull(condition);
+        Validate.notNull(action);
+        
+        InsnList ret = new InsnList();
+        
+        LabelNode doneLabelNode = new LabelNode();
+        LabelNode loopLabelNode = new LabelNode();
+        
+        ret.add(loopLabelNode);
+        ret.add(condition); // after this, there'll be an int (bools are represnted as int in java)
+        ret.add(new JumpInsnNode(Opcodes.IFEQ, doneLabelNode)); // if not true (0 = not true, 1 = true), go to done
+        ret.add(action);
+        ret.add(new JumpInsnNode(Opcodes.GOTO, loopLabelNode));
+        ret.add(doneLabelNode);
+        
+        return ret;
+    }
+    
+    /**
      * For each element in an object array, performs an action.
      * @param counterVar parameter used to keep track of count in loop
      * @param arrayLenVar parameter used to keep track of array length
@@ -606,7 +710,7 @@ public final class GenericGenerators {
      * @return instructions instruction list to perform some action if two ints are equal
      * @throws NullPointerException if any argument is {@code null}
      */
-    public static InsnList forEach(Variable counterVar, Variable arrayLenVar, InsnList array, InsnList action) {
+    public static InsnList forEachLoop(Variable counterVar, Variable arrayLenVar, InsnList array, InsnList action) {
         Validate.notNull(counterVar);
         Validate.notNull(arrayLenVar);
         Validate.notNull(array);
@@ -692,6 +796,38 @@ public final class GenericGenerators {
                     true));
         } else {
             Validate.isTrue(method.getParameterCount() + 1 == args.length);
+            ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, clsType.getInternalName(), method.getName(), methodType.getDescriptor(),
+                    false));
+        }
+        
+        return ret;
+    }
+
+    /**
+     * Calls a method, but does not set the arguments for the method. If you want to set the arguments for the method,
+     * see {@link #call(java.lang.reflect.Method, org.objectweb.asm.tree.InsnList...) }.
+     * <p>
+     * After execution the stack may have an extra item pushed on it: the object that was returned by this method (if any).
+     * @param method method to call
+     * @return instructions to invoke a method
+     * @throws NullPointerException if any argument is {@code null} or array contains {@code null}
+     */
+    public static InsnList invoke(Method method) {
+        Validate.notNull(method);
+        
+        
+        InsnList ret = new InsnList();
+        
+        Type clsType = Type.getType(method.getDeclaringClass());
+        Type methodType = Type.getType(method);
+        
+        if ((method.getModifiers() & Modifier.STATIC) == Modifier.STATIC) {
+            ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, clsType.getInternalName(), method.getName(), methodType.getDescriptor(),
+                    false));
+        } else if (method.getDeclaringClass().isInterface()) {
+            ret.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, clsType.getInternalName(), method.getName(), methodType.getDescriptor(),
+                    true));
+        } else {
             ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, clsType.getInternalName(), method.getName(), methodType.getDescriptor(),
                     false));
         }

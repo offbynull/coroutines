@@ -19,7 +19,6 @@ package com.offbynull.coroutines.instrumenter.generators;
 import com.offbynull.coroutines.instrumenter.asm.VariableTable;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.call;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.construct;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.forEach;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.ifIntegersEqual;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.ifObjectsEqual;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadVar;
@@ -43,6 +42,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.throwRuntimeException;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.forEachLoop;
 
 public final class GenericGeneratorsTest {
     private static final String STUB_CLASSNAME = "SimpleStub";
@@ -239,8 +239,7 @@ public final class GenericGeneratorsTest {
          * return "nomatch";
          */
         methodNode.instructions
-                = merge(
-                        forEach(counterVar, arrayLenVar,
+                = merge(forEachLoop(counterVar, arrayLenVar,
                                 loadVar(objectArrVar),
                                 merge(
                                         saveVar(tempObjectVar),

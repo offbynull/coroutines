@@ -26,7 +26,7 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.enterMonitorAndStore;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.exitMonitorAndDelete;
-import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.Validate;
 
 final class MethodInstrumenter {
@@ -45,10 +45,15 @@ final class MethodInstrumenter {
                 .forEach(x -> methodNode.instructions.contains(x));
 
         // Add trycatch nodes
-        attrs.getContinuationPoints().stream()
-                .filter(x -> x instanceof TryCatchInvokeContinuationPoint)
-                .map(x -> (TryCatchInvokeContinuationPoint) x)
-                .map(x -> x.getTryCatchBlock())
+        Stream.concat(
+                attrs.getContinuationPoints().stream()
+                        .filter(x -> x instanceof TryCatchInvokeContinuationPoint)
+                        .map(x -> (TryCatchInvokeContinuationPoint) x)
+                        .map(x -> x.getOriginaltTryCatchBlockNode()),
+                attrs.getContinuationPoints().stream()
+                        .filter(x -> x instanceof TryCatchInvokeContinuationPoint)
+                        .map(x -> (TryCatchInvokeContinuationPoint) x)
+                        .map(x -> x.getInvokeTryCatchBlockNode()))
                 .forEach(x -> methodNode.tryCatchBlocks.add(0, x));
         
         // Add loading code (this includes continuation restore points)
@@ -69,7 +74,7 @@ final class MethodInstrumenter {
         
         // Add synchronization save points
         List<SynchronizationPoint> synchPoints = attrs.getSynchronizationPoints();
-        MarkerType markerType = attrs.getSettings().getMarkerType();
+        InstrumentationSettings settings = attrs.getSettings();
         LockVariables lockVars = attrs.getLockVariables();
         for (int i = 0; i < synchPoints.size(); i++) {
             SynchronizationPoint sp = synchPoints.get(i);
@@ -78,10 +83,10 @@ final class MethodInstrumenter {
             InsnList insnsToReplaceWith;
             switch (nodeToReplace.getOpcode()) {
                 case Opcodes.MONITORENTER:
-                    insnsToReplaceWith = enterMonitorAndStore(markerType, lockVars);
+                    insnsToReplaceWith = enterMonitorAndStore(settings, lockVars);
                     break;
                 case Opcodes.MONITOREXIT:
-                    insnsToReplaceWith = exitMonitorAndDelete(markerType, lockVars);
+                    insnsToReplaceWith = exitMonitorAndDelete(settings, lockVars);
                     break;
                 default:
                     throw new IllegalStateException(); //should never happen

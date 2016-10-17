@@ -2,7 +2,7 @@ package com.offbynull.coroutines.instrumenter.asm;
 
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.searchForOpcodes;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipFromResource;
-import org.junit.Assert;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
@@ -20,7 +20,7 @@ public class SimpleClassNodeTest {
         cr.accept(classNode, 0);
         
         for (MethodNode methodNode : classNode.methods) {
-            Assert.assertTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR).isEmpty());
+            assertTrue(searchForOpcodes(methodNode.instructions, Opcodes.JSR).isEmpty());
         }
     }
     

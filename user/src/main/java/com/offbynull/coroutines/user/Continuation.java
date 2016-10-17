@@ -28,7 +28,7 @@ import java.io.Serializable;
  * @author Kasra Faghihi
  */
 public final class Continuation implements Serializable {
-    private static final long serialVersionUID = 3L;
+    private static final long serialVersionUID = 4L;
     
     /**
      * Do not use -- for internal use only.
@@ -51,6 +51,7 @@ public final class Continuation implements Serializable {
     private MethodState firstCutpointPointer;
     
     private int mode = MODE_NORMAL;
+    private FrameAllocator allocator;
     private Object context;
 
     // How should method states be handled? Imagine that we started off restoring the following call chain...
@@ -150,6 +151,25 @@ public final class Continuation implements Serializable {
 
 
 
+    
+    
+    /**
+     * Do not use -- for internal use only.
+     * @return n/a
+     */
+    public FrameAllocator getAllocator() {
+        return allocator;
+    }
+
+    /**
+     * Do not use -- for internal use only.
+     * @param allocator n/a
+     */
+    public void setAllocator(FrameAllocator allocator) {
+        this.allocator = allocator;
+    }
+
+    
 
 
 
@@ -229,6 +249,10 @@ public final class Continuation implements Serializable {
         nextLoadPointer = firstPointer;     // reset next load pointer so we load from the beginning
         nextUnloadPointer = null;           // reset unload pointer
         firstCutpointPointer = null;        // reset cutpoint list
+        
+        if (allocator != null) {
+            allocator.commit();
+        }
     }
 
     /**
@@ -240,6 +264,10 @@ public final class Continuation implements Serializable {
         nextLoadPointer = firstPointer;     // reset next load pointer so we load from the beginning
         nextUnloadPointer = null;           // reset unload pointer
         firstCutpointPointer = null;        // reset cutpoint list
+
+        if (allocator != null) {
+            allocator.rollback();
+        }
     }
 
     

@@ -16,21 +16,24 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.CONTINUATION_GETALLOCATOR_METHOD;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.FRAMEALLOCATOR_RELEASEDOUBLE_METHOD;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.FRAMEALLOCATOR_RELEASEFLOAT_METHOD;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.FRAMEALLOCATOR_RELEASEINT_METHOD;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.FRAMEALLOCATOR_RELEASELONG_METHOD;
+import static com.offbynull.coroutines.instrumenter.AllocationGenerators.FRAMEALLOCATOR_RELEASEOBJECT_METHOD;
 import static com.offbynull.coroutines.instrumenter.InternalUtils.validateAndGetContinuationPoint;
 import static com.offbynull.coroutines.instrumenter.LocalsStateGenerators.loadLocals;
 import static com.offbynull.coroutines.instrumenter.LocalsStateGenerators.saveLocals;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.enterStoredMonitors;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.exitStoredMonitors;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.addLabel;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.call;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.cloneInvokeNode;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.construct;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.ifIntegersEqual;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.jumpTo;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadIntConst;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadNull;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadVar;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.merge;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.mergeIf;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.saveVar;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.tableSwitch;
@@ -63,7 +66,6 @@ import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.throwRuntimeException;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
-import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.debugMarker;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.createMonitorContainer;
 import static com.offbynull.coroutines.instrumenter.PackStateGenerators.packStorageArrays;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.lineNumber;
@@ -72,6 +74,21 @@ import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.
 import static com.offbynull.coroutines.instrumenter.PackStateGenerators.unpackLocalsStorageArrays;
 import static com.offbynull.coroutines.instrumenter.PackStateGenerators.unpackOperandStackStorageArrays;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
+import static com.offbynull.coroutines.instrumenter.LocalsStateGenerators.allocateLocalsStorageArrays;
+import static com.offbynull.coroutines.instrumenter.LocalsStateGenerators.freeLocalsStorageArrays;
+import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.allocateOperandStackStorageArrays;
+import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.freeOperandStackStorageArrays;
+import static com.offbynull.coroutines.instrumenter.PackStateGenerators.allocatePackArray;
+import static com.offbynull.coroutines.instrumenter.PackStateGenerators.freePackArray;
+import static com.offbynull.coroutines.instrumenter.generators.DebugGenerators.debugMarker;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.call;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.ifObjectNull;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.invoke;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadVar;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.merge;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.whileLoop;
+import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.TypeInsnNode;
 
 final class ContinuationGenerators {
     
@@ -99,6 +116,8 @@ final class ContinuationGenerators {
             = MethodUtils.getAccessibleMethod(MethodState.class, "getData");
     private static final Method METHODSTATE_GETLOCKSTATE_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getLockState");
+    private static final Method METHODSTATE_GETNEXT_METHOD
+            = MethodUtils.getAccessibleMethod(MethodState.class, "getNext");
     
     private ContinuationGenerators() {
         // do nothing
@@ -116,7 +135,8 @@ final class ContinuationGenerators {
 
         int numOfContinuationPoints = attrs.getContinuationPoints().size();
 
-        MarkerType markerType = attrs.getSettings().getMarkerType();
+        InstrumentationSettings settings = attrs.getSettings();
+        MarkerType markerType = settings.getMarkerType();
         String dbgSig = getLogPrefix(attrs);
         
         LabelNode startOfMethodLabelNode = new LabelNode();
@@ -136,7 +156,7 @@ final class ContinuationGenerators {
                                 // create lockstate if method actually has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[] {
                                         debugMarker(markerType, "Creating monitors container"),
-                                        createMonitorContainer(markerType, lockVars),
+                                        createMonitorContainer(settings, lockVars),
                                 }),
                                 debugMarker(markerType, dbgSig + "Jump to start of method point"),
                                 jumpTo(startOfMethodLabelNode)
@@ -222,7 +242,8 @@ final class ContinuationGenerators {
         Frame<BasicValue> frame = cp.getFrame();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
-        MarkerType markerType = attrs.getSettings().getMarkerType();
+        InstrumentationSettings settings = attrs.getSettings();
+        MarkerType markerType = settings.getMarkerType();
         String dbgSig = getLogPrefix(attrs);
         
         //          enterLocks(lockState);
@@ -233,13 +254,13 @@ final class ContinuationGenerators {
         return merge(
                 debugMarker(markerType, dbgSig + "Restoring SUSPEND " + idx),
                 debugMarker(markerType, dbgSig + "Unpacking operand stack storage variables"),
-                unpackOperandStackStorageArrays(markerType, frame, storageContainerVar, savedStackVars),
+                unpackOperandStackStorageArrays(settings, frame, storageContainerVar, savedStackVars),
                 debugMarker(markerType, dbgSig + "Unpacking locals storage variables"),
-                unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
+                unpackLocalsStorageArrays(settings, frame, storageContainerVar, savedLocalsVars),
                 debugMarker(markerType, dbgSig + "Restoring operand stack"),
-                loadOperandStack(markerType, savedStackVars, frame),
+                loadOperandStack(settings, savedStackVars, frame),
                 debugMarker(markerType, dbgSig + "Restoring locals"),
-                loadLocals(markerType, savedLocalsVars, frame),
+                loadLocals(settings, savedLocalsVars, frame),
                 mergeIf(lineNumber != null, () -> new Object[] {
                     // We add the line number AFTER locals have been restored, so if you put in a break point at the specified line number
                     // the local vars will all show up.
@@ -248,7 +269,7 @@ final class ContinuationGenerators {
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                         debugMarker(markerType, dbgSig + "Entering monitors"),
-                        enterStoredMonitors(markerType, lockVars),
+                        enterStoredMonitors(settings, lockVars),
                 }),
                 debugMarker(markerType, dbgSig + "Popping off continuation object from operand stack"),
                 pop(), // frame at the time of invocation to Continuation.suspend() has Continuation reference on the
@@ -261,6 +282,10 @@ final class ContinuationGenerators {
                 // We've successfully completed our restore and we're continuing the invocation, so we need "discard" this method state
                 debugMarker(markerType, dbgSig + "Discarding saved method state"),
                 call(CONTINUATION_UNLOADCURRENTMETHODSTATE_METHOD, loadVar(contArg)),
+                debugMarker(markerType, dbgSig + "Freeing storage arrays"),
+                freeLocalsStorageArrays(settings, contArg, savedLocalsVars, frame),
+                freeOperandStackStorageArrays(settings, contArg, savedStackVars, frame),
+                freePackArray(settings, frame, contArg, storageContainerVar),
                 debugMarker(markerType, dbgSig + "Restore complete. Jumping to post-invocation point"),
                 jumpTo(continueExecLabelNode)
         );
@@ -293,7 +318,8 @@ final class ContinuationGenerators {
         
         Variable returnCacheVar = attrs.getCacheVariables().getReturnCacheVar(invokeReturnType); // will be null if void
         
-        MarkerType markerType = attrs.getSettings().getMarkerType();
+        InstrumentationSettings settings = attrs.getSettings();
+        MarkerType markerType = settings.getMarkerType();
         boolean debugMode = attrs.getSettings().isDebugMode();
         String dbgSig = getLogPrefix(attrs);
         
@@ -322,21 +348,21 @@ final class ContinuationGenerators {
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Entering monitors"),
-                    enterStoredMonitors(markerType, lockVars), // we MUST re-enter montiors before going further
+                    enterStoredMonitors(settings, lockVars), // we MUST re-enter montiors before going further
                 }),
                 // Only unpack operand stack storage vars, we unpack the locals afterwards if we need to
                 debugMarker(markerType, dbgSig + "Unpacking operand stack storage variables"),
-                unpackOperandStackStorageArrays(markerType, frame, storageContainerVar, savedStackVars),
+                unpackOperandStackStorageArrays(settings, frame, storageContainerVar, savedStackVars),
                 debugMarker(markerType, dbgSig + "Restoring top " + invokeArgCount + " items of operand stack (just enough to invoke)"),
-                loadOperandStack(markerType, savedStackVars, frame, 0, frame.getStackSize() - invokeArgCount, invokeArgCount),
+                loadOperandStack(settings, savedStackVars, frame, 0, frame.getStackSize() - invokeArgCount, invokeArgCount),
                 mergeIf(debugMode, () -> new Object[]{
                     // If in debug mode, load up the locals. This is useful if you're stepping through your coroutine in a debugger... you
                     // can look at method frames above the current one and introspect the variables (what the user expects if they're
                     // running in a debugger).
                     debugMarker(markerType, dbgSig + "Unpacking locals storage variables (for debugMode)"),
-                    unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
+                    unpackLocalsStorageArrays(settings, frame, storageContainerVar, savedLocalsVars),
                     debugMarker(markerType, dbgSig + "Restoring locals (for debugMode)"),
-                    loadLocals(markerType, savedLocalsVars, frame),
+                    loadLocals(settings, savedLocalsVars, frame),
                 }),
                 mergeIf(lineNumber != null, () -> new Object[]{
                     // We add the line number AFTER locals have been restored, so if you put in a break point at the specified line number
@@ -355,7 +381,7 @@ final class ContinuationGenerators {
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(markerType, lockVars),
+                                    exitStoredMonitors(settings, lockVars),
                                 }),
                                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
@@ -366,11 +392,11 @@ final class ContinuationGenerators {
                     saveVar(returnCacheVar)
                 }),
                 debugMarker(markerType, dbgSig + "Unpacking locals storage variables"),
-                unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
+                unpackLocalsStorageArrays(settings, frame, storageContainerVar, savedLocalsVars),
                 debugMarker(markerType, dbgSig + "Restoring operand stack (without invoke args)"),
-                loadOperandStack(markerType, savedStackVars, frame, 0, 0, frame.getStackSize() - invokeArgCount),
+                loadOperandStack(settings, savedStackVars, frame, 0, 0, frame.getStackSize() - invokeArgCount),
                 debugMarker(markerType, dbgSig + "Restoring locals"),
-                loadLocals(markerType, savedLocalsVars, frame),
+                loadLocals(settings, savedLocalsVars, frame),
                 mergeIf(returnCacheVar != null, () -> new Object[] {// load return (if returnCacheVar is null means ret type is void)
                     debugMarker(markerType, dbgSig + "Loading invocation return value"),
                     loadVar(returnCacheVar)
@@ -378,6 +404,9 @@ final class ContinuationGenerators {
                 // We've successfully completed our restore and we're continuing the invocation, so we need "discard" this method state
                 debugMarker(markerType, dbgSig + "Discarding saved method state"),
                 call(CONTINUATION_UNLOADCURRENTMETHODSTATE_METHOD, loadVar(contArg)),
+                freeLocalsStorageArrays(settings, contArg, savedLocalsVars, frame),
+                freeOperandStackStorageArrays(settings, contArg, savedStackVars, frame),
+                freePackArray(settings, frame, contArg, storageContainerVar),
                 debugMarker(markerType, dbgSig + "Restore complete. Jumping to post-invocation point"),
                 jumpTo(continueExecLabelNode)
         );
@@ -402,10 +431,12 @@ final class ContinuationGenerators {
         
         Variable throwableVar = attrs.getCacheVariables().getThrowableCacheVar();
         
+        Variable tempMethodStateVar = attrs.getCacheVariables().getTempMethodStateVar();
+        
         Type returnType = attrs.getSignature().getReturnType();
         
         // tryCatchBlock() invocation further on in this method will populate TryCatchBlockNode fields
-        TryCatchBlockNode newTryCatchBlockNode = cp.getTryCatchBlock();
+        TryCatchBlockNode newTryCatchBlockNode = cp.getOriginaltTryCatchBlockNode();
 
         Frame<BasicValue> frame = cp.getFrame();
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
@@ -417,7 +448,9 @@ final class ContinuationGenerators {
         
         Variable returnCacheVar = attrs.getCacheVariables().getReturnCacheVar(invokeReturnType); // will be null if void
         
-        MarkerType markerType = attrs.getSettings().getMarkerType();
+        InstrumentationSettings settings = attrs.getSettings();
+        MarkerType markerType = settings.getMarkerType();
+        boolean useAllocator = settings.isCustomFrameAllocator();
         boolean debugMode = attrs.getSettings().isDebugMode();
         String dbgSig = getLogPrefix(attrs);
         
@@ -454,21 +487,21 @@ final class ContinuationGenerators {
                 // attempt to enter monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Entering monitors"),
-                    enterStoredMonitors(markerType, lockVars), // we MUST re-enter montiors before going further
+                    enterStoredMonitors(settings, lockVars), // we MUST re-enter montiors before going further
                 }),
                 // Only unpack operand stack storage vars, we unpack the locals afterwards if we need to
                 debugMarker(markerType, dbgSig + "Unpacking operand stack storage variables"),
-                unpackOperandStackStorageArrays(markerType, frame, storageContainerVar, savedStackVars),
+                unpackOperandStackStorageArrays(settings, frame, storageContainerVar, savedStackVars),
                 debugMarker(markerType, dbgSig + "Restoring top " + invokeArgCount + " items of operand stack (just enough to invoke)"),
-                loadOperandStack(markerType, savedStackVars, frame, 0, frame.getStackSize() - invokeArgCount, invokeArgCount),
+                loadOperandStack(settings, savedStackVars, frame, 0, frame.getStackSize() - invokeArgCount, invokeArgCount),
                 mergeIf(debugMode, () -> new Object[]{
                     // If in debug mode, load up the locals. This is useful if you're stepping through your coroutine in a debugger... you
                     // can look at method frames above the current one and introspect the variables (what the user expects if they're
                     // running in a debugger).
                     debugMarker(markerType, dbgSig + "Unpacking locals storage variables (for debugMode)"),
-                    unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
+                    unpackLocalsStorageArrays(settings, frame, storageContainerVar, savedLocalsVars),
                     debugMarker(markerType, dbgSig + "Restoring locals (for debugMode)"),
-                    loadLocals(markerType, savedLocalsVars, frame),
+                    loadLocals(settings, savedLocalsVars, frame),
                 }),
                 mergeIf(lineNumber != null, () -> new Object[]{
                     // We add the line number AFTER locals have been restored, so if you put in a break point at the specified line number
@@ -486,16 +519,48 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Saving caught throwable"),
                                 saveVar(throwableVar),
                                 debugMarker(markerType, dbgSig + "Unpacking locals storage variables"),
-                                unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
+                                unpackLocalsStorageArrays(settings, frame, storageContainerVar, savedLocalsVars),
                                 debugMarker(markerType, dbgSig + "Restoring operand stack (without invoke args)"),
-                                loadOperandStack(markerType, savedStackVars, frame, 0, 0, frame.getStackSize() - invokeArgCount),
+                                loadOperandStack(settings, savedStackVars, frame, 0, 0, frame.getStackSize() - invokeArgCount),
                                 debugMarker(markerType, dbgSig + "Restoring locals"),
-                                loadLocals(markerType, savedLocalsVars, frame),
-                                // We caught an exception, which means that everything that was invoked after us is pretty much gone and
-                                // we're continuing the invocation as if we restore, we need to "discard" this method state along with
-                                // everything after it.
-                                debugMarker(markerType, dbgSig + "Discarding saved method states up until this point (unwinding)"),
+                                loadLocals(settings, savedLocalsVars, frame),
+                                debugMarker(markerType, dbgSig + "Unwinding method states up until this point"),
                                 call(CONTINUATION_UNLOADMETHODSTATETOBEFORE_METHOD, loadVar(contArg), loadVar(methodStateVar)),
+                                mergeIf(useAllocator, () -> new Object[] {
+                                    // NOTE: This only applies if the instrumenter is set to use a custom allocator. It's required because
+                                    // the MethodStates that we've unwound/discarded need to be free'd from the custom allocator.
+                                    //
+                                    // We caught an exception, which means that everything that was invoked after us is pretty much gone
+                                    // (we need to discard it) and we're continuing the invocation as if we restored to this method.
+                                    //
+                                    // If we're using a custom allocator, it means we have to properly free the all data items in method
+                                    // states we're discarding (data items = arrays generated for locals and operand state + the pack array
+                                    // that holds them). Normally we'd end up doing a basic ...
+                                    //
+                                    //  freeLocalsStorageArrays(settings, contArg, savedLocalsVars, frame),
+                                    //  freeOperandStackStorageArrays(settings, contArg, savedStackVars, frame),
+                                    //  freePackArray(settings, frame, contArg, storageContainerVar),
+                                    //
+                                    // but this won't work here because we don't have the Frame<> objects for the methods/continuationpoints
+                                    // that the method states are for. We never will have those Frame<> objects because the callstack isn't
+                                    // a static attribute that we can reasonably track.
+                                    //
+                                    // Instead we have to loop over the method states that we're discarding and manually attempt to 'free'
+                                    // the arrays
+                                    call(METHODSTATE_GETNEXT_METHOD, loadVar(methodStateVar)),
+                                    saveVar(tempMethodStateVar),
+                                    whileLoop(
+                                            merge(
+                                                    // if null, then put 0 on top of the stack (0 = null)
+                                                    ifObjectNull(loadVar(tempMethodStateVar), loadIntConst(0), loadIntConst(1))
+                                            ),
+                                            merge(
+                                                    hardFreeMethodState(settings, contArg, tempMethodStateVar),
+                                                    call(METHODSTATE_GETNEXT_METHOD, loadVar(tempMethodStateVar)),
+                                                    saveVar(tempMethodStateVar)
+                                            )
+                                    )
+                                }),
                                 debugMarker(markerType, dbgSig + "Restore complete. Jumping to rethrow point (within orig trycatch block)"),
                                 jumpTo(exceptionExecutionLabelNode)
                         )
@@ -510,7 +575,7 @@ final class ContinuationGenerators {
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(markerType, lockVars),
+                                    exitStoredMonitors(settings, lockVars),
                                 }),
                                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                                 returnDummy(returnType)
@@ -521,23 +586,140 @@ final class ContinuationGenerators {
                     saveVar(returnCacheVar)
                 }),
                 debugMarker(markerType, dbgSig + "Unpacking locals storage variables"),
-                unpackLocalsStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars),
+                unpackLocalsStorageArrays(settings, frame, storageContainerVar, savedLocalsVars),
                 debugMarker(markerType, dbgSig + "Restoring operand stack (without invoke args)"),
-                loadOperandStack(markerType, savedStackVars, frame, 0, 0, frame.getStackSize() - invokeArgCount),
+                loadOperandStack(settings, savedStackVars, frame, 0, 0, frame.getStackSize() - invokeArgCount),
                 debugMarker(markerType, dbgSig + "Restoring locals"),
-                loadLocals(markerType, savedLocalsVars, frame),
+                loadLocals(settings, savedLocalsVars, frame),
                 mergeIf(returnCacheVar != null, () -> new Object[] {// load return (if returnCacheVar is null means ret type is void)
                     debugMarker(markerType, dbgSig + "Loading invocation return value"),
                     loadVar(returnCacheVar)
                 }),
                 debugMarker(markerType, dbgSig + "Discarding saved method state"),
                 call(CONTINUATION_UNLOADCURRENTMETHODSTATE_METHOD, loadVar(contArg)),
+                freeLocalsStorageArrays(settings, contArg, savedLocalsVars, frame),
+                freeOperandStackStorageArrays(settings, contArg, savedStackVars, frame),
+                freePackArray(settings, frame, contArg, storageContainerVar),
                 debugMarker(markerType, dbgSig + "Restore complete. Jumping to post-invocation point"),
                 jumpTo(continueExecLabelNode)
         );
     }
-
     
+    public static InsnList hardFreeMethodState(
+            InstrumentationSettings settings,
+            Variable contVar,
+            Variable methodStateVar) {
+        Validate.notNull(settings);
+        Validate.notNull(contVar);
+        Validate.notNull(methodStateVar);
+
+        MarkerType markerType = settings.getMarkerType();
+        boolean useAllocator = settings.isCustomFrameAllocator();
+
+        
+        // REMEMBER: Method state contains a method called getData() -- this will return back an Object[] of 10 which contains the storage
+        // variables for both the locals and the operand stack. If you take a look at PackStateGenerators, you can see which element
+        // contains what. Here it is again...
+        //
+        // 0 = int local variables table items (may be null)
+        // 1 = float local variables table items (may be null)
+        // 2 = long local variables table items (may be null)
+        // 3 = double local variables table items (may be null)
+        // 4 = Object local variables table items (may be null)
+        // 5 = int operand stack items (may be null)
+        // 6 = float operand stack items (may be null)
+        // 7 = long operand stack items (may be null)
+        // 8 = double operand stack items (may be null)
+        // 9 = Object operand stack items (may be null)
+        //
+        // We're directly cleaning up
+        
+
+        InsnList ret;
+
+        if (!useAllocator) {
+            ret = debugMarker(markerType, "Doing nothing on free method state -- arrays allocated via new");
+        } else {
+            ret = merge(
+                    call(CONTINUATION_GETALLOCATOR_METHOD, loadVar(contVar)),                // [alloc]
+                    call(METHODSTATE_GETDATA_METHOD, loadVar(methodStateVar)),               // [alloc, Object[]]
+                    // int locals
+                    debugMarker(markerType, "Freeing locals ints container allocated via allocator"),
+                    new InsnNode(Opcodes.DUP2),                                              // [alloc, Object[], alloc, Object[]]
+                    new LdcInsnNode(0),                                                      // [alloc, Object[], alloc, Object[], 0]
+                    new InsnNode(Opcodes.AALOAD),                                            // [alloc, Object[], alloc, Object]
+                    new TypeInsnNode(Opcodes.CHECKCAST, Type.getDescriptor(int[].class)),    // [alloc, Object[], alloc, int[]]
+                    invoke(FRAMEALLOCATOR_RELEASEINT_METHOD),                                // [alloc, Object[]]
+                    // float locals
+                    debugMarker(markerType, "Freeing locals floats container allocated via allocator"),
+                    new InsnNode(Opcodes.DUP2),                                              // [alloc, Object[], alloc, Object[]]
+                    new LdcInsnNode(1),                                                      // [alloc, Object[], alloc, Object[], 1]
+                    new InsnNode(Opcodes.AALOAD),                                            // [alloc, Object[], alloc, Object]
+                    new TypeInsnNode(Opcodes.CHECKCAST, Type.getDescriptor(float[].class)),  // [alloc, Object[], alloc, int[]]
+                    invoke(FRAMEALLOCATOR_RELEASEFLOAT_METHOD),                              // [alloc, Object[]]
+                    // long locals
+                    debugMarker(markerType, "Freeing locals longs container allocated via allocator"),
+                    new InsnNode(Opcodes.DUP2),                                              // [alloc, Object[], alloc, Object[]]
+                    new LdcInsnNode(2),                                                      // [alloc, Object[], alloc, Object[], 2]
+                    new InsnNode(Opcodes.AALOAD),                                            // [alloc, Object[], alloc, Object]
+                    new TypeInsnNode(Opcodes.CHECKCAST, Type.getDescriptor(long[].class)),   // [alloc, Object[], alloc, int[]]
+                    invoke(FRAMEALLOCATOR_RELEASELONG_METHOD),                               // [alloc, Object[]]
+                    // double locals
+                    debugMarker(markerType, "Freeing locals doubles container allocated via allocator"),
+                    new InsnNode(Opcodes.DUP2),                                              // [alloc, Object[], alloc, Object[]]
+                    new LdcInsnNode(3),                                                      // [alloc, Object[], alloc, Object[], 3]
+                    new InsnNode(Opcodes.AALOAD),                                            // [alloc, Object[], alloc, Object]
+                    new TypeInsnNode(Opcodes.CHECKCAST, Type.getDescriptor(double[].class)), // [alloc, Object[], alloc, int[]]
+                    invoke(FRAMEALLOCATOR_RELEASEDOUBLE_METHOD),                             // [alloc, Object[]]
+                    // Object locals
+                    debugMarker(markerType, "Freeing locals Objects container allocated via allocator"),
+                    new InsnNode(Opcodes.DUP2),                                              // [alloc, Object[], alloc, Object[]]
+                    new LdcInsnNode(4),                                                      // [alloc, Object[], alloc, Object[], 4]
+                    new InsnNode(Opcodes.AALOAD),                                            // [alloc, Object[], alloc, Object]
+                    new TypeInsnNode(Opcodes.CHECKCAST, Type.getDescriptor(Object[].class)), // [alloc, Object[], alloc, int[]]
+                    invoke(FRAMEALLOCATOR_RELEASEOBJECT_METHOD),                             // [alloc, Object[]]
+                    // int operand stack items
+                    debugMarker(markerType, "Freeing operand stack ints container allocated via allocator"),
+                    new InsnNode(Opcodes.DUP2),                                              // [alloc, Object[], alloc, Object[]]
+                    new LdcInsnNode(5),                                                      // [alloc, Object[], alloc, Object[], 5]
+                    new InsnNode(Opcodes.AALOAD),                                            // [alloc, Object[], alloc, Object]
+                    new TypeInsnNode(Opcodes.CHECKCAST, Type.getDescriptor(int[].class)),    // [alloc, Object[], alloc, int[]]
+                    invoke(FRAMEALLOCATOR_RELEASEINT_METHOD),                                // [alloc, Object[]]
+                    // float operand stack items
+                    debugMarker(markerType, "Freeing operand stack floats container allocated via allocator"),
+                    new InsnNode(Opcodes.DUP2),                                              // [alloc, Object[], alloc, Object[]]
+                    new LdcInsnNode(6),                                                      // [alloc, Object[], alloc, Object[], 6]
+                    new InsnNode(Opcodes.AALOAD),                                            // [alloc, Object[], alloc, Object]
+                    new TypeInsnNode(Opcodes.CHECKCAST, Type.getDescriptor(float[].class)),  // [alloc, Object[], alloc, int[]]
+                    invoke(FRAMEALLOCATOR_RELEASEFLOAT_METHOD),                              // [alloc, Object[]]
+                    // long operand stack items
+                    debugMarker(markerType, "Freeing operand stack longs container allocated via allocator"),
+                    new InsnNode(Opcodes.DUP2),                                              // [alloc, Object[], alloc, Object[]]
+                    new LdcInsnNode(7),                                                      // [alloc, Object[], alloc, Object[], 7]
+                    new InsnNode(Opcodes.AALOAD),                                            // [alloc, Object[], alloc, Object]
+                    new TypeInsnNode(Opcodes.CHECKCAST, Type.getDescriptor(long[].class)),   // [alloc, Object[], alloc, int[]]
+                    invoke(FRAMEALLOCATOR_RELEASELONG_METHOD),                               // [alloc, Object[]]
+                    // double operand stack items
+                    debugMarker(markerType, "Freeing operand stack doubles container allocated via allocator"),
+                    new InsnNode(Opcodes.DUP2),                                              // [alloc, Object[], alloc, Object[]]
+                    new LdcInsnNode(8),                                                      // [alloc, Object[], alloc, Object[], 8]
+                    new InsnNode(Opcodes.AALOAD),                                            // [alloc, Object[], alloc, Object]
+                    new TypeInsnNode(Opcodes.CHECKCAST, Type.getDescriptor(double[].class)), // [alloc, Object[], alloc, int[]]
+                    invoke(FRAMEALLOCATOR_RELEASEDOUBLE_METHOD),                             // [alloc, Object[]]
+                    // Object operand stack items
+                    debugMarker(markerType, "Freeing operand stack Object container allocated via allocator"),
+                    new InsnNode(Opcodes.DUP2),                                              // [alloc, Object[], alloc, Object[]]
+                    new LdcInsnNode(9),                                                      // [alloc, Object[], alloc, Object[], 9]
+                    new InsnNode(Opcodes.AALOAD),                                            // [alloc, Object[], alloc, Object]
+                    new TypeInsnNode(Opcodes.CHECKCAST, Type.getDescriptor(Object[].class)), // [alloc, Object[], alloc, int[]]
+                    invoke(FRAMEALLOCATOR_RELEASEOBJECT_METHOD),                             // [alloc, Object[]]
+                    debugMarker(markerType, "Freeing pack container allocated via allocator"),
+                    invoke(FRAMEALLOCATOR_RELEASEOBJECT_METHOD)                              // []
+            );
+        }
+        
+        return ret;
+    }
     
     
     
@@ -591,7 +773,8 @@ final class ContinuationGenerators {
         Frame<BasicValue> frame = cp.getFrame();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
-        MarkerType markerType = attrs.getSettings().getMarkerType();
+        InstrumentationSettings settings = attrs.getSettings();
+        MarkerType markerType = settings.getMarkerType();
         String dbgSig = getLogPrefix(attrs);
         
         //          Object[] stack = saveOperandStack();
@@ -603,18 +786,20 @@ final class ContinuationGenerators {
         //
         //
         //          restorePoint_<number>_continue: // at this label: empty exec stack / uninit exec var table
-        return merge(
-                mergeIf(lineNumber != null, () -> new Object[]{
+        return merge(mergeIf(lineNumber != null, () -> new Object[]{
                     lineNumber(lineNumber)
                 }),
                 debugMarker(markerType, dbgSig + "Saving SUSPEND " + idx),
                 debugMarker(markerType, dbgSig + "Saving operand stack"),
-                saveOperandStack(markerType, savedStackVars, frame), // REMEMBER: STACK IS TOTALLY EMPTY AFTER THIS. ALSO, DON'T FORGET THAT
-                                                                     // Continuation OBJECT WILL BE TOP ITEM, NEEDS TO BE DISCARDED ON LOAD
+                allocateOperandStackStorageArrays(settings, contArg, savedStackVars, frame),
+                saveOperandStack(settings, savedStackVars, frame), // REMEMBER: STACK IS TOTALLY EMPTY AFTER THIS. ALSO, DON'T FORGET THAT
+                                                                   // Continuation OBJECT WILL BE TOP ITEM, NEEDS TO BE DISCARDED ON LOAD
                 debugMarker(markerType, dbgSig + "Saving locals"),
-                saveLocals(markerType, savedLocalsVars, frame),
+                allocateLocalsStorageArrays(settings, contArg, savedLocalsVars, frame),
+                saveLocals(settings, savedLocalsVars, frame),
                 debugMarker(markerType, dbgSig + "Packing locals and operand stack in to container"),
-                packStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars, savedStackVars),
+                allocatePackArray(settings, frame, contArg, storageContainerVar),
+                packStorageArrays(settings, frame, storageContainerVar, savedLocalsVars, savedStackVars),
                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
                         construct(METHODSTATE_INIT_METHOD,
@@ -634,7 +819,7 @@ final class ContinuationGenerators {
                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                 mergeIf(lockStateVar != null, () -> new Object[]{
                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                    exitStoredMonitors(markerType, lockVars),
+                    exitStoredMonitors(settings, lockVars),
                 }),
                 debugMarker(markerType, dbgSig + "Returning (dummy return value if not void)"),
                 returnDummy(returnType), // return dummy value
@@ -667,7 +852,8 @@ final class ContinuationGenerators {
         MethodInsnNode invokeNode = cp.getInvokeInstruction();
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         
-        MarkerType markerType = attrs.getSettings().getMarkerType();
+        InstrumentationSettings settings = attrs.getSettings();
+        MarkerType markerType = settings.getMarkerType();
         String dbgSig = getLogPrefix(attrs);
         
         //          Object[] duplicatedArgs = saveOperandStack(<method param count>); -- Why do we do this? because when we want to save the
@@ -696,9 +882,10 @@ final class ContinuationGenerators {
                 }),
                 debugMarker(markerType, dbgSig + "Saving INVOKE " + idx),
                 debugMarker(markerType, dbgSig + "Saving top " + invokeArgCount + " items of operand stack (args for invoke)"),
-                saveOperandStack(markerType, savedStackVars, frame, invokeArgCount),
+                allocateOperandStackStorageArrays(settings, contArg, savedStackVars, frame, invokeArgCount),
+                saveOperandStack(settings, savedStackVars, frame, invokeArgCount),
                 debugMarker(markerType, dbgSig + "Reloading invoke arguments back on to the stack (for invoke)"),
-                loadOperandStack(markerType, savedStackVars, frame,
+                loadOperandStack(settings, savedStackVars, frame,
                         frame.getStackSize() - invokeArgCount,
                         frame.getStackSize() - invokeArgCount,
                         invokeArgCount),
@@ -712,20 +899,25 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Popping dummy return value off stack"),
                                 popMethodResult(invokeNode),
                                 debugMarker(markerType, dbgSig + "Reloading invoke arguments back on to the stack (for full save)"),
-                                loadOperandStack(markerType, savedStackVars, frame,
+                                loadOperandStack(settings, savedStackVars, frame,
                                         frame.getStackSize() - invokeArgCount,
                                         frame.getStackSize() - invokeArgCount,
                                         invokeArgCount),
+                                debugMarker(markerType, dbgSig + "Freeing saved invoke arguments"),
+                                freeOperandStackStorageArrays(settings, contArg, savedStackVars, frame, invokeArgCount),
                                 debugMarker(markerType, dbgSig + "Saving operand stack"),
-                                saveOperandStack(markerType, savedStackVars, frame), // REMEMBER: STACK IS TOTALLY EMPTY AFTER THIS
+                                allocateOperandStackStorageArrays(settings, contArg, savedStackVars, frame),
+                                saveOperandStack(settings, savedStackVars, frame), // REMEMBER: STACK IS TOTALLY EMPTY AFTER THIS
                                 debugMarker(markerType, dbgSig + "Saving locals"),
-                                saveLocals(markerType, savedLocalsVars, frame),
+                                allocateLocalsStorageArrays(settings, contArg, savedLocalsVars, frame),
+                                saveLocals(settings, savedLocalsVars, frame),
                                 debugMarker(markerType, dbgSig + "Packing locals and operand stack in to container"),
-                                packStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars, savedStackVars),
+                                allocatePackArray(settings, frame, contArg, storageContainerVar),
+                                packStorageArrays(settings, frame, storageContainerVar, savedLocalsVars, savedStackVars),
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(markerType, lockVars),
+                                    exitStoredMonitors(settings, lockVars),
                                 }),
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
@@ -748,7 +940,8 @@ final class ContinuationGenerators {
 
                 
                 
-                
+                debugMarker(markerType, dbgSig + "Freeing saved invoke arguments"),
+                freeOperandStackStorageArrays(settings, contArg, savedStackVars, frame, invokeArgCount),
                 addLabel(continueExecLabelNode),
                 debugMarker(markerType, dbgSig + "Continuing execution...")
         );
@@ -778,7 +971,10 @@ final class ContinuationGenerators {
         LabelNode continueExecLabelNode = cp.getContinueExecutionLabel();
         LabelNode exceptionExecutionLabelNode = cp.getExceptionExecutionLabel();
         
-        MarkerType markerType = attrs.getSettings().getMarkerType();
+        TryCatchBlockNode invokeTryCatchBlockNode = cp.getInvokeTryCatchBlockNode();
+        
+        InstrumentationSettings settings = attrs.getSettings();
+        MarkerType markerType = settings.getMarkerType();
         String dbgSig = getLogPrefix(attrs);
 
         int invokeArgCount = getArgumentCountRequiredForInvocation(invokeNode);
@@ -788,35 +984,57 @@ final class ContinuationGenerators {
                 }),
                 debugMarker(markerType, dbgSig + "Saving INVOKE WITHIN TRYCATCH " + idx),
                 debugMarker(markerType, dbgSig + "Saving top " + invokeArgCount + " items of operand stack (args for invoke)"),
-                saveOperandStack(markerType, savedStackVars, frame, invokeArgCount),
+                allocateOperandStackStorageArrays(settings, contArg, savedStackVars, frame, invokeArgCount),
+                saveOperandStack(settings, savedStackVars, frame, invokeArgCount),
                 debugMarker(markerType, dbgSig + "Reloading invoke arguments back on to the stack (for invoke)"),
-                loadOperandStack(markerType, savedStackVars, frame,
+                loadOperandStack(settings, savedStackVars, frame,
                         frame.getStackSize() - invokeArgCount,
                         frame.getStackSize() - invokeArgCount,
                         invokeArgCount),
                 debugMarker(markerType, dbgSig + "Invoking"),
-                cloneInvokeNode(invokeNode), // invoke method  (ADDED MULTIPLE TIMES -- MUST BE CLONED)
+                // We invoke in this trycatch because the operandstack allocation above needs to be free'd in the event of an exception.
+                // Note that this only really matter is the instrumenter is set to use an a custom allocator. We can technically invoke
+                // directly (without a try catch) if there is no allocator.
+                tryCatchBlock(
+                        invokeTryCatchBlockNode,
+                        null,
+                        merge(
+                                cloneInvokeNode(invokeNode) // invoke method  (ADDED MULTIPLE TIMES -- MUST BE CLONED)
+                        ),
+                        merge(
+                                debugMarker(markerType, dbgSig + "Freeing saved invoke arguments"),
+                                freeOperandStackStorageArrays(settings, contArg, savedStackVars, frame, invokeArgCount),
+                                debugMarker(markerType, dbgSig + "Rethrowing throwable"),
+                                throwThrowable()
+                        )
+                ),
                 ifIntegersEqual(// if we're saving after invoke, return dummy value
                         call(CONTINUATION_GETMODE_METHOD, loadVar(contArg)),
                         loadIntConst(MODE_SAVING),
-                        merge(debugMarker(markerType, dbgSig + "Mode set to save on return"),
+                        merge(
+                                debugMarker(markerType, dbgSig + "Mode set to save on return"),
                                 debugMarker(markerType, dbgSig + "Popping dummy return value off stack"),
                                 popMethodResult(invokeNode),
                                 debugMarker(markerType, dbgSig + "Reloading invoke arguments back on to the stack"),
-                                loadOperandStack(markerType, savedStackVars, frame,
+                                loadOperandStack(settings, savedStackVars, frame,
                                         frame.getStackSize() - invokeArgCount,
                                         frame.getStackSize() - invokeArgCount,
                                         invokeArgCount),
+                                debugMarker(markerType, dbgSig + "Freeing saved invoke arguments"),
+                                freeOperandStackStorageArrays(settings, contArg, savedStackVars, frame, invokeArgCount),
                                 debugMarker(markerType, dbgSig + "Saving operand stack"),
-                                saveOperandStack(markerType, savedStackVars, frame), // REMEMBER: STACK IS TOTALLY EMPTY AFTER THIS
+                                allocateOperandStackStorageArrays(settings, contArg, savedStackVars, frame),
+                                saveOperandStack(settings, savedStackVars, frame), // REMEMBER: STACK IS TOTALLY EMPTY AFTER THIS
                                 debugMarker(markerType, dbgSig + "Saving locals"),
-                                saveLocals(markerType, savedLocalsVars, frame),
+                                allocateLocalsStorageArrays(settings, contArg, savedLocalsVars, frame),
+                                saveLocals(settings, savedLocalsVars, frame),
                                 debugMarker(markerType, dbgSig + "Packing locals and operand stack in to container"),
-                                packStorageArrays(markerType, frame, storageContainerVar, savedLocalsVars, savedStackVars),
+                                allocatePackArray(settings, frame, contArg, storageContainerVar),
+                                packStorageArrays(settings, frame, storageContainerVar, savedLocalsVars, savedStackVars),
                                 // attempt to exit monitors only if method has monitorenter/exit in it (var != null if this were the case)
                                 mergeIf(lockStateVar != null, () -> new Object[]{
                                     debugMarker(markerType, dbgSig + "Exiting monitors"),
-                                    exitStoredMonitors(markerType, lockVars),
+                                    exitStoredMonitors(settings, lockVars),
                                 }),
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
@@ -836,6 +1054,8 @@ final class ContinuationGenerators {
                                 returnDummy(returnType)
                         )
                 ),
+                debugMarker(markerType, dbgSig + "Freeing saved invoke arguments"),
+                freeOperandStackStorageArrays(settings, contArg, savedStackVars, frame, invokeArgCount),
                 debugMarker(markerType, dbgSig + "Jumping to continue execution point..."),
                 jumpTo(continueExecLabelNode),
                 
