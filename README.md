@@ -22,13 +22,16 @@ More information on the topic of coroutines and their advantages can be found on
 ## Table of Contents
 
  * [Quick-start Guide](#quick-start-guide)
+  * [Maven Instructions](#maven-instructions)
+  * [Ant Instructions](#ant-instructions)
+  * [Gradle Instructions](#gradle-instructions)
+  * [Code Example](#code-example)
  * [FAQ](#faq)
   * [How much overhead am I adding?](#how-much-overhead-am-i-adding)
   * [What projects make use of Coroutines?](#what-projects-make-use-of-coroutines)
   * [What restrictions are there?](#what-restrictions-are-there)
   * [Can I use this with an IDE?](#can-i-use-this-with-an-ide)
   * [Can I serialize/deserialize my Coroutine?](#can-i-serializedeserialize-my-coroutine)
-  * [Is there a Gradle plugin?](#is-there-a-gradle-plugin)
   * [What alternatives are available?](#what-alternatives-are-available)
  * [Change Log](#change-log)
  * [Footnotes](#footnotes)
@@ -94,6 +97,73 @@ First, define the Ant Task. It's available for download from [Maven Central](htt
 </taskdef>
 ```
 
+**Gradle Instructions**
+
+In your build script...
+
+```groovy
+// Are you a Gradle pro? Can this become more idiomatic to Gradle? Please
+// let me know in a ticket.
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath group: 'com.offbynull.coroutines', name: 'instrumenter', version: '1.2.0'
+        classpath group: 'commons-io', name: 'commons-io', version: '2.5'
+    }
+}
+
+compileJava.doLast {
+    String jdkLibsDirectory = System.getProperty("java.home") + "/lib"
+
+    List<File> classpath = new ArrayList<>()
+    classpath.addAll(sourceSets.main.output.classesDir) // change to destinationDir?
+    classpath.addAll(sourceSets.main.compileClasspath.getFiles().asList())
+    classpath.addAll(FileUtils.listFiles(new File(jdkLibsDirectory), ["jar" ] as String[], true))
+    classpath.removeAll { !it.exists() }
+
+    InstrumentationSettings settings = new InstrumentationSettings(MarkerType.NONE, true)
+    Instrumenter instrumenter = new Instrumenter(classpath)
+
+    FileUtils.listFiles(sourceSets.main.output.classesDir, [ "class" ] as String[], true).each { classFile ->
+        byte[] input = FileUtils.readFileToByteArray(classFile)
+        byte[] output = instrumenter.instrument(input, settings)
+        FileUtils.writeByteArrayToFile(classFile, output)
+    }
+}
+
+compileTestJava.doLast {
+    String jdkLibsDirectory = System.getProperty("java.home") + "/lib"
+
+    List<File> classpath = new ArrayList<>()
+    classpath.addAll(sourceSets.test.output.classesDir) // change to destinationDir?
+    classpath.addAll(sourceSets.test.compileClasspath.getFiles().asList())
+    classpath.addAll(FileUtils.listFiles(new File(jdkLibsDirectory), ["jar" ] as String[], true))
+    classpath.removeAll { !it.exists() }
+
+    InstrumentationSettings settings = new InstrumentationSettings(MarkerType.NONE, true)
+    Instrumenter instrumenter = new Instrumenter(classpath)
+
+    FileUtils.listFiles(sourceSets.test.output.classesDir, [ "class" ] as String[], true).each { classFile ->
+        byte[] input = FileUtils.readFileToByteArray(classFile)
+        byte[] output = instrumenter.instrument(input, settings)
+        FileUtils.writeByteArrayToFile(classFile, output)
+    }
+}
+
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile group: 'com.offbynull.coroutines', name: 'user', version: '1.2.0'
+}
+```
+
 Then, bind it to the target of your choice.
 ```xml
 <target name="-post-compile">
@@ -105,7 +175,7 @@ Then, bind it to the target of your choice.
 
 You'll also need to include the "user" module's JAR in your classpath as a part of your build. It's also available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/user/1.2.0/user-1.2.0.jar).
 
-### Code
+### Code Example
 
 First, declare your coroutine...
 ```java
@@ -332,14 +402,6 @@ If you run the coroutine, serialize it after suspend(), then deserialize it and 
 
 There are likely other reasons as well. Deserialization issues may cause subtle problems that aren't always obvious. It's best to avoid serializing coroutines unless you're absolutely sure you know what you're doing.
 
-#### Is there a Gradle plugin?
-
-A Gradle plugin is on the backburner. In the mean time, Gradle users can make use of the Ant plugin through [Gradle's Ant integration](http://gradle.org/docs/current/userguide/ant.html). The major issue here is that the Gradle plugin APIs aren't made available on Maven Central. From Maven's [Guide to uploading artifacts to the Central Repository](http://maven.apache.org/guides/mini/guide-central-repository-upload.html):
-
->I have other repositories or pluginRepositories listed in my POM, is that a problem?
->
->At present, this won't preclude your project from being included, but we do strongly encourage making sure all your dependencies are included in Central. If you rely on sketchy repositories that have junk in them or disappear, it just creates havok for downstream users. Try to keep your dependencies among reliable repos like Central, Jboss, etc.
-
 #### What alternatives are available?
 
 Alternatives to the Coroutines project include:
@@ -359,6 +421,7 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
+- ADDED: Gradle instructions.
 
 ### [1.2.0] - 2016-09-18
 - CHANGED: Performance improvement: Deferred operand stack and local variable table saving until Coroutine suspended.
