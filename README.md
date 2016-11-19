@@ -22,10 +22,6 @@ More information on the topic of coroutines and their advantages can be found on
 ## Table of Contents
 
  * [Quick-start Guide](#quick-start-guide)
-  * [Maven Instructions](#maven-instructions)
-  * [Ant Instructions](#ant-instructions)
-  * [Gradle Instructions](#gradle-instructions)
-  * [Code Example](#code-example)
  * [FAQ](#faq)
   * [How much overhead am I adding?](#how-much-overhead-am-i-adding)
   * [What projects make use of Coroutines?](#what-projects-make-use-of-coroutines)
@@ -97,13 +93,23 @@ First, define the Ant Task. It's available for download from [Maven Central](htt
 </taskdef>
 ```
 
+Then, bind it to the target of your choice.
+```xml
+<target name="-post-compile">
+    <!-- The classpath attribute is a semicolon delimited list of the classpath required by your code. -->
+    <!-- Add the attribute debugMode="true" if you'll be stepping through your coroutines in an IDE. -->
+    <InstrumentTask classpath="" sourceDirectory="build" targetDirectory="build"/>
+</target>
+```
+
+You'll also need to include the "user" module's JAR in your classpath as a part of your build. It's also available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/user/1.2.0/user-1.2.0.jar).
+
 **Gradle Instructions**
 
 In your build script...
 
 ```groovy
-// Are you a Gradle pro? Can this become more idiomatic to Gradle? Please
-// let me know in a ticket.
+// Are you a Gradle pro? Can this become more idiomatic to Gradle? Please let me know in a ticket.
 
 buildscript {
     repositories {
@@ -163,17 +169,6 @@ dependencies {
     compile group: 'com.offbynull.coroutines', name: 'user', version: '1.2.0'
 }
 ```
-
-Then, bind it to the target of your choice.
-```xml
-<target name="-post-compile">
-    <!-- The classpath attribute is a semicolon delimited list of the classpath required by your code. -->
-    <!-- Add the attribute debugMode="true" if you'll be stepping through your coroutines in an IDE. -->
-    <InstrumentTask classpath="" sourceDirectory="build" targetDirectory="build"/>
-</target>
-```
-
-You'll also need to include the "user" module's JAR in your classpath as a part of your build. It's also available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/user/1.2.0/user-1.2.0.jar).
 
 ### Code Example
 
