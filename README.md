@@ -413,16 +413,15 @@ To use the Java Agent, download it from [Maven Central](https://repo1.maven.org/
 ```shell
 java -javaagent:java-agent-1.2.1-shaded.jar myapp.jar
 
-# If you want to pass in instrumentation properties, you can pass in agent
-# arguments. For example, if you want to set the marker type to STDOUT and
-# enable debug mode... 
+# You can pass in instrumentation properties via agent arguments. For example,
+# if you want to set the marker type to STDOUT and enable debug mode... 
 #
 # -javaagent:java-agent-1.2.1-shaded.jar=STDOUT,true
 #
 # By default, marker type is NONE and debug mode is false.
 ```
 
-The agent won't re-instrument classes that have already been instrumented, so it should be safe to use the Coroutines Java Agent with coroutine classes that have already gone through instrumentation (as long as they've been instrumented by the same version of the instrumenter).
+The Coroutines Java Agent won't re-instrument classes that have already been instrumented, so it should be safe to use it with coroutine classes that may have already gone through instrumentation (as long as those classes have been instrumented by the same version of the instrumenter).
 
 #### What alternatives are available?
 
