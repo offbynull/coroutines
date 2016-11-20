@@ -49,7 +49,7 @@ First, add the "user" module as a dependency.
 <dependency>
     <groupId>com.offbynull.coroutines</groupId>
     <artifactId>user</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
 </dependency>
 ```
 
@@ -58,7 +58,7 @@ Then, add the Maven plugin so that your classes get instrumented when you build.
 <plugin>
     <groupId>com.offbynull.coroutines</groupId>
     <artifactId>maven-plugin</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
     <executions>
         <!-- Instruments main classes at process-classes phase -->        
         <execution>
@@ -86,11 +86,11 @@ Then, add the Maven plugin so that your classes get instrumented when you build.
 
 In your build script...
 
-First, define the Ant Task. It's available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/ant-plugin/1.2.0/ant-plugin-1.2.0-shaded.jar).
+First, define the Ant Task. It's available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/ant-plugin/1.2.1/ant-plugin-1.2.1-shaded.jar).
 ```xml
 <taskdef name="InstrumentTask" classname="com.offbynull.coroutines.anttask.InstrumentTask">
     <classpath>
-        <pathelement location="ant-task-1.2.0-shaded.jar"/>
+        <pathelement location="ant-task-1.2.1-shaded.jar"/>
     </classpath>
 </taskdef>
 ```
@@ -104,7 +104,7 @@ Then, bind it to the target of your choice.
 </target>
 ```
 
-You'll also need to include the "user" module's JAR in your classpath as a part of your build. It's also available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/user/1.2.0/user-1.2.0.jar).
+You'll also need to include the "user" module's JAR in your classpath as a part of your build. It's also available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/user/1.2.1/user-1.2.1.jar).
 
 **Gradle Instructions**
 
@@ -119,7 +119,7 @@ buildscript {
     }
 
     dependencies {
-        classpath group: 'com.offbynull.coroutines', name: 'instrumenter', version: '1.2.0'
+        classpath group: 'com.offbynull.coroutines', name: 'instrumenter', version: '1.2.1'
         classpath group: 'commons-io', name: 'commons-io', version: '2.5'
     }
 }
@@ -168,7 +168,7 @@ repositories {
 }
 
 dependencies {
-    compile group: 'com.offbynull.coroutines', name: 'user', version: '1.2.0'
+    compile group: 'com.offbynull.coroutines', name: 'user', version: '1.2.1'
 }
 ```
 
@@ -403,10 +403,10 @@ There are likely other reasons as well. Deserialization issues may cause subtle 
 
 The Coroutines Java Agent allows you to instrument your coroutines at runtime instead of build-time. That means that the bytecode instrumentation required to make your coroutines work happens when your application runs instead of when your application gets compiled and packaged.
 
-To use the Java Agent, download it from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/java-agent/1.2.0/java-agent-1.2.0-shaded.jar) and apply it when you run your Java program...
+To use the Java Agent, download it from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/java-agent/1.2.1/java-agent-1.2.1-shaded.jar) and apply it when you run your Java program...
 
 ```shell
-java -javaagent:java-agent-1.2.0-shaded.jar myapp.jar
+java -javaagent:java-agent-1.2.1-shaded.jar myapp.jar
 ```
 
 The agent won't attempt to re-instrument classes that have already been instrumented, so it should be safe to use the Coroutines Java Agent with coroutine classes that have already gone through instrumentation (as long as they've been instrumented by the same version of the instrumenter).
@@ -430,6 +430,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
+
+### [1.2.1] - 2016-11-19
 - ADDED: Gradle instructions.
 - ADDED: Java Agent for bytecode instrumenation at runtime.
 
