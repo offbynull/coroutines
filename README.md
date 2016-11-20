@@ -36,7 +36,7 @@ More information on the topic of coroutines and their advantages can be found on
 
 ### Setup
 
-The Coroutines project relies on bytecode instrumentation to make your coroutines work. Maven, Ant, and Gradle instructions to instrument your code are provided below. Although your code can target any version of Java from Java 1.4 to Java 8, the instrumentation being done by Maven/Ant/Gradle require Java 8 to run.
+The Coroutines project relies on bytecode instrumentation to make your coroutines work. Maven, Ant, and Gradle instructions to instrument your code are provided below. Although your code can target any version of Java from Java 1.4 to Java 8, the bytecode instrumentation being done by Maven/Ant/Gradle require Java 8 to run.
 
 **Maven Instructions**
 
