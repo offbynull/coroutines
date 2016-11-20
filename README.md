@@ -113,6 +113,11 @@ In your build script...
 ```groovy
 // Are you a Gradle pro? Can this become more idiomatic to Gradle? Please let me know in a ticket.
 
+import com.offbynull.coroutines.instrumenter.InstrumentationSettings
+import com.offbynull.coroutines.instrumenter.Instrumenter
+import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
+import org.apache.commons.io.FileUtils;
+
 buildscript {
     repositories {
         mavenCentral()
