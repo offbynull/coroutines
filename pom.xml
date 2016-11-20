@@ -50,6 +50,7 @@
         <module>instrumenter</module>
         <module>maven-plugin</module>
         <module>ant-plugin</module>
+        <module>java-agent</module>
     </modules>
     <dependencyManagement>
         <dependencies>

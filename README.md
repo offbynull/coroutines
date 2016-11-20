@@ -6,11 +6,12 @@ Inspired by the [Apache Commons Javaflow](http://commons.apache.org/sandbox/comm
 
 Why use Coroutines over Javaflow? The Couroutines project is a new Java coroutines implementation written from scratch that aims to solve some of the issues that Javaflow has. The Coroutines project provides several distinct advantages:
 
-* Saves and loads method state faster than Javaflow [<sub>[1]</sub>](#footnotes)
-* Provides both a Maven plugin and an Ant plugin [<sub>[2]</sub>](#footnotes)
-* Proper support for Java 8 bytecode [<sub>[3]</sub>](#footnotes)
-* Proper support for synchronized blocks [<sub>[4]</sub>](#footnotes)
-* Modular project structure and the code is readable, tested, and well commented [<sub>[5]</sub>](#footnotes)
+* Saves and loads method state faster than Javaflow [<sub>[Footnote 1]</sub>](#footnotes)
+* Provides Maven, Ant, and Gradle support [<sub>[Footnote 2]</sub>](#footnotes)
+* Provides a Java Agent [<sub>[Footnote 2]</sub>](#footnotes)
+* Proper support for Java 8 bytecode [<sub>[Footnote 3]</sub>](#footnotes)
+* Proper support for synchronized blocks [<sub>[Footnote 4]</sub>](#footnotes)
+* Modular project structure and the code is readable, tested, and well commented [<sub>[Footnote 5]</sub>](#footnotes)
 
 In addition, Javaflow appears to be largely unmaintained at present.
 
@@ -28,6 +29,7 @@ More information on the topic of coroutines and their advantages can be found on
   * [What restrictions are there?](#what-restrictions-are-there)
   * [Can I use this with an IDE?](#can-i-use-this-with-an-ide)
   * [Can I serialize/deserialize my Coroutine?](#can-i-serializedeserialize-my-coroutine)
+  * [How do I use the Java Agent?](#how-do-i-use-the-java-agent)
   * [What alternatives are available?](#what-alternatives-are-available)
  * [Change Log](#change-log)
  * [Footnotes](#footnotes)
@@ -397,6 +399,18 @@ If you run the coroutine, serialize it after suspend(), then deserialize it and 
 
 There are likely other reasons as well. Deserialization issues may cause subtle problems that aren't always obvious. It's best to avoid serializing coroutines unless you're absolutely sure you know what you're doing.
 
+#### How do I use the Java Agent?
+
+The Coroutines Java Agent allows you to instrument your coroutines at runtime instead of build-time. That means that the bytecode instrumentation required to make your coroutines work happens when your application runs instead of when your application gets compiled and packaged.
+
+To use the Java Agent, download it from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/java-agent/1.2.0/java-agent-1.2.0-shaded.jar) and apply it when you run your Java program...
+
+```shell
+java -javaagent:java-agent-1.2.0-shaded.jar myapp.jar
+```
+
+The agent won't attempt to re-instrument classes that have already been instrumented, so it should be safe to use the Coroutines Java Agent with coroutine classes that have already gone through instrumentation (as long as they've been instrumented by the same version of the instrumenter).
+
 #### What alternatives are available?
 
 Alternatives to the Coroutines project include:
@@ -417,6 +431,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
 - ADDED: Gradle instructions.
+- ADDED: Java Agent for bytecode instrumenation at runtime.
 
 ### [1.2.0] - 2016-09-18
 - CHANGED: Performance improvement: Deferred operand stack and local variable table saving until Coroutine suspended.
