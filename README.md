@@ -421,7 +421,7 @@ java -javaagent:java-agent-1.2.1-shaded.jar myapp.jar
 # By default, marker type is NONE and debug mode is false.
 ```
 
-The Coroutines Java Agent won't re-instrument classes that have already been instrumented, so it should be safe to use it with coroutine classes that may have already gone through instrumentation (as long as those classes have been instrumented by the same version of the instrumenter).
+The Coroutines Java Agent won't instrument classes that have already been instrumented, so it should be safe to use it with coroutine classes that may have already gone through instrumentation (as long as those classes have been instrumented by the same version of the instrumenter).
 
 #### What alternatives are available?
 
