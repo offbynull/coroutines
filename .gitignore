@@ -6,3 +6,5 @@
 /target/
 /java-agent/target/
 /java-agent/nbproject/
+/gradle-plugin/target/
+/gradle-plugin/nbproject/

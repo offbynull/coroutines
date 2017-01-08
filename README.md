@@ -7,11 +7,11 @@ Inspired by the [Apache Commons Javaflow](http://commons.apache.org/sandbox/comm
 Why use Coroutines over Javaflow? The Couroutines project is a new Java coroutines implementation written from scratch that aims to solve some of the issues that Javaflow has. The Coroutines project provides several distinct advantages:
 
 * Saves and loads method state faster than Javaflow [<sub>[Footnote 1]</sub>](#footnotes)
-* Provides Maven, Ant, and Gradle support [<sub>[Footnote 2]</sub>](#footnotes)
-* Provides a Java Agent [<sub>[Footnote 2]</sub>](#footnotes)
-* Proper support for Java 8 bytecode [<sub>[Footnote 3]</sub>](#footnotes)
-* Proper support for synchronized blocks [<sub>[Footnote 4]</sub>](#footnotes)
-* Modular project structure and the code is readable, tested, and well commented [<sub>[Footnote 5]</sub>](#footnotes)
+* Provides Maven, Ant, and Gradle plugins [<sub>[Footnote 2]</sub>](#footnotes)
+* Provides a Java Agent [<sub>[Footnote 3]</sub>](#footnotes)
+* Proper support for Java 8 bytecode [<sub>[Footnote 4]</sub>](#footnotes)
+* Proper support for synchronized blocks [<sub>[Footnote 5]</sub>](#footnotes)
+* Modular project structure and the code is readable, tested, and well commented [<sub>[Footnote 6]</sub>](#footnotes)
 
 In addition, Javaflow appears to be largely unmaintained at present.
 
@@ -38,7 +38,7 @@ More information on the topic of coroutines and their advantages can be found on
 
 ### Setup
 
-The Coroutines project relies on bytecode instrumentation to make your coroutines work. Maven, Ant, and Gradle instructions to instrument your code are provided below. Although your code can target any version of Java from Java 1.4 to Java 8, the bytecode instrumentation being done by Maven/Ant/Gradle require Java 8 to run.
+The Coroutines project relies on bytecode instrumentation to make your coroutines work. Maven, Ant, and Gradle plugins to instrument your code are provided below. Although your code can target any version of Java from Java 1.4 to Java 8, the bytecode instrumentation being done by Maven/Ant/Gradle require Java 8 to run.
 
 **Maven Instructions**
 
@@ -111,62 +111,23 @@ You'll also need to include the "user" module's JAR in your classpath as a part 
 In your build script...
 
 ```groovy
-// Are you a Gradle pro? Can this become more idiomatic to Gradle? Please let me know in a ticket.
-
-import com.offbynull.coroutines.instrumenter.InstrumentationSettings
-import com.offbynull.coroutines.instrumenter.Instrumenter
-import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
-import org.apache.commons.io.FileUtils;
-
 buildscript {
     repositories {
         mavenCentral()
     }
 
     dependencies {
-        classpath group: 'com.offbynull.coroutines', name: 'instrumenter', version: '1.2.1'
-        classpath group: 'commons-io', name: 'commons-io', version: '2.5'
+        classpath group: 'com.offbynull.coroutines',  name: 'gradle-plugin',  version: '1.2.1'
     }
 }
 
-compileJava.doLast {
-    String jdkLibsDirectory = System.getProperty("java.home") + "/lib"
+apply plugin: "java"
+apply plugin: "coroutines"
 
-    List<File> classpath = new ArrayList<>()
-    classpath.addAll(sourceSets.main.output.classesDir) // change to destinationDir?
-    classpath.addAll(sourceSets.main.compileClasspath.getFiles().asList())
-    classpath.addAll(FileUtils.listFiles(new File(jdkLibsDirectory), ["jar" ] as String[], true))
-    classpath.removeAll { !it.exists() }
-
-    InstrumentationSettings settings = new InstrumentationSettings(MarkerType.NONE, true)
-    Instrumenter instrumenter = new Instrumenter(classpath)
-
-    FileUtils.listFiles(sourceSets.main.output.classesDir, [ "class" ] as String[], true).each { classFile ->
-        byte[] input = FileUtils.readFileToByteArray(classFile)
-        byte[] output = instrumenter.instrument(input, settings)
-        FileUtils.writeByteArrayToFile(classFile, output)
-    }
+coroutines {
+    // Uncomment if you'll be stepping through your coroutines in an IDE.
+    // debugMode = true 
 }
-
-compileTestJava.doLast {
-    String jdkLibsDirectory = System.getProperty("java.home") + "/lib"
-
-    List<File> classpath = new ArrayList<>()
-    classpath.addAll(sourceSets.test.output.classesDir) // change to destinationDir?
-    classpath.addAll(sourceSets.test.compileClasspath.getFiles().asList())
-    classpath.addAll(FileUtils.listFiles(new File(jdkLibsDirectory), ["jar" ] as String[], true))
-    classpath.removeAll { !it.exists() }
-
-    InstrumentationSettings settings = new InstrumentationSettings(MarkerType.NONE, true)
-    Instrumenter instrumenter = new Instrumenter(classpath)
-
-    FileUtils.listFiles(sourceSets.test.output.classesDir, [ "class" ] as String[], true).each { classFile ->
-        byte[] input = FileUtils.readFileToByteArray(classFile)
-        byte[] output = instrumenter.instrument(input, settings)
-        FileUtils.writeByteArrayToFile(classFile, output)
-    }
-}
-
 
 repositories {
     mavenCentral()
@@ -442,6 +403,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
+- ADDED: Gradle plugin.
+- REMOVED: Gradle instructions.
 
 ### [1.2.1] - 2016-11-19
 - ADDED: Gradle instructions.
@@ -496,6 +459,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ## Footnotes
 1. Javaflow has a reliance on thread local storage and other threading constructs. The Coroutines project avoids anything to do with threads. A quick benchmark performing 10,000,000 iterations of Javaflow's echo sample vs this project's echo example (System.out's removed in both) resulted in Javaflow executing in 46,518ms while Coroutines executed in 19,141ms. Setup used for this benchmark was an Intel i7 960 CPU with 12GB of RAM running Windows 7 and Java 8.
 2. Javaflow only provides an Ant plugin.
-3. Javaflow has [issues](https://issues.apache.org/jira/browse/SANDBOX-476?page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel&focusedCommentId=14133339#comment-14133339) dealing with stackmap frames due to it's reliance on ASM's default behaviour for deriving common superclasses. The Coroutines project works around this behaviour by implementing custom logic.
-4. Javaflow attempts to use static analysis to determine which monitors need to be exitted and reentered, which may not be valid in certain cases (e.g. if your class file was built with a JVM language other than Java). The Coroutines project keeps track of monitors at runtime.
-5. Javaflow's code is difficult to follow and everything is embedded in to a single project.
+3. Javaflow does not provide a Java agent.
+4. Javaflow has [issues](https://issues.apache.org/jira/browse/SANDBOX-476?page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel&focusedCommentId=14133339#comment-14133339) dealing with stackmap frames due to it's reliance on ASM's default behaviour for deriving common superclasses. The Coroutines project works around this behaviour by implementing custom logic.
+5. Javaflow attempts to use static analysis to determine which monitors need to be exitted and reentered, which may not be valid in certain cases (e.g. if your class file was built with a JVM language other than Java). The Coroutines project keeps track of monitors at runtime.
+6. Javaflow's code is difficult to follow and everything is embedded in to a single project.

@@ -51,6 +51,7 @@
         <module>maven-plugin</module>
         <module>ant-plugin</module>
         <module>java-agent</module>
+        <module>gradle-plugin</module>
     </modules>
     <dependencyManagement>
         <dependencies>
@@ -113,6 +114,18 @@
                 <groupId>org.apache.ant</groupId>
                 <artifactId>ant</artifactId>
                 <version>1.9.7</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.groovy</groupId>
+                <artifactId>groovy</artifactId>
+                <version>2.4.7</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.gradle</groupId>
+                <artifactId>gradle-core</artifactId>
+                <version>3.1</version>
                 <scope>provided</scope>
             </dependency>
             <dependency>
