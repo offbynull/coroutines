@@ -29,7 +29,7 @@ public final class CoroutinesPluginConfiguration {
     private boolean debugMode;
 
     /**
-     * Constructs a {@link ConroutinesPluginConfiguration} object.
+     * Constructs a {@link CoroutinesPluginConfiguration} object.
      */
     public CoroutinesPluginConfiguration() {
         jdkLibsDirectory = System.getProperty("java.home") + "/lib";
