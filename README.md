@@ -405,6 +405,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### [Unreleased][unreleased]
 - ADDED: Gradle plugin.
 - REMOVED: Gradle instructions.
+- CHANGED: Upgraded to dependencies and plugins
 
 ### [1.2.1] - 2016-11-19
 - ADDED: Gradle instructions.
