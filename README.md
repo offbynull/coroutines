@@ -110,6 +110,8 @@ You'll also need to include the "user" module's JAR in your classpath as a part 
 
 In your build script...
 
+First, instruct Gradle to pull the coroutines plugin from Maven central...
+
 ```groovy
 buildscript {
     repositories {
@@ -120,7 +122,11 @@ buildscript {
         classpath group: 'com.offbynull.coroutines',  name: 'gradle-plugin',  version: '1.2.2'
     }
 }
+```
 
+Then, apply the coroutines plugin and add the "user" module as a dependency...
+
+```groovy
 apply plugin: "java"
 apply plugin: "coroutines"
 
