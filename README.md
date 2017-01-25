@@ -23,6 +23,11 @@ More information on the topic of coroutines and their advantages can be found on
 ## Table of Contents
 
  * [Quick-start Guide](#quick-start-guide)
+  * [Maven Instructions](#maven-instructions)
+  * [Ant Instructions](#ant-instructions)
+  * [Gradle Instructions](#gradle-instructions)
+  * [Java Agent Instructions](#java-agent-instructions)
+  * [Code Example](#code-example)
  * [FAQ](#faq)
   * [How much overhead am I adding?](#how-much-overhead-am-i-adding)
   * [What projects make use of Coroutines?](#what-projects-make-use-of-coroutines)
@@ -36,11 +41,9 @@ More information on the topic of coroutines and their advantages can be found on
 
 ## Quick-start Guide
 
-### Setup
+The Coroutines project relies on bytecode instrumentation to make your coroutines work. Maven, Ant, and Gradle plugins are provided to instrument your code. In addition to these plugins, a Java Agent is provided to instrument your code at runtime. Although your code can target any version of Java from Java 1.4 to Java 8, the plugins and Java Agent that instrument your code will require Java 8 to run.
 
-The Coroutines project relies on bytecode instrumentation to make your coroutines work. Maven, Ant, and Gradle plugins are provided to instrument your code. Although your code can target any version of Java from Java 1.4 to Java 8, the Maven/Ant/Gradle plugins that instrument your code will require Java 8 to run.
-
-**Maven Instructions**
+### Maven Instructions
 
 In your POM...
 
@@ -82,7 +85,7 @@ Then, add the Maven plugin so that your classes get instrumented when you build.
 </plugin>
 ```
 
-**Ant Instructions**
+### Ant Instructions
 
 In your build script...
 
@@ -106,7 +109,7 @@ Then, bind it to the target of your choice.
 
 You'll also need to include the "user" module's JAR in your classpath as a part of your build. It's also available for download from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/user/1.2.2/user-1.2.2.jar).
 
-**Gradle Instructions**
+### Gradle Instructions
 
 In your build script...
 
@@ -143,6 +146,25 @@ dependencies {
     compile group: 'com.offbynull.coroutines', name: 'user', version: '1.2.2'
 }
 ```
+
+### Java Agent Instructions
+
+The Coroutines Java Agent allows you to instrument your coroutines at runtime instead of build-time. That means that the bytecode instrumentation required to make your coroutines work happens when your application runs instead of when your application gets compiled.
+
+To use the Java Agent, download it from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/java-agent/1.2.2/java-agent-1.2.2-shaded.jar) and apply it when you run your Java program...
+
+```shell
+java -javaagent:java-agent-1.2.2-shaded.jar myapp.jar
+
+# Set the debug mode to true if you'll be stepping through your coroutines in
+# an IDE. You can enable debug mode via Java Agent arguments
+#
+# -javaagent:java-agent-1.2.2-shaded.jar=NONE,true
+#
+# By default, debug mode is false. 
+```
+
+The Coroutines Java Agent won't instrument classes that have already been instrumented, so it should be safe to use it with coroutine classes that may have already gone through instrumentation (as long as those classes have been instrumented by the same version of the instrumenter).
 
 ### Code Example
 
@@ -370,25 +392,6 @@ public static final class MyCoroutine implements Coroutine, Serializable {
 If you run the coroutine, serialize it after suspend(), then deserialize it and continue running it from the deserialized version, the code above will print out false. Why? testObj is recreated on deserialization, meaning that it's no longer referring to the same object that's in the static final field. The objects may be equal based on value (the equals() method may return true), but they're referring to different objects after deserialization.
 
 There are likely other reasons as well. Deserialization issues may cause subtle problems that aren't always obvious. It's best to avoid serializing coroutines unless you're absolutely sure you know what you're doing.
-
-#### How do I use the Java Agent?
-
-The Coroutines Java Agent allows you to instrument your coroutines at runtime instead of build-time. That means that the bytecode instrumentation required to make your coroutines work happens when your application runs instead of when your application gets compiled and packaged.
-
-To use the Java Agent, download it from [Maven Central](https://repo1.maven.org/maven2/com/offbynull/coroutines/java-agent/1.2.2/java-agent-1.2.2-shaded.jar) and apply it when you run your Java program...
-
-```shell
-java -javaagent:java-agent-1.2.2-shaded.jar myapp.jar
-
-# You can pass in instrumentation properties via agent arguments. For example,
-# if you want to enable debug mode... 
-#
-# -javaagent:java-agent-1.2.2-shaded.jar=NONE,true
-#
-# By default, debug mode is false.
-```
-
-The Coroutines Java Agent won't instrument classes that have already been instrumented, so it should be safe to use it with coroutine classes that may have already gone through instrumentation (as long as those classes have been instrumented by the same version of the instrumenter).
 
 #### What alternatives are available?
 
