@@ -19,12 +19,15 @@ package com.offbynull.coroutines.javaagent;
 import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
 import com.offbynull.coroutines.instrumenter.asm.ClassLoaderClassInformationRepository;
+import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
 import java.util.Arrays;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.tree.ClassNode;
 
 /**
  * Java Agent that instruments coroutines.
@@ -88,17 +91,54 @@ public final class CoroutinesAgent {
             this.markerType = markerType;
             this.debugMode = debugMode;
         }
-                
+
         @Override
         public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
                 byte[] classfileBuffer) throws IllegalClassFormatException {
+            ClassReader cr = new ClassReader(classfileBuffer);
+            ClassNode classNode = new SimpleClassNode();
+            cr.accept(classNode, 0);
+            String classNameFromBytes = classNode.name;
             
-            Instrumenter instrumenter = new Instrumenter(new ClassLoaderClassInformationRepository(loader));
-            byte[] moddedClassfileBuffer = instrumenter.instrument(
-                    classfileBuffer,
-                    new InstrumentationSettings(markerType, debugMode));
+            // If class is internal to the coroutines user project, don't instrument them
+            //   FYI: If the class being transformed is a lambda, className will show up as null.
+            if (classNameFromBytes.startsWith("com/offbynull/coroutines/user/")) {
+                return null;
+            }
+            
+            // If loader is null, don't attempt instrumentation (this is a core class?)
+            if (loader == null) {
+                return null;
+            }
+            
+            System.out.println(classNameFromBytes + " " + (loader == null));
 
-            return moddedClassfileBuffer;
+//            if (classNameFromBytes.equals("TestFiber2")) {
+//                try {
+//                    System.out.println(Class.forName("TestFiber2$TestFiber3", false, loader));
+//                } catch (ClassNotFoundException ex) {
+//                    System.out.println("failed");
+//                }
+//            }
+//            System.out.println(cir.getInformation("TestFiber2"));
+//            System.out.println(cir.getInformation("TestFiber2.TestFiber3"));
+//            System.out.println(cir.getInformation("TestFiber2$TestFiber3"));
+//            System.out.println(cir.getInformation("TestFiber3"));
+//            
+//            if (1 == 1) {
+//                return classfileBuffer;
+//            }
+            
+            try {
+                Instrumenter instrumenter = new Instrumenter(new ClassLoaderClassInformationRepository(loader));
+                byte[] moddedClassfileBuffer = instrumenter.instrument(
+                        classfileBuffer,
+                        new InstrumentationSettings(markerType, debugMode));
+                return moddedClassfileBuffer;
+            } catch (Throwable e) {
+                System.err.println("FAILED TO INSTRUMENT: " + e);
+                return null;
+            }
         }
         
     }
