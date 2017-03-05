@@ -412,7 +412,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [Unreleased][unreleased]
-- FIXED: Avoid instrumenting core coroutines classes / Java bootstrap classes in Java Agent.
+- FIXED: Avoid instrumenting core coroutines classes / Java bootstrap classes in Java Agent (see issue #77).
+- FIXED: Avoid loading classes in Java Agent (see issue #77).
 
 ### [1.2.2] - 2017-01-08
 - ADDED: Gradle plugin.

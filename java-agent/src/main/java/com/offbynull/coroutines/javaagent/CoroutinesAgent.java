@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,16 +18,13 @@ package com.offbynull.coroutines.javaagent;
 
 import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
-import com.offbynull.coroutines.instrumenter.asm.ClassLoaderClassInformationRepository;
-import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
+import com.offbynull.coroutines.instrumenter.asm.ClassResourceClassInformationRepository;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
 import java.util.Arrays;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.tree.ClassNode;
 
 /**
  * Java Agent that instruments coroutines.
@@ -95,14 +92,14 @@ public final class CoroutinesAgent {
         @Override
         public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
                 byte[] classfileBuffer) throws IllegalClassFormatException {
-            ClassReader cr = new ClassReader(classfileBuffer);
-            ClassNode classNode = new SimpleClassNode();
-            cr.accept(classNode, 0);
-            String classNameFromBytes = classNode.name;
+//            ClassReader cr = new ClassReader(classfileBuffer);
+//            ClassNode classNode = new SimpleClassNode();
+//            cr.accept(classNode, 0);
+//            String classNameFromBytes = classNode.name;
             
             // If class is internal to the coroutines user project, don't instrument them
             //   FYI: If the class being transformed is a lambda, className will show up as null.
-            if (classNameFromBytes.startsWith("com/offbynull/coroutines/user/")) {
+            if (className == null || className.startsWith("com/offbynull/coroutines/user/")) {
                 return null;
             }
             
@@ -111,26 +108,10 @@ public final class CoroutinesAgent {
                 return null;
             }
             
-            System.out.println(classNameFromBytes + " " + (loader == null));
-
-//            if (classNameFromBytes.equals("TestFiber2")) {
-//                try {
-//                    System.out.println(Class.forName("TestFiber2$TestFiber3", false, loader));
-//                } catch (ClassNotFoundException ex) {
-//                    System.out.println("failed");
-//                }
-//            }
-//            System.out.println(cir.getInformation("TestFiber2"));
-//            System.out.println(cir.getInformation("TestFiber2.TestFiber3"));
-//            System.out.println(cir.getInformation("TestFiber2$TestFiber3"));
-//            System.out.println(cir.getInformation("TestFiber3"));
-//            
-//            if (1 == 1) {
-//                return classfileBuffer;
-//            }
+//            System.out.println(className + " " + (loader == null));
             
             try {
-                Instrumenter instrumenter = new Instrumenter(new ClassLoaderClassInformationRepository(loader));
+                Instrumenter instrumenter = new Instrumenter(new ClassResourceClassInformationRepository(loader));
                 byte[] moddedClassfileBuffer = instrumenter.instrument(
                         classfileBuffer,
                         new InstrumentationSettings(markerType, debugMode));

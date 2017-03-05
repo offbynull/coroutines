@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,6 +24,7 @@ import org.objectweb.asm.Type;
 /**
  * Provides information on classes contained within a {@link ClassLoader}.
  * @author Kasra Faghihi
+ * @see ClassResourceClassInformationRepository
  */
 public final class ClassLoaderClassInformationRepository implements ClassInformationRepository {
     private final ClassLoader classLoader;
@@ -40,6 +41,8 @@ public final class ClassLoaderClassInformationRepository implements ClassInforma
 
     @Override
     public ClassInformation getInformation(String internalClassName) {
+        Validate.notNull(internalClassName);
+        
         String className = Type.getObjectType(internalClassName).getClassName();
         Class<?> cls;
         try {
@@ -71,6 +74,6 @@ public final class ClassLoaderClassInformationRepository implements ClassInforma
             internalSuperClassName = superCls == null ? null : Type.getInternalName(superCls);
         }
 
-        return new ClassInformation(internalSuperClassName, internalInterfaceNames, interfaceMarker);
+        return new ClassInformation(internalClassName, internalSuperClassName, internalInterfaceNames, interfaceMarker);
     }
 }

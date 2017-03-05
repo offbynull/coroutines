@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,11 +16,11 @@
  */
 package com.offbynull.coroutines.instrumenter.asm;
 
+import static com.offbynull.coroutines.instrumenter.asm.InternalUtils.getClassInformation;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,8 +28,6 @@ import org.apache.commons.compress.archivers.jar.JarArchiveEntry;
 import org.apache.commons.compress.archivers.jar.JarArchiveInputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.Validate;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.Opcodes;
 
 /**
  * Provides information on classes contained within JARs and folders.
@@ -55,6 +53,7 @@ public final class FileSystemClassInformationRepository implements ClassInformat
     
     @Override
     public ClassInformation getInformation(String internalClassName) {
+        Validate.notNull(internalClassName);
         return hierarchyMap.get(internalClassName);
     }
 
@@ -125,19 +124,13 @@ public final class FileSystemClassInformationRepository implements ClassInformat
     }
     
     private void populateSuperClassMapping(final InputStream is) throws IOException {
-        ClassReader classReader = new ClassReader(is);
-        String name = classReader.getClassName();
+        ClassInformation ci = getClassInformation(is);
         
-        if (hierarchyMap.containsKey(name)) {
+        if (hierarchyMap.containsKey(ci.getName())) {
             // duplicate encounter, ignore
             return;
         }
-        
-        String superName = classReader.getSuperName();
-        String[] interfaces = classReader.getInterfaces();
-        boolean interfaceMarker = (classReader.getAccess() & Opcodes.ACC_INTERFACE) != 0;
 
-        hierarchyMap.put(name, new ClassInformation(superName, Arrays.asList(interfaces), interfaceMarker));
+        hierarchyMap.put(ci.getName(), ci);
     }
-    
 }

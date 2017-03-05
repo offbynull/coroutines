@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -30,6 +30,7 @@ public interface ClassInformationRepository {
      * its superclass is set to {@link Object}. Note that this is different from what {@link Class#getSuperclass() } returns when the class
      * represents an interface (it returns {@code null}).
      * @param internalClassName internal class name
+     * @throws NullPointerException if any argument is {@code null}
      * @return information for that class, or {@code null} if not found
      */
     ClassInformation getInformation(String internalClassName);

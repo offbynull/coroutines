@@ -16,4 +16,14 @@
                 <goal>versions:display-plugin-updates</goal>
             </goals>
         </action>
+        <action>
+            <actionName>CUSTOM-ready-for-release-test</actionName>
+            <displayName>ready-for-release-test</displayName>
+            <goals>
+                <goal>clean</goal>
+                <goal>install</goal>
+                <goal>source:jar</goal>
+                <goal>javadoc:jar</goal>
+            </goals>
+        </action>
     </actions>
