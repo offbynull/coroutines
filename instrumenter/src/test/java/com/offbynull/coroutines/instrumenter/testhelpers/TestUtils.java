@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,12 +20,14 @@ import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepository;
+import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Serializable;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
@@ -34,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.compress.archivers.jar.JarArchiveEntry;
@@ -44,6 +47,8 @@ import org.apache.commons.io.Charsets;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 
 /**
@@ -70,9 +75,10 @@ public final class TestUtils {
     public static URLClassLoader loadClassesInZipResourceAndInstrument(String path) throws IOException {
         return loadClassesInZipResourceAndInstrument(path, new InstrumentationSettings(MarkerType.CONSTANT, false));
     }
-
-        /**
-     * Opens up a ZIP resource, instruments the classes within, and returns a {@link URLClassLoader} object with access to those classes.
+    
+    /**
+     * Equivalent to calling
+     * {@code loadClassesInZipResourceAndInstrument(path, new InstrumentationSettings(MarkerType.CONSTANT, false), x -> x)}.
      * @param path path of zip resource
      * @param settings instrumentation settings
      * @return class loader able to access instrumented classes
@@ -80,6 +86,20 @@ public final class TestUtils {
      * @throws IOException if an IO error occurs
      */
     public static URLClassLoader loadClassesInZipResourceAndInstrument(String path, InstrumentationSettings settings) throws IOException {
+        return loadClassesInZipResourceAndInstrument(path, settings, x -> x);
+    }
+
+    /**
+     * Opens up a ZIP resource, instruments the classes within, and returns a {@link URLClassLoader} object with access to those classes.
+     * @param path path of zip resource
+     * @param settings instrumentation settings
+     * @param classModifier function to change up class as needed by tests
+     * @return class loader able to access instrumented classes
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IOException if an IO error occurs
+     */
+    public static URLClassLoader loadClassesInZipResourceAndInstrument(String path, InstrumentationSettings settings,
+            Function<byte[], byte[]> classModifier) throws IOException {
         Validate.notNull(path);
         
         // Load original class
@@ -102,7 +122,7 @@ public final class TestUtils {
         for (Entry<String, byte[]> entry : classContents.entrySet()) {
             byte[] content = entry.getValue();
             if (entry.getKey().endsWith(".class")) {
-                content = instrumenter.instrument(content, settings);
+                content = instrumenter.instrument(classModifier.apply(content), settings).getInstrumentedClass();
             }
             instrumentedJarEntries.add(new JarEntry(entry.getKey(), content));
         }
@@ -313,6 +333,26 @@ public final class TestUtils {
             Validate.isTrue(!name.isEmpty());
             this.name = name;
             this.data = data.clone();
+        }
+    }
+    
+    public static final class ClassSerializabler implements Function<byte[], byte[]> {
+
+        @Override
+        public byte[] apply(byte[] t) {
+            ClassReader cr = new ClassReader(t);
+            ClassNode cn = new SimpleClassNode();
+            cr.accept(cn, 0);
+
+            String internalSerializableType = Type.getInternalName(Serializable.class);
+            if (!cn.interfaces.contains(internalSerializableType)) {
+                cn.interfaces.add(internalSerializableType);
+            }
+
+            ClassWriter cw = new ClassWriter(0);
+            cn.accept(cw);
+
+            return cw.toByteArray();
         }
     }
 }

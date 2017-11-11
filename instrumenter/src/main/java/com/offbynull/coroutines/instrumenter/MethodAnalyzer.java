@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -85,6 +85,17 @@ final class MethodAnalyzer {
 
 
         ///////////////////////////////////////////////////////////////////////////////////////////
+        // CREATE METHOD SIGNATURE
+        ///////////////////////////////////////////////////////////////////////////////////////////
+        int methodId = InternalUtils.generateMethodId(classNode.name, methodNode.name, methodNode.desc);
+        int methodVersion = InternalUtils.generateMethodVersion(methodNode);
+        MethodSignature signature = new MethodSignature(methodId, methodVersion, classNode.name, methodNode.name,
+                Type.getMethodType(methodNode.desc));
+        
+        
+        
+        
+        ///////////////////////////////////////////////////////////////////////////////////////////
         // FIND SUSPEND / CONTINUATION INVOCATIONS + ALSO FIND SYNCHRONIZATION INSTRUCTIONS
         ///////////////////////////////////////////////////////////////////////////////////////////
         
@@ -156,7 +167,7 @@ final class MethodAnalyzer {
             
             LineNumberNode lineNumberNode = findLineNumberForInstruction(methodNode.instructions, contInvocationInsnNode);
             Integer lineNumber = lineNumberNode != null ? lineNumberNode.line : null;
-            
+
             ContinuationPoint continuationPoint;
             if (withinTryCatch) {
                 continuationPoint = new TryCatchInvokeContinuationPoint(
@@ -314,7 +325,7 @@ final class MethodAnalyzer {
         
         // Create variables to for holding on to monitors -- only create if we need them
         LockVariables lockVars = allocateLockVariableSlots(varTable, !synchPoints.isEmpty());
-        
+
 
 
 
@@ -322,8 +333,6 @@ final class MethodAnalyzer {
         ///////////////////////////////////////////////////////////////////////////////////////////
         // RETURN RESULTS OF ANALYSIS
         ///////////////////////////////////////////////////////////////////////////////////////////
-        
-        MethodSignature signature = new MethodSignature(classNode.name, methodNode.name, Type.getMethodType(methodNode.desc));
 
         return new MethodAttributes(
                 signature,

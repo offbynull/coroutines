@@ -23,16 +23,28 @@ final class MethodSignature {
     private final String className;
     private final String methodName;
     private final Type methodDescriptor;
+    private final int methodId;
+    private final int methodVersion;
 
-    MethodSignature(String className, String methodName, Type methodDescriptor) {
+    MethodSignature(int methodId, int methodVersion, String className, String methodName, Type methodDescriptor) {
         Validate.notNull(className);
         Validate.notNull(methodName);
         Validate.notNull(methodDescriptor);
         Validate.isTrue(methodDescriptor.getSort() == Type.METHOD);
         
+        this.methodId = methodId;
+        this.methodVersion = methodVersion;
         this.className = className;
         this.methodName = methodName;
         this.methodDescriptor = methodDescriptor;
+    }
+
+    public int getMethodId() {
+        return methodId;
+    }
+
+    public int getMethodVersion() {
+        return methodVersion;
     }
 
     public String getClassName() {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -73,7 +73,7 @@ public final class MainInstrumentMojo extends AbstractInstrumentMojo {
             throw new MojoExecutionException("Dependency resolution problem", ex);
         }
 
-        log.info("Processing main output folder ... ");
+        log.debug("Processing main output folder ... ");
         instrumentPath(log, classpath, mainOutputFolder);
     }
 }

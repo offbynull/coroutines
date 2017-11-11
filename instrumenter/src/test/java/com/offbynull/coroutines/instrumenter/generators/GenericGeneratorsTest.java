@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -43,6 +43,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.throwRuntimeException;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
+import org.objectweb.asm.Opcodes;
 
 public final class GenericGeneratorsTest {
     private static final String STUB_CLASSNAME = "SimpleStub";
@@ -296,6 +297,43 @@ public final class GenericGeneratorsTest {
             Object obj = cl.loadClass(STUB_CLASSNAME).newInstance();
             
             assertEquals("hi!", MethodUtils.invokeMethod(obj, STUB_METHOD_NAME));
+        }
+    }
+    
+    @Test
+    public void mustConstructAndCallNonVisibleMethod() throws Exception {
+        methodNode = new MethodNode(
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+                "internalMethod",
+                Type.getMethodDescriptor(Type.getType(String.class), new Type[] { }),
+                null,
+                null);
+        classNode.methods.add(methodNode);
+        
+        // Initialize variable table
+        VariableTable varTable = new VariableTable(classNode, methodNode);
+        Variable sbVar = varTable.acquireExtra(StringBuilder.class);
+        Variable retVar = varTable.acquireExtra(String.class);
+        
+        // Update method logic
+        /**
+         * return new StringBuilder().append("hi!").toString()
+         */
+        methodNode.instructions
+                = merge(
+                        construct(StringBuilder.class.getConstructor()),
+                        saveVar(sbVar),
+                        call(StringBuilder.class.getMethod("append", String.class), loadVar(sbVar), loadStringConst("hi!")),
+                        call(StringBuilder.class.getMethod("toString"), loadVar(sbVar)),
+                        saveVar(retVar),
+                        returnValue(Type.getType(String.class), loadVar(retVar))
+                );
+        
+        // Write to JAR file + load up in classloader -- then execute tests
+        try (URLClassLoader cl = createJarAndLoad(classNode)) {
+            Object obj = cl.loadClass(STUB_CLASSNAME).newInstance();
+            
+            assertEquals("hi!", MethodUtils.invokeMethod(obj, "internalMethod"));
         }
     }
 }

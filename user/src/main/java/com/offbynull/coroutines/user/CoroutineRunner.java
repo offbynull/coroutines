@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,10 +23,10 @@ import java.io.Serializable;
  * @author Kasra Faghihi
  */
 public final class CoroutineRunner implements Serializable {
-    private static final long serialVersionUID = 3L;
+    private static final long serialVersionUID = 4L;
     
     private Coroutine coroutine;
-    private Continuation continuation = new Continuation();
+    private Continuation continuation;
 
     /**
      * Constructs a {@link CoroutineRunner} object.
@@ -38,6 +38,15 @@ public final class CoroutineRunner implements Serializable {
             throw new NullPointerException();
         }
         this.coroutine = coroutine;
+        this.continuation = new Continuation();
+    }
+    
+    CoroutineRunner(Coroutine coroutine, Continuation continuation) {
+        if (coroutine == null || continuation == null) {
+            throw new NullPointerException();
+        }
+        this.coroutine = coroutine;
+        this.continuation = continuation;
     }
 
     /**
@@ -93,5 +102,8 @@ public final class CoroutineRunner implements Serializable {
     public Coroutine getCoroutine() {
         return coroutine;
     }
-    
+
+    Continuation getContinuation() {
+        return continuation;
+    }
 }

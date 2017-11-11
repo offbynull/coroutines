@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -35,6 +35,7 @@ final class SuspendContinuationPoint implements ContinuationPoint {
             Frame<BasicValue> frame) {
         // lineNumber is null if it doesn't exist
         Validate.notNull(invokeInstruction);
+        // stateModifierMethod is null if it doesn't exist
         Validate.notNull(frame);
 
         this.lineNumber = lineNumber;

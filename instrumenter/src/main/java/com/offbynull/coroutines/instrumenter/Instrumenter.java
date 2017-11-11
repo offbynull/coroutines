@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -101,11 +101,11 @@ public final class Instrumenter {
      * Instruments a class.
      * @param input class file contents
      * @param settings instrumentation settings
-     * @return instrumented class
+     * @return instrumentation results
      * @throws IllegalArgumentException if the class could not be instrumented for some reason
      * @throws NullPointerException if any argument is {@code null}
      */
-    public byte[] instrument(byte[] input, InstrumentationSettings settings) {
+    public InstrumentationResult instrument(byte[] input, InstrumentationSettings settings) {
         Validate.notNull(input);
         Validate.notNull(settings);
         Validate.isTrue(input.length > 0);
@@ -117,7 +117,7 @@ public final class Instrumenter {
 
         // Is this class an interface? if so, skip it
         if ((classNode.access & Opcodes.ACC_INTERFACE) == Opcodes.ACC_INTERFACE) {
-            return input.clone();
+            return new InstrumentationResult(input, null);
         }
 
         // Has this class already been instrumented? if so, skip it
@@ -133,13 +133,13 @@ public final class Instrumenter {
                 throw new IllegalArgumentException("Instrumentation marker found wrong value: " + instrumentedMarkerField.value);
             }
             
-            return input.clone();
+            return new InstrumentationResult(input, null);
         }
         
         // Find methods that need to be instrumented. If none are found, skip
         List<MethodNode> methodNodesToInstrument = findMethodsWithParameter(classNode.methods, CONTINUATION_CLASS_TYPE);
         if (methodNodesToInstrument.isEmpty()) {
-            return input.clone();
+            return new InstrumentationResult(input, null);
         }
         
         // Add the "Instrumented" marker field to this class so if we ever come back to it, we can skip it
@@ -154,11 +154,14 @@ public final class Instrumenter {
         // Instrument each method that needs to be instrumented
         MethodAnalyzer analyzer = new MethodAnalyzer(classRepo);
         MethodInstrumenter instrumenter = new MethodInstrumenter();
+        MethodDetailer detailer = new MethodDetailer();
+        StringBuilder details = new StringBuilder();
         for (MethodNode methodNode : methodNodesToInstrument) {
             MethodAttributes methodAttrs = analyzer.analyze(classNode, methodNode, settings);
             
             // If methodProps is null, it means that the analyzer determined that the method doesn't need to be instrumented.
             if (methodAttrs != null) {
+                detailer.detail(methodNode, methodAttrs, details);
                 instrumenter.instrument(methodNode, methodAttrs);
             }
         }
@@ -171,7 +174,7 @@ public final class Instrumenter {
 
         ClassWriter cw = new SimpleClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, classRepo);
         classNode.accept(cw);
-        return cw.toByteArray();
+        return new InstrumentationResult(cw.toByteArray(), details.toString());
     }
 
 

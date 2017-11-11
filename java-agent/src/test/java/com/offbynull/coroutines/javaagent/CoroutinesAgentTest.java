@@ -1,6 +1,5 @@
 package com.offbynull.coroutines.javaagent;
 
-import com.offbynull.coroutines.javaagent.CoroutinesAgent;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.instrument.ClassFileTransformer;

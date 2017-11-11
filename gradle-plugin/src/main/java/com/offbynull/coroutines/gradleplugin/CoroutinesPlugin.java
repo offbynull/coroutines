@@ -18,6 +18,7 @@ package com.offbynull.coroutines.gradleplugin;
 
 import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
+import com.offbynull.coroutines.instrumenter.PluginHelper;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.File;
 import java.io.IOException;
@@ -32,6 +33,7 @@ import org.apache.commons.lang3.reflect.MethodUtils;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.logging.Logger;
 
 //CHECKSTYLE.OFF:DesignForExtension - Gradle likely needs these classes to be extendable
 /**
@@ -69,6 +71,8 @@ import org.gradle.api.Task;
  */
 public class CoroutinesPlugin implements Plugin<Project> {
 
+    private Logger log;
+
     @SuppressWarnings("unchecked")
     @Override
     public void apply(Project target) {
@@ -85,6 +89,8 @@ public class CoroutinesPlugin implements Plugin<Project> {
         for (Task task : compileJavaTestTasks) {
             addInstrumentActionToTask("test", task, config);
         }
+
+        log = target.getLogger();
     }
 
     @SuppressWarnings("unchecked")
@@ -119,23 +125,26 @@ public class CoroutinesPlugin implements Plugin<Project> {
         try {
             List<File> classpath = new ArrayList<>();
             classpath.add(classesDir); // change to destinationDir?
+            log.debug("Getting compile classpath");
             classpath.addAll(compileClasspath);
+            log.debug("Getting bootstrap classpath");
             classpath.addAll(FileUtils.listFiles(new File(config.getJdkLibsDirectory()), new String[]{"jar"}, true));
 
             classpath = classpath.stream()
                     .filter(x -> x.exists())
                     .collect(toList());
+            
+            log.debug("Classpath for instrumentation is as follows: " + classpath);
 
+            log.debug("Creating instrumenter...");
             MarkerType markerType = MarkerType.valueOf(config.getMarkerType());
             boolean debugMode = config.isDebugMode();
             InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode);
             Instrumenter instrumenter = new Instrumenter(classpath);
 
-            for (File classFile : FileUtils.listFiles(classesDir, new String[]{"class"}, true)) {
-                byte[] input = FileUtils.readFileToByteArray(classFile);
-                byte[] output = instrumenter.instrument(input, settings);
-                FileUtils.writeByteArrayToFile(classFile, output);
-            }
+            // This logs to info by default, but info won't show up unless you pass -i to gradle. If you want logs to show up by default,
+            // pass in log::lifecycle instead.
+            PluginHelper.instrument(instrumenter, settings, classesDir, classesDir, log::info);
         } catch (IOException ioe) {
             throw new IllegalStateException("Failed to instrument", ioe);
         }

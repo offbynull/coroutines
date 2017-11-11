@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -43,6 +43,7 @@ import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.TypeInsnNode;
@@ -693,6 +694,50 @@ public final class GenericGenerators {
         } else {
             Validate.isTrue(method.getParameterCount() + 1 == args.length);
             ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, clsType.getInternalName(), method.getName(), methodType.getDescriptor(),
+                    false));
+        }
+        
+        return ret;
+    }
+
+    /**
+     * Calls a method with a set of arguments. After execution the stack may have an extra item pushed on it: the object that was returned
+     * by this method (if any).
+     * @param internalClassName name of class that {@code method} belongs to (this is the internal Java name where dots are replaced with
+     * slashes)
+     * @param method method node that describes the method to call
+     * @param args method argument instruction lists -- each instruction list must leave one item on the stack of the type expected
+     * by the method (note that if this is a non-static method, the first argument must always evaluate to the "this" pointer/reference)
+     * @return instructions to invoke a method
+     * @throws NullPointerException if any argument is {@code null} or array contains {@code null}
+     * @throws IllegalArgumentException if the length of {@code args} doesn't match the number of parameters in {@code method}
+     */
+    public static InsnList call(String internalClassName, MethodNode method, InsnList ... args) {
+        Validate.notNull(internalClassName);
+        Validate.notNull(method);
+        Validate.notNull(args);
+        Validate.noNullElements(args);
+        
+        
+        InsnList ret = new InsnList();
+        
+        for (InsnList arg : args) {
+            ret.add(arg);
+        }
+
+        Type[] argTypes = Type.getMethodType(method.desc).getArgumentTypes();
+        
+        if ((method.access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC) {
+            Validate.isTrue(argTypes.length == args.length);
+            ret.add(new MethodInsnNode(Opcodes.INVOKESTATIC, internalClassName, method.name, method.desc,
+                    false));
+        } else if ((method.access & Opcodes.ACC_INTERFACE) == Opcodes.ACC_INTERFACE) {
+            Validate.isTrue(argTypes.length + 1 == args.length);
+            ret.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, internalClassName, method.name, method.desc,
+                    true));
+        } else {
+            Validate.isTrue(argTypes.length + 1 == args.length);
+            ret.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, internalClassName, method.name, method.desc,
                     false));
         }
         

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,6 +18,7 @@ package com.offbynull.coroutines.mavenplugin;
 
 import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
+import com.offbynull.coroutines.instrumenter.PluginHelper;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.File;
 import java.util.List;
@@ -60,13 +61,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
             Instrumenter instrumenter = getInstrumenter(log, classpath);
             InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode);
 
-            for (File classFile : FileUtils.listFiles(path, new String[]{"class"}, true)) {
-                log.info("Instrumenting " + classFile);
-                byte[] input = FileUtils.readFileToByteArray(classFile);
-                byte[] output = instrumenter.instrument(input, settings);
-                log.debug("File size changed from " + input.length + " to " + output.length);
-                FileUtils.writeByteArrayToFile(classFile, output);
-            }
+            PluginHelper.instrument(instrumenter, settings, path, path, log::info);
         } catch (Exception ex) {
             throw new MojoExecutionException("Unable to get compile classpath elements", ex);
         }
@@ -88,12 +83,12 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
             log.debug("Getting bootstrap classpath");
             classpathFiles.addAll(FileUtils.listFiles(new File(jdkLibsDirectory), new String[]{"jar"}, true));
 
-            log.info("Classpath for instrumentation is as follows: " + classpathFiles);
+            log.debug("Classpath for instrumentation is as follows: " + classpathFiles);
         } catch (Exception ex) {
             throw new MojoExecutionException("Unable to get compile classpath elements", ex);
         }
 
-        log.info("Creating instrumenter...");
+        log.debug("Creating instrumenter...");
 
         try {
             return new Instrumenter(classpathFiles);

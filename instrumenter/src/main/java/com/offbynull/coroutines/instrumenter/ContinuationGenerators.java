@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -92,7 +92,8 @@ final class ContinuationGenerators {
             = MethodUtils.getAccessibleMethod(Continuation.class, "pushNewMethodState", MethodState.class);
 
     private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
-            = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Object[].class, LockState.class);
+            = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Integer.TYPE, Integer.TYPE, Object[].class,
+                    LockState.class);
     private static final Method METHODSTATE_GETCONTINUATIONPOINT_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getContinuationPoint");
     private static final Method METHODSTATE_GETDATA_METHOD
@@ -207,7 +208,7 @@ final class ContinuationGenerators {
         Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
         SuspendContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, SuspendContinuationPoint.class);
-        
+
         Integer lineNumber = cp.getLineNumber();
 
         Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
@@ -270,7 +271,7 @@ final class ContinuationGenerators {
         Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
         NormalInvokeContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, NormalInvokeContinuationPoint.class);
-        
+
         Integer lineNumber = cp.getLineNumber();
         
         Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
@@ -387,7 +388,7 @@ final class ContinuationGenerators {
         Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
         TryCatchInvokeContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, TryCatchInvokeContinuationPoint.class);
-        
+
         Integer lineNumber = cp.getLineNumber();
         
         Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
@@ -575,6 +576,9 @@ final class ContinuationGenerators {
         Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
         SuspendContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, SuspendContinuationPoint.class);
+
+        int methodId = attrs.getSignature().getMethodId();
+        int methodVersion = attrs.getSignature().getMethodVersion();
         
         Integer lineNumber = cp.getLineNumber();
 
@@ -618,6 +622,8 @@ final class ContinuationGenerators {
                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
                         construct(METHODSTATE_INIT_METHOD,
+                                loadIntConst(methodId),
+                                loadIntConst(methodVersion),
                                 loadIntConst(idx),
                                 loadVar(storageContainerVar),
                                 // load lockstate for last arg if method actually has monitorenter/exit in it
@@ -650,7 +656,10 @@ final class ContinuationGenerators {
         Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
         NormalInvokeContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, NormalInvokeContinuationPoint.class);
-        
+
+        int methodId = attrs.getSignature().getMethodId();
+        int methodVersion = attrs.getSignature().getMethodVersion();
+
         Integer lineNumber = cp.getLineNumber();
 
         Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
@@ -730,6 +739,8 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
+                                                loadIntConst(methodId),
+                                                loadIntConst(methodVersion),
                                                 loadIntConst(idx),
                                                 loadVar(storageContainerVar),
                                                 // load lockstate for last arg if method actually has monitorenter/exit in it
@@ -758,7 +769,10 @@ final class ContinuationGenerators {
         Validate.notNull(attrs);
         Validate.isTrue(idx >= 0);
         TryCatchInvokeContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, TryCatchInvokeContinuationPoint.class);
-        
+
+        int methodId = attrs.getSignature().getMethodId();
+        int methodVersion = attrs.getSignature().getMethodVersion();
+
         Integer lineNumber = cp.getLineNumber();
 
         Variable contArg = attrs.getCoreVariables().getContinuationArgVar();
@@ -821,6 +835,8 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
+                                                loadIntConst(methodId),
+                                                loadIntConst(methodVersion),
                                                 loadIntConst(idx),
                                                 loadVar(storageContainerVar),
                                                 // load lockstate for last arg if method actually has monitorenter/exit in it

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,8 +18,12 @@ package com.offbynull.coroutines.instrumenter.asm;
 
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findInvocationsOf;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findInvocationsWithParameter;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findLocalVariableNodeForInstruction;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethod;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithName;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithParameter;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithParameters;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findStaticMethods;
 import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.searchForOpcodes;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipResourcesAsClassNodes;
 import java.io.IOException;
@@ -33,6 +37,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.LocalVariableNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -51,6 +56,15 @@ public final class SearchUtilsTest {
         assertEquals(1, methodNodes.size());
         assertEquals("syncTest", methodNodes.get(0).name);
     }
+
+    @Test
+    public void mustFindStaticMethods() throws IOException {
+        classNode = readZipResourcesAsClassNodes("staticInvokeTest.zip").get("StaticInvokeTest.class");
+        List<MethodNode> methodNodes = findStaticMethods(classNode.methods);
+        
+        assertEquals(1, methodNodes.size());
+        assertEquals("echo", methodNodes.get(0).name);
+    }
     
     @Test
     public void mustFindMethodsWithIntParameters() {
@@ -67,6 +81,23 @@ public final class SearchUtilsTest {
         
         assertEquals(1, methodNodes.size());
         assertEquals("method2", methodNodes.get(0).name);
+    }
+
+    @Test
+    public void mustFindMethodsWithSpecificSetOfParameters() {
+        List<MethodNode> methodNodes = findMethodsWithParameters(classNode.methods,
+                Type.INT_TYPE, Type.getType(List.class), Type.DOUBLE_TYPE);
+        
+        assertEquals(1, methodNodes.size());
+        assertEquals("method1", methodNodes.get(0).name);
+    }
+
+    @Test
+    public void mustFindSpecificMethod() {
+        MethodNode methodNode = findMethod(classNode.methods, false, Type.VOID_TYPE, "method1",
+                Type.INT_TYPE, Type.getType(List.class), Type.DOUBLE_TYPE);
+        
+        assertEquals("method1", methodNode.name);
     }
 
     @Test
@@ -98,5 +129,21 @@ public final class SearchUtilsTest {
         assertEquals(1, insns.size());
         assertEquals("println", ((MethodInsnNode) insns.get(0)).name);
     }
-    
+
+    @Test
+    public void mustFindLocalVariableNodeForInstruction() {
+        MethodNode methodNode = findMethodsWithName(classNode.methods, "localVariablesTest").get(0);
+        List<AbstractInsnNode> insns = findInvocationsOf(methodNode.instructions,
+                MethodUtils.getAccessibleMethod(PrintStream.class, "println", String.class));
+        
+        AbstractInsnNode insnNode = insns.get(0);
+        
+        LocalVariableNode lvn0 = findLocalVariableNodeForInstruction(methodNode.localVariables, methodNode.instructions, insnNode, 0);
+        LocalVariableNode lvn1 = findLocalVariableNodeForInstruction(methodNode.localVariables, methodNode.instructions, insnNode, 1);
+        LocalVariableNode lvn2 = findLocalVariableNodeForInstruction(methodNode.localVariables, methodNode.instructions, insnNode, 2);
+        
+        assertEquals(lvn0.name, "this");
+        assertEquals(lvn1.name, "val1");
+        assertEquals(lvn2.name, "val2");
+    }
 }

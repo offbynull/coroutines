@@ -16,6 +16,7 @@
  */
 package com.offbynull.coroutines.javaagent;
 
+import com.offbynull.coroutines.instrumenter.InstrumentationResult;
 import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
 import com.offbynull.coroutines.instrumenter.asm.ClassResourceClassInformationRepository;
@@ -111,11 +112,10 @@ public final class CoroutinesAgent {
 //            System.out.println(className + " " + (loader == null));
             
             try {
+                InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode);
                 Instrumenter instrumenter = new Instrumenter(new ClassResourceClassInformationRepository(loader));
-                byte[] moddedClassfileBuffer = instrumenter.instrument(
-                        classfileBuffer,
-                        new InstrumentationSettings(markerType, debugMode));
-                return moddedClassfileBuffer;
+                InstrumentationResult result = instrumenter.instrument(classfileBuffer, settings);
+                return result.getInstrumentedClass();
             } catch (Throwable e) {
                 System.err.println("FAILED TO INSTRUMENT: " + e);
                 return null;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,10 +18,10 @@ package com.offbynull.coroutines.antplugin;
 
 import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
+import com.offbynull.coroutines.instrumenter.PluginHelper;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -170,37 +170,22 @@ public final class InstrumentTask extends Task {
             log("Getting bootstrap classpath", Project.MSG_DEBUG);
             combinedClasspath.addAll(FileUtils.listFiles(jdkLibsDirectory, new String[]{"jar"}, true));
 
-            log("Classpath for instrumentation is as follows: " + combinedClasspath, Project.MSG_INFO);
+            log("Classpath for instrumentation is as follows: " + combinedClasspath, Project.MSG_DEBUG);
         } catch (Exception ex) {
             throw new BuildException("Unable to get compile classpath elements", ex);
         }
 
         Instrumenter instrumenter;
         try {
-            log("Creating instrumenter...", Project.MSG_INFO);
-            instrumenter = new Instrumenter(combinedClasspath);
-            
-            log("Processing " + sourceDirectory.getAbsolutePath() + " ... ", Project.MSG_INFO);
-            instrumentPath(instrumenter);
-        } catch (Exception ex) {
-            throw new BuildException("Failed to instrument", ex);
-        }
-    }
-
-    private void instrumentPath(Instrumenter instrumenter) throws IOException {
-        for (File inputFile : FileUtils.listFiles(sourceDirectory, new String[]{"class"}, true)) {
-            Path relativePath = sourceDirectory.toPath().relativize(inputFile.toPath());
-            Path outputFilePath = targetDirectory.toPath().resolve(relativePath);
-            File outputFile = outputFilePath.toFile();
-
+            log("Creating instrumenter...", Project.MSG_DEBUG);
             MarkerType markerTypeEnum = MarkerType.valueOf(markerType);
+            instrumenter = new Instrumenter(combinedClasspath);
             InstrumentationSettings settings = new InstrumentationSettings(markerTypeEnum, debugMode);
             
-            log("Instrumenting " + inputFile, Project.MSG_INFO);
-            byte[] input = FileUtils.readFileToByteArray(inputFile);
-            byte[] output = instrumenter.instrument(input, settings);
-            log("File size changed from " + input.length + " to " + output.length, Project.MSG_DEBUG);
-            FileUtils.writeByteArrayToFile(outputFile, output);
+            log("Processing " + sourceDirectory.getAbsolutePath() + " ... ", Project.MSG_DEBUG);
+            PluginHelper.instrument(instrumenter, settings, sourceDirectory, targetDirectory, this::log);
+        } catch (Exception ex) {
+            throw new BuildException("Failed to instrument", ex);
         }
     }
 }
