@@ -110,7 +110,7 @@ final class InternalUtils {
         
         private final DataOutputStream daos;
         private final Map<Label, Integer> labelOffsets;
-
+        
         DumpToDaosMethodVisitor(DataOutputStream daos, Map<Label, Integer> labelOffsets) {
             super(Opcodes.ASM5);
 
