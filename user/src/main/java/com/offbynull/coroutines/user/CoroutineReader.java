@@ -36,7 +36,7 @@ public final class CoroutineReader {
     private final Map versionMap;
 
     /**
-     * Construct a {@link CoroutineReader} object with {@link DefaultCoroutineSerializer}. Equivalent to calling
+     * Construct a {@link CoroutineReader} object with {@link DefaultCoroutineDeserializer}. Equivalent to calling
      * {@code new CoroutineReader(new DefaultCoroutineSerializer())}.
      */
     public CoroutineReader() {

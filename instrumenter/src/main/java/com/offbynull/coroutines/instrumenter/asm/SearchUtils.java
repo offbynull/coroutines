@@ -178,7 +178,7 @@ public final class SearchUtils {
      * @param returnType return type to search for
      * @param paramTypes parameter types to search for (in the order specified)
      * @return method found (or {@code null} if no method could be found)
-     * @throws NullPointerException if any argument is {@code null} or contains {@code null|
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
      * @throws IllegalArgumentException if any element of  {@code paramTypes} is either of sort {@link Type#METHOD} or {@link Type#VOID}, or
      * if {@code returnType} is {@link Type#METHOD}
      */

@@ -44,10 +44,10 @@ public final class PluginHelper {
      * <p>
      * For example, imagine source path of {@code /src} and a destination path of {@code /dst}...
      * <pre>
-     * /src/A.class -> /dst/A.class
-     * /src/a/B.class -> /dst/B.class
-     * /src/a/b/c/d/e/C.class -> /dst/a/b/c/d/e/C.class
-     * /src/a/b/c/d/e/D.class -> /dst/a/b/c/d/e/D.class
+     * /src/A.class -&gt; /dst/A.class
+     * /src/a/B.class -&gt; /dst/B.class
+     * /src/a/b/c/d/e/C.class -&gt; /dst/a/b/c/d/e/C.class
+     * /src/a/b/c/d/e/D.class -&gt; /dst/a/b/c/d/e/D.class
      * </pre>
      * @param srcDir source directory
      * @param dstDir destination directory
