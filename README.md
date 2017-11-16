@@ -6,12 +6,12 @@ Inspired by the [Apache Commons Javaflow](http://commons.apache.org/sandbox/comm
 
 Why use Coroutines over Javaflow? The Couroutines project is a new Java coroutines implementation written from scratch that aims to solve some of the issues that Javaflow has. The Coroutines project provides several distinct advantages:
 
-* Saves and loads method state faster than Javaflow [<sub>[Footnote 1]</sub>](#footnotes)
-* Provides Maven, Ant, and Gradle plugins [<sub>[Footnote 2]</sub>](#footnotes)
-* Provides a Java Agent [<sub>[Footnote 3]</sub>](#footnotes)
-* Proper support for Java 8 bytecode [<sub>[Footnote 4]</sub>](#footnotes)
-* Proper support for synchronized blocks [<sub>[Footnote 5]</sub>](#footnotes)
-* Proper support for serialization and versioning [<sub>[Footnote 6]</sub>](#footnotes)
+* Saves and loads method state faster than Javaflow [<sub>[1]</sub>](#footnotes)
+* Provides Maven, Ant, and Gradle plugins [<sub>[2]</sub>](#footnotes)
+* Provides a Java Agent [<sub>[3]</sub>](#footnotes)
+* Proper support for Java 8 bytecode [<sub>[4]</sub>](#footnotes)
+* Proper support for synchronized blocks [<sub>[5]</sub>](#footnotes)
+* Proper support for serialization and versioning [<sub>[6]</sub>](#footnotes)
 * Modular project structure and the code is readable, tested, and well commented [<sub>[Footnote 7]</sub>](#footnotes)
 
 In addition, Javaflow appears to be largely unmaintained at present.
@@ -283,7 +283,7 @@ To further control how coroutines get serialized/deserialized, create custom imp
 
 ### Versioning Instructions
 
-When using one of the provided buildsystem plugins to instrument your code, classes that have methods intended to run as part of a coroutine will get a corresponding file generated with the same name but a ```.coroutinesinfo``` extension. These files are human-readable and contain basic information required for supporting versioning. They will be included along-side your class files (both in your build path and JAR).
+When using one of the provided build system plugins on your code, classes which contain methods intended to run as part of a coroutine will have a corresponding file generated with the same name, but with a ```.coroutinesinfo``` extension. These files are human-readable and contain basic information required for supporting versioning. They will be included along-side your class files (both in your build path and JAR).
 
 Basic example...
 
@@ -347,7 +347,7 @@ Continuation Point ID: 0    Line: 18   Type: SuspendContinuationPoint
   operandObjects[0]    // operand index is 0 / type is Lcom/offbynull/coroutines/user/Continuation;
 ```
 
-For each method that's identified to run as part of a coroutine, the corresponding ```.coroutinesinfo``` file details the...
+For each method identified to run as part of a coroutine, the corresponding ```.coroutinesinfo``` file details the...
 
  * basic method details (signature, return type, name, class it belongs to, etc..).
  * unique ID used to identify the method (based on class name, method name, and method description).
@@ -355,7 +355,7 @@ For each method that's identified to run as part of a coroutine, the correspondi
  * continuation points in the method (where ```Continuation.suspend()``` is called / where methods that takes in a ```Continuation``` object are called).
  * types expected on the local variables table and operand stack at each continuation point
 
-When a method that's intended to run as part of a coroutine is changed, the version number gets updated. Diffing the previous ```.coroutinesinfo``` against the new ```.coroutinesinfo``` will identify what needs to be changed for deserialization of previous versions to work, if anything. If changes are required, they can be applied by passing a ```ContinuationPointUpdater``` to ```CoroutineReader```. The following subsections provide a few basic versioning examples with the ```MyCoroutine``` example class provided above.
+When a method intended to run as part of a coroutine is changed, the version number gets updated. Diffing the previous ```.coroutinesinfo``` against the new ```.coroutinesinfo``` will identify what needs to be changed for deserialization of previous versions to work, if anything. If changes are required, they can be applied by passing a ```ContinuationPointUpdater``` to ```CoroutineReader```. The following subsections provide a few basic versioning examples with the ```MyCoroutine``` example class provided above.
 
 It's important to note that versioning has its limits. This feature is intended for use-cases such as hot-deploying small emergency fixes/patches to a server or enabling saves from older versions of a game to run on newer versions. It isn't intended for cases where there are large structural changes.
 
@@ -637,7 +637,7 @@ Common pitfalls with versioning include...
 
  * Using different compilers (e.g. Oracle Java vs Eclipse Java Compiler) or using different versions of the same compiler (Oracle JDK 1.7 vs Oracle JDK 1.8) on the same code may produce different method versions -- the version number in the ```.coroutinesinfo``` file may change even though you didn't modify your code. The bytecode generated between different compilers and compiler versions is mostly the same but also slightly different. These slight differences are what make the version change. To reduce headaches, follow the best practice of sticking to the same compiler vendor and version between your builds.
  * If the constants used by a method are changed, the method version may not change. The problem is that if the constant is loaded as a getstatic instruction instead of a ldc instruction, the value of the constant won't be factored into the method version. Future versions of the instrumenter may be updated to do multiple passes over classes to ensure these changes are properly mixed in to the method version.
- * If the version of a method changed but you've determined that no variables/operands manipulation is required, a placeholder ```ContinuationPointUpdater``` should still be added to ```CoroutineReader``` even though it does nothing. The placeholder makes sure that the method version gets updated internally on deserialization, such that if it gets re-serialized it will contain the updated method version. This is required if you ever end up having more than 1 method version (multiple ```ContinuationPointUpdater``` can be chained to handle this scenario).
+ * * If the version of a method changed but you've determined that no variables/operands manipulation is required, a placeholder ```ContinuationPointUpdater``` should still be added to ```CoroutineReader``` even though it does nothing. The placeholder makes sure that the method version gets updated internally on deserialization, so that if it gets re-serialized it will contain the updated method version. This is required if you ever end up having more than 1 method version (multiple ```ContinuationPointUpdater``` can be chained to handle this scenario).
 
 ## FAQ
 
@@ -725,7 +725,7 @@ would be equivalent to
     }
 ```
 
-A more indepth explanation on why this happens is available in the code. Replicated here:
+A more in depth explanation on why this happens is available in the code. Replicated here:
 ```
 Why is invokedynamic not allowed? because apparently invokedynamic can map to anything... which means that we can't reliably
 determine if what is being called by invokedynamic is going to be a method we expect to be instrumented to handle Continuations.
