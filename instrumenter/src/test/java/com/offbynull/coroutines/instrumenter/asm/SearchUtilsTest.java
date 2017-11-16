@@ -59,7 +59,7 @@ public final class SearchUtilsTest {
 
     @Test
     public void mustFindStaticMethods() throws IOException {
-        classNode = readZipResourcesAsClassNodes("staticInvokeTest.zip").get("StaticInvokeTest.class");
+        classNode = readZipResourcesAsClassNodes("StaticInvokeTest.zip").get("StaticInvokeTest.class");
         List<MethodNode> methodNodes = findStaticMethods(classNode.methods);
         
         assertEquals(1, methodNodes.size());
