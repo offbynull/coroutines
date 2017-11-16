@@ -808,6 +808,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [1.3.0] - 2017-11-15
 - ADDED: Serialization and versioning support.
+- CHANGED: Upgraded dependencies and plugins.
 
 ### [1.2.3] - 2017-03-05
 - FIXED: Avoid instrumenting core coroutines classes / Java bootstrap classes in Java Agent (see issue #77).
@@ -816,7 +817,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### [1.2.2] - 2017-01-08
 - ADDED: Gradle plugin.
 - REMOVED: Gradle instructions.
-- CHANGED: Upgraded dependencies and plugins
+- CHANGED: Upgraded dependencies and plugins.
 
 ### [1.2.1] - 2016-11-19
 - ADDED: Gradle instructions.
