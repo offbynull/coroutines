@@ -98,6 +98,7 @@ public final class SerializedState implements Serializable {
     public static final class Frame implements Serializable {
         private static final long serialVersionUID = 5L;
 
+        private final String className; // this is friendly name -- uses dots instead of slashes to separate names
         private final int methodId;
         private final int methodVersion;
         private final int continuationPointId;
@@ -107,6 +108,7 @@ public final class SerializedState implements Serializable {
 
         /**
          * Constructs a {@link Frame} object.
+         * @param className class name
          * @param methodId method id
          * @param methodVersion method version
          * @param continuationPointId continuation point id
@@ -117,11 +119,19 @@ public final class SerializedState implements Serializable {
          * @throws IllegalArgumentException if any elements in {@code monitors} are {@code null} or if either {@code variables} or
          * {@code operands} are in an invalid state
          */
-        public Frame(int methodId, int methodVersion, int continuationPointId, Object[] monitors, Data variables, Data operands) {
-            if (monitors == null || variables == null || operands == null) {
+        public Frame(
+                String className,
+                int methodId,
+                int methodVersion,
+                int continuationPointId,
+                Object[] monitors,
+                Data variables,
+                Data operands) {
+            if (className == null || monitors == null || variables == null || operands == null) {
                 throw new NullPointerException();
             }
             
+            this.className = className;
             this.methodId = methodId;
             this.methodVersion = methodVersion;
             this.continuationPointId = continuationPointId;
@@ -134,6 +144,14 @@ public final class SerializedState implements Serializable {
             } catch (IllegalStateException ise) {
                 throw new IllegalArgumentException(ise);
             }
+        }
+
+        /**
+         * Get class name.
+         * @return class name
+         */
+        public String getClassName() {
+            return className;
         }
 
         /**

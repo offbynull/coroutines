@@ -18,7 +18,6 @@ package com.offbynull.coroutines.instrumenter;
 
 import static com.offbynull.coroutines.instrumenter.SharedConstants.VERSION_TEST;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators;
-import com.offbynull.coroutines.instrumenter.testhelpers.TestUtils;
 import com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.ClassSerializabler;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.loadClassesInZipResourceAndInstrument;
 import com.offbynull.coroutines.user.Coroutine;
@@ -40,24 +39,6 @@ import org.junit.Test;
 public final class CoroutineVersioningTest {
     @Test
     public void mustRunModifierOnDeserialize() throws Exception {
-//        Class Name: VersionTest
-//        Method Name: run
-//        Method ID: 1972618944
-//        Method Version: 204733529
-//        Parameters: (Lcom/offbynull/coroutines/user/Continuation;)V
-//        Return: V
-//        ------------------------------------
-//        Continuation Point ID: 0    Line: 30   Type: SuspendContinuationPoint
-//          varObjects[0]        // LVT index is 0 / name is this / type is LVersionTest;
-//          varObjects[1]        // LVT index is 1 / name is c / type is Lcom/offbynull/coroutines/user/Continuation;
-//          varInts[0]           // LVT index is 2 / name is _b / type is int
-//          varInts[1]           // LVT index is 3 / name is _c / type is int
-//          varInts[2]           // LVT index is 4 / name is _i / type is int
-//          varFloats[0]         // LVT index is 5 / name is _f / type is float
-//          varLongs[0]          // LVT index is 6 / name is _l / type is long
-//          varDoubles[0]        // LVT index is 8 / name is _d / type is double
-//          varObjects[2]        // LVT index is 10 / name is _s / type is Ljava/lang/String;
-//          operandObjects[0]    // operand index is 0 / type is Lcom/offbynull/coroutines/user/Continuation;
         // This test is being wrapped in a new thread where the thread's context classlaoder is being set to the classloader of the zip
         // we're dynamically loading. We need to do this being ObjectInputStream uses the system classloader by default, not the thread's
         // classloader. CoroutineReader has been modified to use the thread's classloader if the system's classloader fails.
@@ -75,7 +56,7 @@ public final class CoroutineVersioningTest {
                     
                     CoroutineWriter writer = new CoroutineWriter(new DefaultCoroutineSerializer());
                     CoroutineReader reader = new CoroutineReader(new DefaultCoroutineDeserializer(), new ContinuationPointUpdater[] {
-                        new ContinuationPointUpdater(1972618944, -1410922588, -1410922588, 0, frame -> {
+                        new ContinuationPointUpdater(VERSION_TEST, 1972618944, -1410922588, -1410922588, 0, frame -> {
                             int[] varInts = frame.getVariables().getInts();
                             float[] varFloats = frame.getVariables().getFloats();
                             double[] varDoubles = frame.getVariables().getDoubles();

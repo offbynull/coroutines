@@ -75,6 +75,7 @@ public final class CoroutineWriter {
         while (currentMethodState != null) {
             // Pull out information from method state. We should never modify method state values, they will be copied by the Data
             // constructor before being passed to the user for further modification.
+            String className = currentMethodState.getClassName();
             int methodId = currentMethodState.getMethodId();
             int methodVersion = currentMethodState.getMethodVersion();
             int continuationPoint = currentMethodState.getContinuationPoint();
@@ -103,6 +104,7 @@ public final class CoroutineWriter {
             // Create the frame, making sure we create empty arrays for any null references (remember that MethodState var/operand arrays
             // that don't contain any data are set to null due to an optimization).
             SerializedState.Frame serializedFrame = new SerializedState.Frame(
+                    className,
                     methodId,
                     methodVersion,
                     continuationPoint,

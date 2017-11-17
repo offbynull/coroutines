@@ -59,7 +59,7 @@ public final class CoroutineReader {
      * @param continuationPointUpdaters continuation point updaters
      * @throws NullPointerException if any argument is {@code null} or contains {@code null}
      * @throws IllegalArgumentException if {@code continuationPointUpdaters} contains more than one entry for the same identifier
-     * (classId/oldMethodVersion/continuationPoint)
+     * (className/methodId/oldMethodVersion/continuationPoint)
      */
     public CoroutineReader(CoroutineDeserializer deserializer, ContinuationPointUpdater[] continuationPointUpdaters) {
         if (deserializer == null || continuationPointUpdaters == null) {
@@ -76,6 +76,7 @@ public final class CoroutineReader {
             }
 
             InternalVersionKey key = new InternalVersionKey(
+                    continuationPointUpdater.className,
                     continuationPointUpdater.methodId,
                     continuationPointUpdater.oldMethodVersion,
                     continuationPointUpdater.continuationPointId);
@@ -86,7 +87,8 @@ public final class CoroutineReader {
             Object oldKey = versionMap.put(key, value);
             if (oldKey != null) {
                 throw new IllegalArgumentException("Continuation point for identifier already exists: "
-                        + "classId=" + continuationPointUpdater.methodId + ", "
+                        + "className=" + continuationPointUpdater.className + ", "
+                        + "methodId=" + continuationPointUpdater.methodId + ", "
                         + "oldMethodVersion=" + continuationPointUpdater.oldMethodVersion + ", "
                         + "continuationPoint=" + continuationPointUpdater.continuationPointId);
             }
@@ -98,7 +100,7 @@ public final class CoroutineReader {
      * @param data byte array to deserialize
      * @return {@code data} deserialized to a {@link CoroutineRunner} object
      * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if failed to deserialize
+     * @throws IllegalArgumentException if failed to deserialize or deserialized to an unknown version of a method
      */
     public CoroutineRunner read(byte[] data) {
         if (data == null) {
@@ -124,11 +126,12 @@ public final class CoroutineReader {
         for (int i = serializedFrames.length - 1; i >= 0; i--) {
             SerializedState.Frame serializedFrame = serializedFrames[i];
 
+            String className = serializedFrame.getClassName();
             int methodId = serializedFrame.getMethodId();
             int methodVersion = serializedFrame.getMethodVersion();
             int continuationPoint = serializedFrame.getContinuationPointId();
 
-            InternalVersionKey versionKey = new InternalVersionKey(methodId, methodVersion, continuationPoint);
+            InternalVersionKey versionKey = new InternalVersionKey(className, methodId, methodVersion, continuationPoint);
             InternalVersionValue versionValue = (InternalVersionValue) versionMap.get(versionKey);
             while (versionValue != null) {
                 versionValue.frameModifier.modifyFrame(serializedFrame);
@@ -142,9 +145,12 @@ public final class CoroutineReader {
                 }
 
                 methodVersion = newMethodVersion;
-                versionKey = new InternalVersionKey(methodId, methodVersion, continuationPoint);
+                versionKey = new InternalVersionKey(className, methodId, methodVersion, continuationPoint);
                 versionValue = (InternalVersionValue) versionMap.get(versionKey);                
             }
+
+            // Check that we're deserialzing to for the correct version of the class
+            
 
             LockState lockState = new LockState();
             Object[] monitors = serializedFrame.getMonitors();
@@ -171,7 +177,14 @@ public final class CoroutineReader {
             placeContinuationReferences(variables.getContinuationIndexes(), (Object[]) frameData[4], cn);
             placeContinuationReferences(operands.getContinuationIndexes(), (Object[]) frameData[9], cn);
             
-            MethodState methodState = new MethodState(methodId, methodVersion, continuationPoint, frameData, lockState);
+            MethodState methodState = new MethodState(className, methodId, methodVersion, continuationPoint, frameData, lockState);
+            boolean correctVersion = methodState.isValid(null);
+            if (!correctVersion) {
+                throw new IllegalArgumentException("Method not found for frame state "
+                        + "className: " + className + ", "
+                        + "methodId: " + methodId + ", "
+                        + "methodVersion: " + methodVersion);
+            }
             cn.pushNewMethodState(methodState);
         }
 
@@ -199,6 +212,7 @@ public final class CoroutineReader {
      */
     public static final class ContinuationPointUpdater {
 
+        private final String className;
         private final int methodId;
         private final int oldMethodVersion;
         private final int newMethodVersion;
@@ -207,6 +221,7 @@ public final class CoroutineReader {
 
         /**
          * Constructs a {@link ContinuationPointUpdater} object.
+         * @param className class name for the continuation point
          * @param methodId method id for the continuation point
          * @param oldMethodVersion old method version for the continuation point (used for identification)
          * @param newMethodVersion new method version for the continuation point (used as replacement)
@@ -215,7 +230,7 @@ public final class CoroutineReader {
          * @throws NullPointerException if any argument is {@code null}
          * @throws IllegalArgumentException if {@code continuationPointId < 0}
          */
-        public ContinuationPointUpdater(int methodId, int oldMethodVersion, int newMethodVersion, int continuationPointId,
+        public ContinuationPointUpdater(String className, int methodId, int oldMethodVersion, int newMethodVersion, int continuationPointId,
                 FrameModifier frameModifier) {
             if (frameModifier == null) {
                 throw new NullPointerException();
@@ -224,6 +239,7 @@ public final class CoroutineReader {
                 throw new IllegalArgumentException("Negative continuation point");
             }
 
+            this.className = className;
             this.methodId = methodId;
             this.oldMethodVersion = oldMethodVersion;
             this.newMethodVersion = newMethodVersion;
@@ -246,21 +262,28 @@ public final class CoroutineReader {
 
     private static final class InternalVersionKey {
 
+        private final String className;
         private final int methodId;
         private final int methodVersion;
         private final int continuationPointId;
 
-        InternalVersionKey(int methodId, int methodVersion, int continuationPointId) {
+        InternalVersionKey(String className, int methodId, int methodVersion, int continuationPointId) {
+            if (className == null) {
+                throw new NullPointerException();
+            }
+
+            this.className = className;
             this.methodId = methodId;
             this.methodVersion = methodVersion;
             this.continuationPointId = continuationPointId;
         }
 
         public int hashCode() {
-            int hash = 5;
-            hash = 23 * hash + this.methodId;
-            hash = 23 * hash + this.methodVersion;
-            hash = 23 * hash + this.continuationPointId;
+            int hash = 3;
+            hash = 79 * hash + (this.className != null ? this.className.hashCode() : 0);
+            hash = 79 * hash + this.methodId;
+            hash = 79 * hash + this.methodVersion;
+            hash = 79 * hash + this.continuationPointId;
             return hash;
         }
 
@@ -282,6 +305,9 @@ public final class CoroutineReader {
                 return false;
             }
             if (this.continuationPointId != other.continuationPointId) {
+                return false;
+            }
+            if ((this.className == null) ? (other.className != null) : !this.className.equals(other.className)) {
                 return false;
             }
             return true;

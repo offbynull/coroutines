@@ -71,6 +71,7 @@ import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.
 import static com.offbynull.coroutines.instrumenter.OperandStackStateGenerators.saveOperandStack;
 import static com.offbynull.coroutines.instrumenter.PackStateGenerators.unpackLocalsStorageArrays;
 import static com.offbynull.coroutines.instrumenter.PackStateGenerators.unpackOperandStackStorageArrays;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadStringConst;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
 
 final class ContinuationGenerators {
@@ -92,8 +93,8 @@ final class ContinuationGenerators {
             = MethodUtils.getAccessibleMethod(Continuation.class, "pushNewMethodState", MethodState.class);
 
     private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
-            = ConstructorUtils.getAccessibleConstructor(MethodState.class, Integer.TYPE, Integer.TYPE, Integer.TYPE, Object[].class,
-                    LockState.class);
+            = ConstructorUtils.getAccessibleConstructor(MethodState.class, String.class, Integer.TYPE, Integer.TYPE, Integer.TYPE,
+                    Object[].class, LockState.class);
     private static final Method METHODSTATE_GETCONTINUATIONPOINT_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getContinuationPoint");
     private static final Method METHODSTATE_GETDATA_METHOD
@@ -577,6 +578,7 @@ final class ContinuationGenerators {
         Validate.isTrue(idx >= 0);
         SuspendContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, SuspendContinuationPoint.class);
 
+        String friendlyClassName = attrs.getSignature().getClassName().replace('/', '.'); // '/' -> '.'   because it's non-internal format
         int methodId = attrs.getSignature().getMethodId();
         int methodVersion = attrs.getSignature().getMethodVersion();
         
@@ -622,6 +624,7 @@ final class ContinuationGenerators {
                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
                         construct(METHODSTATE_INIT_METHOD,
+                                loadStringConst(friendlyClassName),
                                 loadIntConst(methodId),
                                 loadIntConst(methodVersion),
                                 loadIntConst(idx),
@@ -657,6 +660,7 @@ final class ContinuationGenerators {
         Validate.isTrue(idx >= 0);
         NormalInvokeContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, NormalInvokeContinuationPoint.class);
 
+        String friendlyClassName = attrs.getSignature().getClassName().replace('/', '.'); // '/' -> '.'   because it's non-internal format
         int methodId = attrs.getSignature().getMethodId();
         int methodVersion = attrs.getSignature().getMethodVersion();
 
@@ -739,6 +743,7 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
+                                                loadStringConst(friendlyClassName),
                                                 loadIntConst(methodId),
                                                 loadIntConst(methodVersion),
                                                 loadIntConst(idx),
@@ -770,6 +775,7 @@ final class ContinuationGenerators {
         Validate.isTrue(idx >= 0);
         TryCatchInvokeContinuationPoint cp = validateAndGetContinuationPoint(attrs, idx, TryCatchInvokeContinuationPoint.class);
 
+        String friendlyClassName = attrs.getSignature().getClassName().replace('/', '.'); // '/' -> '.'   because it's non-internal format
         int methodId = attrs.getSignature().getMethodId();
         int methodVersion = attrs.getSignature().getMethodVersion();
 
@@ -835,6 +841,7 @@ final class ContinuationGenerators {
                                 debugMarker(markerType, dbgSig + "Creating and pushing method state"),
                                 call(CONTINUATION_PUSHNEWMETHODSTATE_METHOD, loadVar(contArg),
                                         construct(METHODSTATE_INIT_METHOD,
+                                                loadStringConst(friendlyClassName),
                                                 loadIntConst(methodId),
                                                 loadIntConst(methodVersion),
                                                 loadIntConst(idx),

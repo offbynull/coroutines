@@ -815,6 +815,9 @@ If you know of any other projects please let me know and I'll update this sectio
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+### [1.4.0] - Unreleased
+- CHANGED: Made deserialization to unrecognized method versions illegal.
+
 ### [1.3.0] - 2017-11-15
 - ADDED: Serialization and versioning support.
 - CHANGED: Upgraded dependencies and plugins.

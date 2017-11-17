@@ -26,4 +26,26 @@
                 <goal>javadoc:jar</goal>
             </goals>
         </action>
+        <action>
+            <actionName>CUSTOM-clean install -DskipTest=True</actionName>
+            <displayName>clean install -DskipTest=True</displayName>
+            <goals>
+                <goal>clean</goal>
+                <goal>install</goal>
+            </goals>
+            <properties>
+                <skipTests>true</skipTests>
+            </properties>
+        </action>
+        <action>
+            <actionName>rebuild</actionName>
+            <packagings>
+                <packaging>*</packaging>
+            </packagings>
+            <goals>
+                <goal>clean</goal>
+                <goal>install</goal>
+                <goal>javadoc</goal>
+            </goals>
+        </action>
     </actions>
