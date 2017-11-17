@@ -806,6 +806,7 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [1.4.0] - Unreleased
+- CHANGED: Decoupled construction from serialization.
 - CHANGED: Combined serialization method ID and method version.
 - CHANGED: Made deserialization to unrecognized method IDs illegal.
 

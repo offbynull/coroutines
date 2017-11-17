@@ -63,6 +63,22 @@ public final class CoroutineWriter {
             throw new NullPointerException();
         }
 
+        SerializedState serializeState = deconstruct(runner);
+        return serializer.serialize(serializeState);
+    }
+
+    /**
+     * Deconstructs a {@link CoroutineRunner} object to a serializable state.
+     * @param runner coroutine runner to deconstruct
+     * @return deconstructed representation of {@link CoroutineRunner}
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if failed to deconstruct
+     */
+    public SerializedState deconstruct(CoroutineRunner runner) {
+        if (runner == null) {
+            throw new NullPointerException();
+        }
+
         Coroutine coroutine = runner.getCoroutine();
         Continuation cn = runner.getContinuation();
 
@@ -132,7 +148,7 @@ public final class CoroutineWriter {
         
         Object context = cn.getContext();
         
-        return serializer.serialize(new SerializedState(coroutine, context, frames));
+        return new SerializedState(coroutine, context, frames);
     }
 
     private int[] clearContinuationReferences(Object[] objects, Continuation cn) {

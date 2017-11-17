@@ -96,10 +96,15 @@ public final class CoroutineReader {
 
     /**
      * Deserializes a {@link CoroutineRunner} object from a byte array.
+     * <p>
+     * If you're handling your own deserialization and you simply want to reconstruct the deserialized object to the
+     * {@link CoroutineRunner}, use {@link #reconstruct(com.offbynull.coroutines.user.SerializedState) }.
      * @param data byte array to deserialize
      * @return {@code data} deserialized to a {@link CoroutineRunner} object
      * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if failed to deserialize or deserialized to an unknown version of a method
+     * @throws IllegalArgumentException if failed to deserialize or deserialized to a state for an unrecognized method (e.g. a method that's
+     * state is being deserialized for was changed but no {@link ContinuationPointUpdater} was provided to this class's constructor to
+     * handle the changes)
      */
     public CoroutineRunner read(byte[] data) {
         if (data == null) {
@@ -107,6 +112,23 @@ public final class CoroutineReader {
         }
 
         SerializedState serializedState = deserializer.deserialize(data);
+        return reconstruct(serializedState);
+    }
+
+    /**
+     * Reconstructs a {@link CoroutineRunner} object from a serializable state.
+     * @param serializedState serialized state to reconstruct
+     * @return reconstructed {@link CoroutineRunner}
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code serializedState} contains a reference / was updated to contain a reference to an
+     * unrecognized method (e.g. a method that's state is being reconstructed for was changed but no {@link ContinuationPointUpdater} was
+     * provided to this class's constructor to handle the changes)
+     */
+    public CoroutineRunner reconstruct(SerializedState serializedState) {
+        if (serializedState == null) {
+            throw new NullPointerException();
+        }
+
         try {
             serializedState.validateState();
         } catch (IllegalStateException ise) {
