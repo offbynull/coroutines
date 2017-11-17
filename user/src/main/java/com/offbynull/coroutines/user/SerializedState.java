@@ -23,7 +23,7 @@ import java.io.Serializable;
  * @author Kasra Faghihi
  */
 public final class SerializedState implements Serializable {
-    private static final long serialVersionUID = 4L;
+    private static final long serialVersionUID = 5L;
     
     private final Coroutine coroutine;
     private final Object context;
@@ -96,7 +96,7 @@ public final class SerializedState implements Serializable {
      * {@link MethodState}'s and {@link LockState}'s state translated for serialization.
      */
     public static final class Frame implements Serializable {
-        private static final long serialVersionUID = 4L;
+        private static final long serialVersionUID = 5L;
 
         private final int methodId;
         private final int methodVersion;
@@ -204,7 +204,7 @@ public final class SerializedState implements Serializable {
      * Data bundle.
      */
     public static final class Data implements Serializable {
-        private static final long serialVersionUID = 4L;
+        private static final long serialVersionUID = 5L;
         
         private int[] ints;
         private float[] floats;

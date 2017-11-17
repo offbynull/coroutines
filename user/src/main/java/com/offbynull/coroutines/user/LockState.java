@@ -27,7 +27,7 @@ import java.util.ListIterator;
  * @author Kasra Faghihi
  */
 public final class LockState implements Serializable {
-    private static final long serialVersionUID = 4L;
+    private static final long serialVersionUID = 5L;
 
     // We use a linkedlist to make sure that we retain the order of monitors as they come in. Otherwise we're going to deal with deadlock
     // issues if we have code structured with double locks. For example, imagine the following scenario...

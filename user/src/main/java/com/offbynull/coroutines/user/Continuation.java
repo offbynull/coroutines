@@ -28,7 +28,7 @@ import java.io.Serializable;
  * @author Kasra Faghihi
  */
 public final class Continuation implements Serializable {
-    private static final long serialVersionUID = 4L;
+    private static final long serialVersionUID = 5L;
     
     /**
      * Do not use -- for internal use only.
