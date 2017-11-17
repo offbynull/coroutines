@@ -33,7 +33,7 @@ import java.util.Map;
  */
 public final class CoroutineReader {
     private final CoroutineDeserializer deserializer;
-    private final Map versionMap;
+    private final Map updateMap;
 
     /**
      * Construct a {@link CoroutineReader} object with {@link DefaultCoroutineDeserializer}. Equivalent to calling
@@ -67,7 +67,7 @@ public final class CoroutineReader {
         }
 
         this.deserializer = deserializer;
-        this.versionMap = new HashMap();
+        this.updateMap = new HashMap();
 
         for (int i = 0; i < continuationPointUpdaters.length; i++) {
             ContinuationPointUpdater continuationPointUpdater = continuationPointUpdaters[i];
@@ -75,21 +75,20 @@ public final class CoroutineReader {
                 throw new NullPointerException();
             }
 
-            InternalVersionKey key = new InternalVersionKey(
+            InternalKey key = new InternalKey(
                     continuationPointUpdater.className,
-                    continuationPointUpdater.methodId,
-                    continuationPointUpdater.oldMethodVersion,
+                    continuationPointUpdater.oldMethodId,
                     continuationPointUpdater.continuationPointId);
-            InternalVersionValue value = new InternalVersionValue(
-                    continuationPointUpdater.newMethodVersion,
+            InternalValue value = new InternalValue(
+                    continuationPointUpdater.newMethodId,
                     continuationPointUpdater.frameModifier);
             
-            Object oldKey = versionMap.put(key, value);
+            Object oldKey = updateMap.put(key, value);
             if (oldKey != null) {
                 throw new IllegalArgumentException("Continuation point for identifier already exists: "
                         + "className=" + continuationPointUpdater.className + ", "
-                        + "methodId=" + continuationPointUpdater.methodId + ", "
-                        + "oldMethodVersion=" + continuationPointUpdater.oldMethodVersion + ", "
+                        + "oldMethodId=" + continuationPointUpdater.oldMethodId + ", "
+                        + "newMethodId=" + continuationPointUpdater.newMethodId + ", "
                         + "continuationPoint=" + continuationPointUpdater.continuationPointId);
             }
         }
@@ -128,25 +127,22 @@ public final class CoroutineReader {
 
             String className = serializedFrame.getClassName();
             int methodId = serializedFrame.getMethodId();
-            int methodVersion = serializedFrame.getMethodVersion();
             int continuationPoint = serializedFrame.getContinuationPointId();
 
-            InternalVersionKey versionKey = new InternalVersionKey(className, methodId, methodVersion, continuationPoint);
-            InternalVersionValue versionValue = (InternalVersionValue) versionMap.get(versionKey);
-            while (versionValue != null) {
-                versionValue.frameModifier.modifyFrame(serializedFrame);
-
-                int newMethodVersion = versionValue.newMethodVersion;
+            InternalKey internalKey = new InternalKey(className, methodId, continuationPoint);
+            InternalValue internalValue = (InternalValue) updateMap.get(internalKey);
+            while (internalValue != null) {
+                internalValue.frameModifier.modifyFrame(serializedFrame);
+                methodId = internalValue.newMethodId;
 
                 // This case happens if all we want to do is update values in the frame. If we don't catch and break we'll get into an
                 // infinite loop
-                if (methodVersion == newMethodVersion) {
+                if (internalKey.methodId == internalValue.newMethodId) {
                     break;
                 }
 
-                methodVersion = newMethodVersion;
-                versionKey = new InternalVersionKey(className, methodId, methodVersion, continuationPoint);
-                versionValue = (InternalVersionValue) versionMap.get(versionKey);                
+                internalKey = new InternalKey(className, methodId, continuationPoint);
+                internalValue = (InternalValue) updateMap.get(internalKey);                
             }
 
             // Check that we're deserialzing to for the correct version of the class
@@ -177,13 +173,12 @@ public final class CoroutineReader {
             placeContinuationReferences(variables.getContinuationIndexes(), (Object[]) frameData[4], cn);
             placeContinuationReferences(operands.getContinuationIndexes(), (Object[]) frameData[9], cn);
             
-            MethodState methodState = new MethodState(className, methodId, methodVersion, continuationPoint, frameData, lockState);
+            MethodState methodState = new MethodState(className, methodId, continuationPoint, frameData, lockState);
             boolean correctVersion = methodState.isValid(null);
             if (!correctVersion) {
                 throw new IllegalArgumentException("Method not found for frame state "
                         + "className: " + className + ", "
-                        + "methodId: " + methodId + ", "
-                        + "methodVersion: " + methodVersion);
+                        + "methodId: " + methodId);
             }
             cn.pushNewMethodState(methodState);
         }
@@ -213,24 +208,22 @@ public final class CoroutineReader {
     public static final class ContinuationPointUpdater {
 
         private final String className;
-        private final int methodId;
-        private final int oldMethodVersion;
-        private final int newMethodVersion;
+        private final int oldMethodId;
+        private final int newMethodId;
         private final int continuationPointId;
         private final FrameModifier frameModifier;
 
         /**
          * Constructs a {@link ContinuationPointUpdater} object.
          * @param className class name for the continuation point
-         * @param methodId method id for the continuation point
-         * @param oldMethodVersion old method version for the continuation point (used for identification)
-         * @param newMethodVersion new method version for the continuation point (used as replacement)
+         * @param oldMethodId old method id for the continuation point (used for identification)
+         * @param newMethodId new method id for the continuation point (used as replacement)
          * @param continuationPointId continuation point ID
          * @param frameModifier logic to modify the frame's contents to the new version
          * @throws NullPointerException if any argument is {@code null}
          * @throws IllegalArgumentException if {@code continuationPointId < 0}
          */
-        public ContinuationPointUpdater(String className, int methodId, int oldMethodVersion, int newMethodVersion, int continuationPointId,
+        public ContinuationPointUpdater(String className, int oldMethodId, int newMethodId, int continuationPointId,
                 FrameModifier frameModifier) {
             if (frameModifier == null) {
                 throw new NullPointerException();
@@ -240,9 +233,8 @@ public final class CoroutineReader {
             }
 
             this.className = className;
-            this.methodId = methodId;
-            this.oldMethodVersion = oldMethodVersion;
-            this.newMethodVersion = newMethodVersion;
+            this.oldMethodId = oldMethodId;
+            this.newMethodId = newMethodId;
             this.continuationPointId = continuationPointId;
             this.frameModifier = frameModifier;
         }
@@ -260,30 +252,27 @@ public final class CoroutineReader {
         void modifyFrame(SerializedState.Frame frame);
     }
 
-    private static final class InternalVersionKey {
+    private static final class InternalKey {
 
         private final String className;
         private final int methodId;
-        private final int methodVersion;
         private final int continuationPointId;
 
-        InternalVersionKey(String className, int methodId, int methodVersion, int continuationPointId) {
+        InternalKey(String className, int methodId, int continuationPointId) {
             if (className == null) {
                 throw new NullPointerException();
             }
 
             this.className = className;
             this.methodId = methodId;
-            this.methodVersion = methodVersion;
             this.continuationPointId = continuationPointId;
         }
 
         public int hashCode() {
-            int hash = 3;
-            hash = 79 * hash + (this.className != null ? this.className.hashCode() : 0);
-            hash = 79 * hash + this.methodId;
-            hash = 79 * hash + this.methodVersion;
-            hash = 79 * hash + this.continuationPointId;
+            int hash = 7;
+            hash = 71 * hash + (this.className != null ? this.className.hashCode() : 0);
+            hash = 71 * hash + this.methodId;
+            hash = 71 * hash + this.continuationPointId;
             return hash;
         }
 
@@ -297,11 +286,8 @@ public final class CoroutineReader {
             if (getClass() != obj.getClass()) {
                 return false;
             }
-            final InternalVersionKey other = (InternalVersionKey) obj;
+            final InternalKey other = (InternalKey) obj;
             if (this.methodId != other.methodId) {
-                return false;
-            }
-            if (this.methodVersion != other.methodVersion) {
                 return false;
             }
             if (this.continuationPointId != other.continuationPointId) {
@@ -314,12 +300,15 @@ public final class CoroutineReader {
         }
     }
     
-    private static final class InternalVersionValue {
-        private final int newMethodVersion;
+    private static final class InternalValue {
+        private final int newMethodId;
         private final FrameModifier frameModifier;
 
-        InternalVersionValue(int newMethodVersion, FrameModifier frameModifier) {
-            this.newMethodVersion = newMethodVersion;
+        InternalValue(int newMethodId, FrameModifier frameModifier) {
+            if (frameModifier == null) {
+                throw new NullPointerException();
+            }
+            this.newMethodId = newMethodId;
             this.frameModifier = frameModifier;
         }
     }

@@ -56,7 +56,7 @@ public final class CoroutineVersioningTest {
                     
                     CoroutineWriter writer = new CoroutineWriter(new DefaultCoroutineSerializer());
                     CoroutineReader reader = new CoroutineReader(new DefaultCoroutineDeserializer(), new ContinuationPointUpdater[] {
-                        new ContinuationPointUpdater(VERSION_TEST, 1972618944, -1410922588, -1410922588, 0, frame -> {
+                        new ContinuationPointUpdater(VERSION_TEST, -1122580925, -1122580925, 0, frame -> {
                             int[] varInts = frame.getVariables().getInts();
                             float[] varFloats = frame.getVariables().getFloats();
                             double[] varDoubles = frame.getVariables().getDoubles();

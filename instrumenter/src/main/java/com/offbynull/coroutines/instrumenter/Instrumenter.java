@@ -24,7 +24,6 @@ import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsW
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
 import com.offbynull.coroutines.instrumenter.asm.SimpleVerifier;
 import com.offbynull.coroutines.user.Continuation;
-import com.offbynull.coroutines.user.MethodState;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -55,12 +54,6 @@ import org.objectweb.asm.util.TraceMethodVisitor;
 public final class Instrumenter {
 
     private static final Type CONTINUATION_CLASS_TYPE = Type.getType(Continuation.class);
-
-    // The following consts are used to write out the versions of the methods being instrumented -- this is used by the serialization logic
-    // to determine if the MethodState objects being deserialized are for the methods loaded.
-    private static final int INSTRUMENTED_METHODID_FIELD_ACCESS = Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC;
-    private static final Type INSTRUMENTED_METHODID_FIELD_TYPE = Type.INT_TYPE;
-    private static final Integer INSTRUMENTED_METHODID_FIELD_VALUE = 0;
     
     // The following consts are used to determine if the class being instrumented is already instrumented + to make sure that if it is
     // instrumented that it's instrumented with this version of the instrumenter 
@@ -169,19 +162,7 @@ public final class Instrumenter {
             // If methodProps is null, it means that the analyzer determined that the method doesn't need to be instrumented.
             if (methodAttrs != null) {
                 detailer.detail(methodNode, methodAttrs, details);
-                instrumenter.instrument(methodNode, methodAttrs);
-                
-                // Shove in the method version information as a field -- used by serialization feature. 
-                String instrumentedMethodIdFieldName = MethodState.getIdentifyingFieldName(
-                        methodAttrs.getSignature().getMethodId(),
-                        methodAttrs.getSignature().getMethodVersion());
-                instrumentedMarkerField = new FieldNode(
-                        INSTRUMENTED_METHODID_FIELD_ACCESS,
-                        instrumentedMethodIdFieldName,
-                        INSTRUMENTED_METHODID_FIELD_TYPE.getDescriptor(),
-                        null,
-                        INSTRUMENTED_METHODID_FIELD_VALUE);
-                classNode.fields.add(instrumentedMarkerField);
+                instrumenter.instrument(classNode, methodNode, methodAttrs);
             }
         }
 

@@ -34,14 +34,12 @@ final class MethodDetailer {
         Validate.notNull(output);
 
         int methodId = attrs.getSignature().getMethodId();
-        int methodVersion = attrs.getSignature().getMethodVersion();
 
         output.append("Class Name: ").append(attrs.getSignature().getClassName().replace('/', '.')).append('\n');
         output.append("Method Name: ").append(attrs.getSignature().getMethodName()).append('\n');
+        output.append("Method Params: ").append(attrs.getSignature().getMethodDescriptor()).append('\n');
+        output.append("Method Return: ").append(attrs.getSignature().getReturnType()).append('\n');
         output.append("Method ID: ").append(methodId).append('\n');
-        output.append("Method Version: ").append(methodVersion).append('\n');
-        output.append("Parameters: ").append(attrs.getSignature().getMethodDescriptor()).append('\n');
-        output.append("Return: ").append(attrs.getSignature().getReturnType()).append('\n');
         output.append("------------------------------------\n");
 
         UnmodifiableList<ContinuationPoint> cps = attrs.getContinuationPoints();

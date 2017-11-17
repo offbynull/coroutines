@@ -100,7 +100,6 @@ public final class SerializedState implements Serializable {
 
         private final String className; // this is friendly name -- uses dots instead of slashes to separate names
         private final int methodId;
-        private final int methodVersion;
         private final int continuationPointId;
         private final Object[] monitors;
         private final Data variables;
@@ -110,7 +109,6 @@ public final class SerializedState implements Serializable {
          * Constructs a {@link Frame} object.
          * @param className class name
          * @param methodId method id
-         * @param methodVersion method version
          * @param continuationPointId continuation point id
          * @param monitors monitor locks
          * @param variables lock variable table values
@@ -122,7 +120,6 @@ public final class SerializedState implements Serializable {
         public Frame(
                 String className,
                 int methodId,
-                int methodVersion,
                 int continuationPointId,
                 Object[] monitors,
                 Data variables,
@@ -133,7 +130,6 @@ public final class SerializedState implements Serializable {
             
             this.className = className;
             this.methodId = methodId;
-            this.methodVersion = methodVersion;
             this.continuationPointId = continuationPointId;
             this.monitors = (Object[]) monitors.clone();
             this.variables = variables;
@@ -160,14 +156,6 @@ public final class SerializedState implements Serializable {
          */
         public int getMethodId() {
             return methodId;
-        }
-
-        /**
-         * Get method version.
-         * @return method version
-         */
-        public int getMethodVersion() {
-            return methodVersion;
         }
 
         /**

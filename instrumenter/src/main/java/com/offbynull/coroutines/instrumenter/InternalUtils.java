@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -55,23 +56,25 @@ final class InternalUtils {
         return (T) continuationPoint;
     }
 
-    static int generateMethodId(String className, String methodName, String methodDesc) {
+    static int generateMethodId(String className, MethodNode methodNode) {
         Validate.notNull(className);
-        Validate.notNull(methodName);
-        Validate.notNull(methodDesc);
-        
-        // Note we don't include return type as part of the ID because we want to be able to change the return type but still point to the
-        // same method. Remember that you can't overload methods by return type.
+        Validate.notNull(methodNode);
 
-        byte[] methodIdHash = md5(className
-                + methodName
-                + methodDesc);
+        String signature = className + '\u0000' + methodNode.name + '\u0000' + methodNode.desc;
+        byte[] signatureBytes = signature.getBytes(StandardCharsets.UTF_8);
+        byte[] contentBytes = generateMethodVersioningData(methodNode);
 
-        return ByteBuffer.wrap(methodIdHash).getInt();
+        byte[] combinedBytes = new byte[signatureBytes.length + contentBytes.length];
+        System.arraycopy(signatureBytes, 0, combinedBytes, 0, signatureBytes.length);
+        System.arraycopy(contentBytes, 0, combinedBytes, signatureBytes.length, contentBytes.length);
+
+        byte[] methodHash = md5(combinedBytes);
+
+        return ByteBuffer.wrap(methodHash).getInt();
     }
 
     // Takes into account the instructions and operands, as well as the overall structure.
-    static int generateMethodVersion(MethodNode methodNode) {
+    private static byte[] generateMethodVersioningData(MethodNode methodNode) {
         // Calculate label offsets -- required for hash calculation
           // we only care about where the labels are in relation to the opcode instructions -- we don't care about things like
           // LocalVariableNode or other ancillary data because these can change without the actual logic changing
@@ -85,7 +88,6 @@ final class InternalUtils {
 
 
         // Hash based on overall structures and instructions+operands
-        byte[] rawDataToHash;
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 DataOutputStream daos = new DataOutputStream(baos);) {
             MethodVisitor daosDumpMethodVisitor = new DumpToDaosMethodVisitor(daos, labelOffsets);
@@ -93,16 +95,10 @@ final class InternalUtils {
             methodNode.accept(daosDumpMethodVisitor);
             daos.flush(); // doesn't really need it -- just incase
             
-            rawDataToHash = baos.toByteArray();
+            return baos.toByteArray();
         } catch (IOException ioe) {
             throw new IllegalStateException(ioe); // should never happen
         }
-
-        byte[] methodIdHash = md5(rawDataToHash);
-
-
-        // Return truncated hash
-        return ByteBuffer.wrap(methodIdHash).getInt();
     }
 
 

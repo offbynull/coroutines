@@ -77,7 +77,6 @@ public final class CoroutineWriter {
             // constructor before being passed to the user for further modification.
             String className = currentMethodState.getClassName();
             int methodId = currentMethodState.getMethodId();
-            int methodVersion = currentMethodState.getMethodVersion();
             int continuationPoint = currentMethodState.getContinuationPoint();
             
             LockState monitors = currentMethodState.getLockState();
@@ -106,7 +105,6 @@ public final class CoroutineWriter {
             SerializedState.Frame serializedFrame = new SerializedState.Frame(
                     className,
                     methodId,
-                    methodVersion,
                     continuationPoint,
                     monitors == null ? new Object[0] : monitors.toArray(),
                     new SerializedState.Data(

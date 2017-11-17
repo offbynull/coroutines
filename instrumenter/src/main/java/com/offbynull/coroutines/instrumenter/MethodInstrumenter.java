@@ -27,22 +27,36 @@ import org.objectweb.asm.tree.MethodNode;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.enterMonitorAndStore;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.exitMonitorAndDelete;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
+import static com.offbynull.coroutines.user.MethodState.getIdentifyingFieldName;
 import org.apache.commons.lang3.Validate;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
 
 final class MethodInstrumenter {
+    
+    // The following consts are used to write out the versions of the methods being instrumented -- this is used by the serialization logic
+    // to determine if the MethodState objects being deserialized are for the methods loaded.
+    private static final int INSTRUMENTED_METHODID_FIELD_ACCESS = Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC;
+    private static final Type INSTRUMENTED_METHODID_FIELD_TYPE = Type.INT_TYPE;
+    private static final Integer INSTRUMENTED_METHODID_FIELD_VALUE = 0;
 
-    public void instrument(MethodNode methodNode, MethodAttributes attrs) {
+    public void instrument(ClassNode classNode, MethodNode methodNode, MethodAttributes attrs) {
+        Validate.notNull(classNode);
         Validate.notNull(methodNode);
         Validate.notNull(attrs);
 
+        // Sanity check to make sure that the method belongs to the class
+        Validate.isTrue(classNode.methods.contains(methodNode));
+        
         // These sanity checks need to exist. The methodNode.instructions.insertBefore/remove methods don't actually check to make sure the
         // instructions they're operating on belong to the method. This is here to make sure that the properties and methodNode match.
         attrs.getContinuationPoints().stream()
                 .map(x -> x.getInvokeInstruction())
-                .forEach(x -> methodNode.instructions.contains(x));
+                .forEach(x -> Validate.isTrue(methodNode.instructions.contains(x)));
         attrs.getSynchronizationPoints().stream()
                 .map(x -> x.getMonitorInstruction())
-                .forEach(x -> methodNode.instructions.contains(x));
+                .forEach(x -> Validate.isTrue(methodNode.instructions.contains(x)));
 
         // Add trycatch nodes
         attrs.getContinuationPoints().stream()
@@ -90,5 +104,16 @@ final class MethodInstrumenter {
             methodNode.instructions.insertBefore(nodeToReplace, insnsToReplaceWith);
             methodNode.instructions.remove(nodeToReplace);
         }
+        
+        // Shove in the method version information as a field on the class -- used by serialization feature. 
+        int methodId = attrs.getSignature().getMethodId();
+        String methodIdFieldName = getIdentifyingFieldName(methodId);
+        FieldNode methodIdField = new FieldNode(
+                INSTRUMENTED_METHODID_FIELD_ACCESS,
+                methodIdFieldName,
+                INSTRUMENTED_METHODID_FIELD_TYPE.getDescriptor(),
+                null,
+                INSTRUMENTED_METHODID_FIELD_VALUE);
+        classNode.fields.add(methodIdField);
     }
 }

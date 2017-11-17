@@ -93,7 +93,7 @@ final class ContinuationGenerators {
             = MethodUtils.getAccessibleMethod(Continuation.class, "pushNewMethodState", MethodState.class);
 
     private static final Constructor<MethodState> METHODSTATE_INIT_METHOD
-            = ConstructorUtils.getAccessibleConstructor(MethodState.class, String.class, Integer.TYPE, Integer.TYPE, Integer.TYPE,
+            = ConstructorUtils.getAccessibleConstructor(MethodState.class, String.class, Integer.TYPE, Integer.TYPE,
                     Object[].class, LockState.class);
     private static final Method METHODSTATE_GETCONTINUATIONPOINT_METHOD
             = MethodUtils.getAccessibleMethod(MethodState.class, "getContinuationPoint");
@@ -580,7 +580,6 @@ final class ContinuationGenerators {
 
         String friendlyClassName = attrs.getSignature().getClassName().replace('/', '.'); // '/' -> '.'   because it's non-internal format
         int methodId = attrs.getSignature().getMethodId();
-        int methodVersion = attrs.getSignature().getMethodVersion();
         
         Integer lineNumber = cp.getLineNumber();
 
@@ -626,7 +625,6 @@ final class ContinuationGenerators {
                         construct(METHODSTATE_INIT_METHOD,
                                 loadStringConst(friendlyClassName),
                                 loadIntConst(methodId),
-                                loadIntConst(methodVersion),
                                 loadIntConst(idx),
                                 loadVar(storageContainerVar),
                                 // load lockstate for last arg if method actually has monitorenter/exit in it
@@ -662,7 +660,6 @@ final class ContinuationGenerators {
 
         String friendlyClassName = attrs.getSignature().getClassName().replace('/', '.'); // '/' -> '.'   because it's non-internal format
         int methodId = attrs.getSignature().getMethodId();
-        int methodVersion = attrs.getSignature().getMethodVersion();
 
         Integer lineNumber = cp.getLineNumber();
 
@@ -745,7 +742,6 @@ final class ContinuationGenerators {
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadStringConst(friendlyClassName),
                                                 loadIntConst(methodId),
-                                                loadIntConst(methodVersion),
                                                 loadIntConst(idx),
                                                 loadVar(storageContainerVar),
                                                 // load lockstate for last arg if method actually has monitorenter/exit in it
@@ -777,7 +773,6 @@ final class ContinuationGenerators {
 
         String friendlyClassName = attrs.getSignature().getClassName().replace('/', '.'); // '/' -> '.'   because it's non-internal format
         int methodId = attrs.getSignature().getMethodId();
-        int methodVersion = attrs.getSignature().getMethodVersion();
 
         Integer lineNumber = cp.getLineNumber();
 
@@ -843,7 +838,6 @@ final class ContinuationGenerators {
                                         construct(METHODSTATE_INIT_METHOD,
                                                 loadStringConst(friendlyClassName),
                                                 loadIntConst(methodId),
-                                                loadIntConst(methodVersion),
                                                 loadIntConst(idx),
                                                 loadVar(storageContainerVar),
                                                 // load lockstate for last arg if method actually has monitorenter/exit in it

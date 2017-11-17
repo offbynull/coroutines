@@ -316,10 +316,9 @@ The corresponding ```MyCoroutine.coroutinesinfo``` file that gets generated...
 ```
 Class Name: MyCoroutine
 Method Name: run
-Method ID: 1034486434
-Method Version: -444517028
-Parameters: (Lcom/offbynull/coroutines/user/Continuation;)V
-Return: V
+Method Params: (Lcom/offbynull/coroutines/user/Continuation;)V
+Method Return: V
+Method ID: -1538415977
 ------------------------------------
 Continuation Point ID: 0    Line: 13   Type: NormalInvokeContinuationPoint
   varObjects[0]        // LVT index is 0 / name is this / type is LMyCoroutine;
@@ -334,10 +333,9 @@ Continuation Point ID: 0    Line: 13   Type: NormalInvokeContinuationPoint
 
 Class Name: MyCoroutine
 Method Name: echo
-Method ID: -118046625
-Method Version: -1581159911
-Parameters: (Lcom/offbynull/coroutines/user/Continuation;II)V
-Return: V
+Method Params: (Lcom/offbynull/coroutines/user/Continuation;II)V
+Method Return: V
+Method ID: 1191091979
 ------------------------------------
 Continuation Point ID: 0    Line: 18   Type: SuspendContinuationPoint
   varObjects[0]        // LVT index is 0 / name is this / type is LMyCoroutine;
@@ -349,13 +347,12 @@ Continuation Point ID: 0    Line: 18   Type: SuspendContinuationPoint
 
 For each method identified to run as part of a coroutine, the corresponding ```.coroutinesinfo``` file details the...
 
- * basic method details (signature, return type, name, class it belongs to, etc..).
- * unique ID used to identify the method (based on class name, method name, and method description).
- * unique version number for the method (based on the bytecode instructions).
+ * basic method details (signature, return type, name, owning class, etc..).
+ * unique ID used to identify the method (based on class name, method signature, and method bytecode).
  * continuation points in the method (where ```Continuation.suspend()``` is called / where methods that takes in a ```Continuation``` object are called).
  * types expected on the local variables table and operand stack at each continuation point
 
-When a method intended to run as part of a coroutine is changed, the version number gets updated. Diffing the previous ```.coroutinesinfo``` against the new ```.coroutinesinfo``` will identify what needs to be changed for deserialization of previous versions to work, if anything. If changes are required, they can be applied by passing a ```ContinuationPointUpdater``` to ```CoroutineReader```. The following subsections provide a few basic versioning examples with the ```MyCoroutine``` example class provided above.
+When a method intended to run as part of a coroutine is changed, the ID gets updated. Diffing the previous ```.coroutinesinfo``` against the new ```.coroutinesinfo``` will identify what needs to be changed for deserialization of previous versions to work, if anything. If changes are required, they can be applied by passing a ```ContinuationPointUpdater``` to ```CoroutineReader```. The following subsections provide a few basic versioning examples with the ```MyCoroutine``` example class provided above.
 
 It's important to note that versioning has its limits. This feature is intended for use-cases such as hot-deploying small emergency fixes/patches to a server or enabling saves from older versions of a game to run on newer versions. It isn't intended for cases where there are large structural changes.
 
@@ -388,10 +385,9 @@ Files.write(Paths.get(".testfile.tmp"), data);
 ```
 Class Name: MyCoroutine
 Method Name: run
-Method ID: 1034486434
-Method Version: -444517028
-Parameters: (Lcom/offbynull/coroutines/user/Continuation;)V
-Return: V
+Method Params: (Lcom/offbynull/coroutines/user/Continuation;)V
+Method Return: V
+Method ID: -1538415977
 ------------------------------------
 Continuation Point ID: 0    Line: 13   Type: NormalInvokeContinuationPoint
   varObjects[0]        // LVT index is 0 / name is this / type is LMyCoroutine;
@@ -409,10 +405,9 @@ When we deserialize, we can explicitly tell the ```CoroutineReader``` to interce
 ```java
 // Create continuation point updater for the point we want to intercept.
 ContinuationPointUpdater randomObjectUpdater = new ContinuationPointUpdater(
-        1034486434, // methodId to intercept
-        -444517028, // methodVersion to intercept
-        -444517028, // methodVersion to update to (same because code unchanged)
-        0,          // continuation point to intercept
+        -1538415977, // method ID to intercept
+        -1538415977, // method ID to update to (same because code unchanged)
+        0,           // continuation point ID to intercept
         frame -> {
             // Get new secure random
             SecureRandom secureRandom;
@@ -525,12 +520,11 @@ The updated method should produce the following updated ```MyCoroutines.coroutin
 ```
 Class Name: MyCoroutine
 Method Name: echo
-Method ID: -118046625
-Method Version: 1027292264
-Parameters: (Lcom/offbynull/coroutines/user/Continuation;II)V
-Return: V
+Method Params: (Lcom/offbynull/coroutines/user/Continuation;II)V
+Method Return: V
+Method ID: -571717800
 ------------------------------------
-Continuation Point ID: 0    Line: 20   Type: SuspendContinuationPoint
+Continuation Point ID: 0    Line: 22   Type: SuspendContinuationPoint
   varObjects[0]        // LVT index is 0 / name is this / type is LMyCoroutine;
   varObjects[1]        // LVT index is 1 / name is c / type is Lcom/offbynull/coroutines/user/Continuation;
   varInts[0]           // LVT index is 2 / name is i / type is int
@@ -542,14 +536,12 @@ Continuation Point ID: 0    Line: 20   Type: SuspendContinuationPoint
 If we diff the old ```MyCoroutines.coroutinesinfo``` with this new one, we'll get a clear picture of what needs to be changed...
 
 ```diff
-@@ -1,13 +1,14 @@
  Class Name: MyCoroutine
  Method Name: echo
- Method ID: -118046625
--Method Version: -1581159911
-+Method Version: 1027292264
- Parameters: (Lcom/offbynull/coroutines/user/Continuation;II)V
- Return: V
+ Method Params: (Lcom/offbynull/coroutines/user/Continuation;II)V
+ Method Return: V
+-Method ID: 1191091979
++Method ID: -571717800
  ------------------------------------
 -Continuation Point ID: 0    Line: 18   Type: SuspendContinuationPoint
 +Continuation Point ID: 0    Line: 20   Type: SuspendContinuationPoint
@@ -561,15 +553,14 @@ If we diff the old ```MyCoroutines.coroutinesinfo``` with this new one, we'll ge
    operandObjects[0]    // operand index is 0 / type is Lcom/offbynull/coroutines/user/Continuation;
 ```
 
-We can see that the method version got updated from ```-1581159911``` to ```1027292264``` and a new item was added to index 2 of the objects variable array. When we deserialize, we can explicitly tell the CoroutineReader to intercept the old version and update it so this new variable slot is properly filled in...
+We can see that the method ID got updated from ```1191091979``` to ```-571717800``` and a new item was added to index 2 of the objects variable array. When we deserialize, we can explicitly tell the CoroutineReader to intercept the old version and update it so this new variable slot is properly filled in...
 
 ```java
 // Read it back in, making sure to add an updater to handle changes required
 // for this new version.
 ContinuationPointUpdater updater = new ContinuationPointUpdater(
-        -118046625, // methodId to intercept
-        -1581159911,// methodVersion to intercept
-        1027292264, // methodVersion to update to (same because code unchanged)
+        1191091979, // method ID to intercept
+        -571717800, // method ID to update to (same because code unchanged)
         0,          // continuation point to intercept
         frame -> {
             int[] ints = frame.getVariables().getInts();
@@ -635,9 +626,8 @@ Your simplest and best option for avoiding these serialization pitfalls is to de
 
 Common pitfalls with versioning include...
 
- * Using different compilers (e.g. Oracle Java vs Eclipse Java Compiler) or using different versions of the same compiler (Oracle JDK 1.7 vs Oracle JDK 1.8) on the same code may produce different method versions -- the version number in the ```.coroutinesinfo``` file may change even though you didn't modify your code. The bytecode generated between different compilers and compiler versions is mostly the same but also slightly different. These slight differences are what make the version change. To reduce headaches, follow the best practice of sticking to the same compiler vendor and version between your builds.
- * If the constants used by a method are changed, the method version may not change. The problem is that if the constant is loaded as a getstatic instruction instead of a ldc instruction, the value of the constant won't be factored into the method version. Future versions of the instrumenter may be updated to do multiple passes over classes to ensure these changes are properly mixed in to the method version.
- * If the version of a method changed but you've determined that no variables/operands manipulation is required, a placeholder ```ContinuationPointUpdater``` should still be added to ```CoroutineReader``` even though it does nothing. The placeholder makes sure that the method version gets updated internally on deserialization, so that if it gets re-serialized it will contain the updated method version. This is required if you ever end up having more than 1 method version (multiple ```ContinuationPointUpdater``` can be chained to handle this scenario).
+ * Using different compilers (e.g. Oracle Java vs Eclipse Java Compiler) or using different versions of the same compiler (Oracle JDK 1.7 vs Oracle JDK 1.8) on the same code may produce different method IDs -- the ID in the ```.coroutinesinfo``` file may change even though you didn't modify your code. The bytecode generated between different compilers and compiler versions is mostly the same but also slightly different. These slight differences are what make the version change. To reduce headaches, follow the best practice of sticking to the same compiler vendor and version between your builds.
+ * If the constants used by a method are changed, the method ID may not change. The problem is that if the constant is loaded as a getstatic instruction instead of a ldc instruction, the value of the constant won't be factored into the method ID. Future versions of the instrumenter may do multiple passes to properly mix in constants into the method ID.
 
 ## FAQ
 
@@ -816,7 +806,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [1.4.0] - Unreleased
-- CHANGED: Made deserialization to unrecognized method versions illegal.
+- CHANGED: Combined serialization method ID and method version.
+- CHANGED: Made deserialization to unrecognized method IDs illegal.
 
 ### [1.3.0] - 2017-11-15
 - ADDED: Serialization and versioning support.
