@@ -45,7 +45,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-public final class CoroutineSerializationTest {
+public final class SerializationTest {
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();

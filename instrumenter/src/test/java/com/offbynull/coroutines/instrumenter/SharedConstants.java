@@ -41,5 +41,8 @@ final class SharedConstants {
     public static final String EXCEPTION_THEN_CONTINUE_INVOKE_TEST = "ExceptionThenContinueInvokeTest";
     public static final String EMPTY_CONTINUATION_POINT_INVOKE_TEST = "EmptyContinuationPointInvokeTest";
     public static final String COMPLEX_TEST = "ComplexTest";
-    public static final String VERSION_TEST = "VersionTest";    
+    public static final String INTERCEPT_TEST = "InterceptTest";    
+    public static final String UPDATE_TEST = "UpdateTest";    
+    public static final String UPDATE_TEST_ORIGINAL = UPDATE_TEST + "_Original";    
+    public static final String UPDATE_TEST_MODIFIED = UPDATE_TEST + "_Modified";    
 }

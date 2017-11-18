@@ -67,7 +67,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-public final class CoroutineInstrumentationTest {
+public final class InstrumentationTest {
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();

@@ -178,14 +178,26 @@ public final class MethodState implements Serializable {
      * correct version for this method state.
      * @param classLoader class loader to use to look for the class ({@code null} will attempt to use this Object's classloader / the
      * thread's context class loader)
+     * @param className class name
+     * @param methodId method id
+     * @param continuationPointId continuation point id
      * @return {@code true} if method for this method state exists and is of the correct version, {@code false} otherwise
+     * @throws NullPointerException if {@code className} is {@code null}
+     * @throws IllegalArgumentException if {@code continuationPointId < 0}
      */
-    public boolean isValid(ClassLoader classLoader) {
+    public static boolean isValid(ClassLoader classLoader, String className, int methodId, int continuationPointId) {
+        if (className == null) {
+            throw new NullPointerException();
+        }
+        if (continuationPointId < 0) {
+            throw new IllegalArgumentException();
+        }
+
         Class cls = null;
         if (classLoader == null) {
             // Try to find the class from this object's classloader
             try {
-                cls = getClass().getClassLoader().loadClass(className);
+                cls = MethodState.class.getClassLoader().loadClass(className);
             } catch (ClassNotFoundException cnfe) {
                 // do nothing
             }
@@ -215,7 +227,7 @@ public final class MethodState implements Serializable {
 
 
 
-        String versionField = getIdentifyingFieldName(methodId);
+        String versionField = getIdentifyingFieldName(methodId, continuationPointId);
         try {
             cls.getDeclaredField(versionField);
         } catch (NoSuchFieldException nsfe) {
@@ -230,10 +242,17 @@ public final class MethodState implements Serializable {
      * <p>
      * Get the name of the field that will be inserted into a class for some method id and version combination.
      * @param methodId method id
+     * @param continuationPointId continuation point id
      * @return field name
+     * @throws IllegalArgumentException if {@code continuationPointId < 0}
      */
-    public static String getIdentifyingFieldName(int methodId) {
+    public static String getIdentifyingFieldName(int methodId, int continuationPointId) {
+        if (continuationPointId < 0) {
+            throw new IllegalArgumentException();
+        }
+
         String methodIdStr = Integer.toString(methodId).replace('-', 'N');
-        return "__COROUTINES_ID_" + methodIdStr;
+        String continuationPointIdStr = Integer.toString(continuationPointId).replace('-', 'N');
+        return "__COROUTINES_ID_" + methodIdStr + "_" + continuationPointIdStr;
     }
 }

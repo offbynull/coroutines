@@ -16,39 +16,99 @@
  */
 package com.offbynull.coroutines.user;
 
+import com.offbynull.coroutines.user.SerializedState.Data;
+import com.offbynull.coroutines.user.SerializedState.Frame;
+import com.offbynull.coroutines.user.SerializedState.FrameInterceptPoint;
+import com.offbynull.coroutines.user.SerializedState.FrameUpdatePoint;
+import com.offbynull.coroutines.user.SerializedState.VersionedFrame;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InvalidClassException;
 import java.io.NotSerializableException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * Writes out (serializes) the current state of a {@link CoroutineRunner} object into a byte array.
+ * Writes out (serializes) the current state of a {@link CoroutineRunner} object.
  * @author Kasra Faghihi
  */
 public final class CoroutineWriter {
     private final CoroutineSerializer serializer;
+    private final Map updatersMap;
+    private final Map interceptersMap;
     
     /**
-     * Constructs a {@link CoroutineWriter} object with a {@link DefaultCoroutineSerializer}. Equivalent to calling
-     * {@code new CoroutineWriter(new DefaultCoroutineSerializer())}.
+     * Construct a {@link CoroutineWriter} object. Equivalent to calling
+     * {@code new CoroutineWriter(new DefaultCoroutineSerializer(), new FrameUpdatePoint[0], new FrameInterceptPoint[0])}.
      */
     public CoroutineWriter() {
-        this(new DefaultCoroutineSerializer());
+        this(new DefaultCoroutineSerializer(), new FrameUpdatePoint[0], new FrameInterceptPoint[0]);
     }
-    
+
+    /**
+     * Constructs a {@link CoroutineWriter}. Equivalent to calling
+     * {@code new CoroutineWriter(new DefaultCoroutineSerializer(), frameUpdatePoints, new FrameInterceptPoint[0])}.
+     * @param frameUpdatePoints frame update points
+     * @throws IllegalArgumentException if {@code frameUpdatePoints} contains more than one entry for the same identifier
+     * (className/oldMethodId/newMethodId/continuationPoint)
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public CoroutineWriter(FrameUpdatePoint[] frameUpdatePoints) {
+        this(new DefaultCoroutineSerializer(), frameUpdatePoints, new FrameInterceptPoint[0]);
+    }
+
+    /**
+     * Constructs a {@link CoroutineWriter}. Equivalent to calling
+     * {@code new CoroutineWriter(new DefaultCoroutineSerializer(), new FrameUpdatePoint[0], frameInterceptPoints)}.
+     * @param frameInterceptPoints frame intercept points
+     * @throws IllegalArgumentException if {@code frameInterceptPoints} contains more than one entry for the same identifier
+     * (className/methodId/continuationPoint)
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public CoroutineWriter(FrameInterceptPoint[] frameInterceptPoints) {
+        this(new DefaultCoroutineSerializer(), new FrameUpdatePoint[0], frameInterceptPoints);
+    }
+
+    /**
+     * Constructs a {@link CoroutineWriter}. Equivalent to calling
+     * {@code new CoroutineWriter(new DefaultCoroutineSerializer(), frameUpdatePoints, frameInterceptPoints)}.
+     * @param frameUpdatePoints frame update points
+     * @param frameInterceptPoints frame intercept points
+     * @throws IllegalArgumentException if {@code frameUpdatePoints} contains more than one entry for the same identifier
+     * (className/oldMethodId/newMethodId/continuationPoint), or if {@code frameInterceptPoints} contains more than one entry for the same
+     * identifier (className/methodId/continuationPoint)
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public CoroutineWriter(FrameUpdatePoint[] frameUpdatePoints, FrameInterceptPoint[] frameInterceptPoints) {
+        this(new DefaultCoroutineSerializer(), frameUpdatePoints, frameInterceptPoints);
+    }
+
     /**
      * Constructs a {@link CoroutineWriter} object.
      * @param serializer serializer to write out the coroutine state
-     * @throws NullPointerException if any argument is {@code null}
+     * @param frameUpdatePoints frame update points
+     * @param frameInterceptPoints frame intercept points
+     * @throws NullPointerException if any argument is {@code null} or contains {@code null}
+     * @throws IllegalArgumentException if {@code frameUpdatePoints} contains more than one entry for the same identifier
+     * (className/oldMethodId/newMethodId/continuationPoint), or if {@code frameInterceptPoints} contains more than one entry for the same
+     * identifier (className/methodId/continuationPoint)
      */
-    public CoroutineWriter(CoroutineSerializer serializer) {
-        if (serializer == null) {
+    public CoroutineWriter(CoroutineSerializer serializer,
+            FrameUpdatePoint[] frameUpdatePoints,
+            FrameInterceptPoint[] frameInterceptPoints) {
+        if (serializer == null || frameUpdatePoints == null || frameInterceptPoints == null) {
             throw new NullPointerException();
         }
-        
+
         this.serializer = serializer;
+        this.updatersMap = new HashMap();
+        this.interceptersMap = new HashMap();
+
+        SerializationUtils.populateUpdatesMapAndInterceptsMap(
+                updatersMap, frameUpdatePoints,
+                interceptersMap, frameInterceptPoints);
     }
     
     /**
@@ -83,13 +143,13 @@ public final class CoroutineWriter {
         Continuation cn = runner.getContinuation();
 
         int size = cn.getSize();
-        SerializedState.Frame[] frames = new SerializedState.Frame[size];
+        VersionedFrame[] frames = new VersionedFrame[size];
 
         MethodState currentMethodState = cn.getSaved(0);
         
         int idx = 0;
         while (currentMethodState != null) {
-            // Pull out information from method state. We should never modify method state values, they will be copied by the Data
+            // Pull out information from MethoState. We should never modify MethodState values, they will be copied by the Data
             // constructor before being passed to the user for further modification.
             String className = currentMethodState.getClassName();
             int methodId = currentMethodState.getMethodId();
@@ -109,6 +169,7 @@ public final class CoroutineWriter {
             double[] doubleOperands = ((double[]) currentMethodState.getData()[8]);
             Object[] objectOperands = ((Object[]) currentMethodState.getData()[9]);
 
+
             // Clone the object[] buffers because we need to remove references to the Continuation object for this coroutine.
             objectVars = objectVars == null ? new Object[0] : (Object[]) objectVars.clone();
             int[] continuationPositionsInObjectVars = clearContinuationReferences(objectVars, cn);
@@ -116,21 +177,22 @@ public final class CoroutineWriter {
             objectOperands = objectOperands == null ? new Object[0] : (Object[]) objectOperands.clone();
             int[] continuationPositionsInObjectOperands = clearContinuationReferences(objectOperands, cn);
 
+
             // Create the frame, making sure we create empty arrays for any null references (remember that MethodState var/operand arrays
             // that don't contain any data are set to null due to an optimization).
-            SerializedState.Frame serializedFrame = new SerializedState.Frame(
+            Frame serializedFrame = new Frame(
                     className,
                     methodId,
                     continuationPoint,
                     monitors == null ? new Object[0] : monitors.toArray(),
-                    new SerializedState.Data(
+                    new Data(
                             intVars == null ? new int[0] : intVars,
                             floatVars == null ? new float[0] : floatVars,
                             longVars == null ? new long[0] : longVars,
                             doubleVars == null ? new double[0] : doubleVars,
                             objectVars,
                             continuationPositionsInObjectVars),
-                    new SerializedState.Data(
+                    new Data(
                             intOperands == null ? new int[0] : intOperands,
                             floatOperands == null ? new float[0] : floatOperands,
                             longOperands == null ? new long[0] : longOperands,
@@ -138,11 +200,16 @@ public final class CoroutineWriter {
                             objectOperands,
                             continuationPositionsInObjectOperands));
 
-            // Insert the frame
-            frames[idx] = serializedFrame;
+            
+            // Add all possible down-versions for frame into a versionedframe object and add it
+            VersionedFrame versionedFrame = SerializationUtils.calculateAllPossibleFrameVersions(
+                    null,
+                    updatersMap,
+                    interceptersMap,
+                    serializedFrame);
+            frames[idx] = versionedFrame;
             idx++;
 
-            // Go to next method state
             currentMethodState = currentMethodState.getNext();
         }
         
@@ -204,11 +271,14 @@ public final class CoroutineWriter {
                 throw new NullPointerException();
             }
 
-            SerializedState.Frame[] frames = serializedState.getFrames();
+            VersionedFrame[] frames = serializedState.getFrames();
             for (int i = 0; i < frames.length; i++) {
-                SerializedState.Frame frame = frames[i];
-                if (frame.getMonitors().length > 0) {
-                    throw new IllegalArgumentException("Monitors not allowed in default serializer");
+                Frame[] possibleFrames = frames[i].getFrames();
+                for (int j = 0; j < possibleFrames.length; j++) {
+                    Frame frame = possibleFrames[j];
+                    if (frame.getMonitors().length > 0) {
+                        throw new IllegalArgumentException("Monitors not allowed in default serializer");
+                    }
                 }
             }
 

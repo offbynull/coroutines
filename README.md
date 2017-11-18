@@ -33,7 +33,12 @@ More information on the topic of coroutines and their advantages can be found on
  * [Serialization and Versioning Guide](#serialization-and-versioning-guide)
    * [Serialization Instructions](#serialization-instructions)
    * [Versioning Instructions](#versioning-instructions)
+     * [Example: Modifying state in current versions](#modifying-state-in-current-versions)
+     * [Example: Upgrading from old versions](#example-upgrading-from-old-versions)
+     * [Example: Supporting old versions](#example-supporting-old-versions)
    * [Common Pitfalls and Best Practices](#common-pitfalls-and-best-practices)
+     * [Serialization pitfalls and best practices](#serialization-pitfalls-and-best-practices)
+     * [Versioning pitfalls and best practices](#versioning-pitfalls-and-best-practices)
  * [FAQ](#faq)
    * [How much overhead am I adding?](#how-much-overhead-am-i-adding)
    * [What projects make use of Coroutines?](#what-projects-make-use-of-coroutines)
@@ -219,7 +224,7 @@ Any method that takes in a ```Continuation``` type as a parameter will be instru
 
 **:warning: WARNING -- This is an advanced feature. Familiarity with JVM bytecode is highly recommended. :warning:**
 
-The Coroutines project provides support for serialization and versioning. Serialization and versioning work hand-in-hand. Serialization allows you to convert your coroutine to a byte array and vice-versa, while versioning allows you to make small tweaks to your coroutine's logic while still being able to load it up serialized data from previous versions.
+The Coroutines project provides support for serialization and versioning. Serialization and versioning work hand-in-hand. Serialization allows you to convert your coroutine to a byte array and vice-versa, while versioning allows you to make small tweaks to your coroutine's logic while still being able to load up serialized data from previous versions.
 
 Typical use-cases include...
 
@@ -294,6 +299,8 @@ import java.io.Serializable;
 import java.util.Random;
 
 public final class MyCoroutine implements Coroutine, Serializable {
+    private static final long serialVersionUID = 1L; // required if using default serializer
+
     @Override
     public void run(Continuation c) {
         Random random = new Random(0);
@@ -320,7 +327,7 @@ Method Params: (Lcom/offbynull/coroutines/user/Continuation;)V
 Method Return: V
 Method ID: -1538415977
 ------------------------------------
-Continuation Point ID: 0    Line: 13   Type: NormalInvokeContinuationPoint
+Continuation Point ID: 0    Line: 15   Type: NormalInvokeContinuationPoint
   varObjects[0]        // LVT index is 0 / name is this / type is LMyCoroutine;
   varObjects[1]        // LVT index is 1 / name is c / type is Lcom/offbynull/coroutines/user/Continuation;
   varObjects[2]        // LVT index is 2 / name is random / type is Ljava/util/Random;
@@ -352,11 +359,11 @@ For each method identified to run as part of a coroutine, the corresponding ```.
  * continuation points in the method (where ```Continuation.suspend()``` is called / where methods that takes in a ```Continuation``` object are called).
  * types expected on the local variables table and operand stack at each continuation point
 
-When a method intended to run as part of a coroutine is changed, the ID gets updated. Diffing the previous ```.coroutinesinfo``` against the new ```.coroutinesinfo``` will identify what needs to be changed for deserialization of previous versions to work, if anything. If changes are required, they can be applied by passing a ```ContinuationPointUpdater``` to ```CoroutineReader```. The following subsections provide a few basic versioning examples with the ```MyCoroutine``` example class provided above.
+When a method intended to run as part of a coroutine is changed, the ID gets updated. Diffing the previous ```.coroutinesinfo``` against the new ```.coroutinesinfo``` will identify what needs to be changed for deserialization of previous versions to work, if anything. If changes are required, they can be applied by using the ```FrameUpdatePoint``` / ```FrameInterceptPoint``` interfaces. The following subsections provide a few basic versioning examples with the ```MyCoroutine``` example class provided above (please read them in order).
 
 It's important to note that versioning has its limits. This feature is intended for use-cases such as hot-deploying small emergency fixes/patches to a server or enabling saves from older versions of a game to run on newer versions. It isn't intended for cases where there are large structural changes.
 
-#### Example: Swapping variables and operands on deserialization
+#### Example: Modifying state in current version
 
 Notice how the first line of ```MyCoroutine.run()``` creates a ```Random``` seeded with 0. If we serialize this coroutine, we can replace the ```Random``` on deserialization with a more robust random number generator that isn't deterministically seeded.
 
@@ -376,8 +383,6 @@ runner.execute();
 // Checkpoint it.
 CoroutineWriter writer = new CoroutineWriter();
 byte[] data = writer.write(runner);
-        
-Files.write(Paths.get(".testfile.tmp"), data);
 ```
 
 ```MyCoroutines.coroutinesinfo``` states that the ```Random``` object sits in index 2 of the objects variable array...
@@ -389,7 +394,7 @@ Method Params: (Lcom/offbynull/coroutines/user/Continuation;)V
 Method Return: V
 Method ID: -1538415977
 ------------------------------------
-Continuation Point ID: 0    Line: 13   Type: NormalInvokeContinuationPoint
+Continuation Point ID: 0    Line: 15   Type: NormalInvokeContinuationPoint
   varObjects[0]        // LVT index is 0 / name is this / type is LMyCoroutine;
   varObjects[1]        // LVT index is 1 / name is c / type is Lcom/offbynull/coroutines/user/Continuation;
   varObjects[2]        // LVT index is 2 / name is random / type is Ljava/util/Random;
@@ -403,12 +408,12 @@ Continuation Point ID: 0    Line: 13   Type: NormalInvokeContinuationPoint
 When we deserialize, we can explicitly tell the ```CoroutineReader``` to intercept the frame at this point and update the ```Random``` with a ```SecureRandom```...
 
 ```java
-// Create continuation point updater for the point we want to intercept.
-ContinuationPointUpdater randomObjectUpdater = new ContinuationPointUpdater(
-        -1538415977, // method ID to intercept
-        -1538415977, // method ID to update to (same because code unchanged)
-        0,           // continuation point ID to intercept
-        frame -> {
+// Create frame update point for the point we want to intercept.
+FrameInterceptPoint randomObjectUpdater = new FrameInterceptPoint(
+        "MyCoroutine", // class to intercept
+        -1538415977,   // method ID to intercept
+        0,             // continuation point ID to intercept
+        (frame, mode) -> {
             // Get new secure random
             SecureRandom secureRandom;
             try {
@@ -418,20 +423,20 @@ ContinuationPointUpdater randomObjectUpdater = new ContinuationPointUpdater(
             }
 
             // Replace existing random with new secure random
-            frame.getVariables().getObjects()[2] = secureRandom;
+            Object[] objectVars = frame.getVariables().getObjects();
+            objectVars[2] = secureRandom;
+            return frame.withObjectVariables(objectVars);
         }
 );
 
-// Create reader with that continuation point updater.
+// Create reader with that frame intercept point.
 CoroutineReader reader = new CoroutineReader(
-        new DefaultCoroutineDeserializer(),
-        new ContinuationPointUpdater[] { randomObjectUpdater }
+        new FrameInterceptPoint[] { randomObjectUpdater }
 );
 
 // Load up the coroutine from the checkpoint. It should now contain a
 // SecureRandom instead of a random.
-byte[] data = Files.readAllBytes(Paths.get(".testfile.tmp"));
-CoroutineRunner runner = reader.read(data);
+runner = reader.read(data);
 
 // Execute runner 6 times.
 runner.execute();
@@ -440,6 +445,7 @@ runner.execute();
 runner.execute();
 runner.execute();
 runner.execute();
+}
 ```
 
 Now, if we execute this deserialized coroutine, we'll get numbers printed to stdout using our new ```SecureRandom```. Here's the output of 3 separate runs (both the serialization and deserialization portion). Note that on each run, the first 4 ```runner.execute()``` calls prior to serialization will always produce the same numbers on each run, while the 6 ```runner.execute()``` after deserializing will produce unique random numbers...
@@ -469,6 +475,7 @@ started
 -626132767
 -346399779
 
+started
 -1155484576
 -723955400
 1033096058
@@ -481,9 +488,11 @@ started
 431304956
 ```
 
-#### Example: Re-organizing variables and operands to match new version of method
+#### Example: Upgrading from old versions
 
-Imagine we start the coroutine, run it a few times, and then serialize it...
+If you update one or more of the methods that make up your coroutine, the method ID will change. If you want support to deserializing from the older version, you'll need to supply a ```FramePointUpdater``` to read in the data from the old version and convert it to data expected by the new version.
+
+Imagine we start ```MyCoroutine```, run it a few times, and then serialize it...
 
 ```java
 // Create the coroutine.
@@ -524,7 +533,7 @@ Method Params: (Lcom/offbynull/coroutines/user/Continuation;II)V
 Method Return: V
 Method ID: -571717800
 ------------------------------------
-Continuation Point ID: 0    Line: 22   Type: SuspendContinuationPoint
+Continuation Point ID: 0    Line: 20   Type: SuspendContinuationPoint
   varObjects[0]        // LVT index is 0 / name is this / type is LMyCoroutine;
   varObjects[1]        // LVT index is 1 / name is c / type is Lcom/offbynull/coroutines/user/Continuation;
   varInts[0]           // LVT index is 2 / name is i / type is int
@@ -558,11 +567,12 @@ We can see that the method ID got updated from ```1191091979``` to ```-571717800
 ```java
 // Read it back in, making sure to add an updater to handle changes required
 // for this new version.
-ContinuationPointUpdater updater = new ContinuationPointUpdater(
-        1191091979, // method ID to intercept
-        -571717800, // method ID to update to (same because code unchanged)
-        0,          // continuation point to intercept
-        frame -> {
+FrameUpdatePoint updater = new FrameUpdatePoint(
+        "MyCoroutine",// class name to intercept
+        1191091979,   // method ID to intercept
+        0,            // continuation point to intercept
+        (frame, mode) -> {
+            // Read in old variables and compute the missing variable
             int[] ints = frame.getVariables().getInts();
             Object[] objects = frame.getVariables().getObjects();
 
@@ -571,16 +581,16 @@ ContinuationPointUpdater updater = new ContinuationPointUpdater(
             objects = Arrays.copyOf(objects, 3);
             objects[2] = "Iteration " + i + " and value is divisible by 2: " + (value % 2);
 
-            frame.getVariables().setObjects(objects);
+            // Return a new Frame with the the expected method ID and variables
+            return frame
+                    .withMethodId(-571717800)
+                    .withObjectVariables(objects);
         }
 );
 
-CoroutineReader reader = new CoroutineReader(
-        new DefaultCoroutineDeserializer(),
-        new ContinuationPointUpdater[] { updater }
-);
+CoroutineReader reader = new CoroutineReader(new FrameUpdatePoint[] { updater });
 
-byte[] readData = Files.readAllBytes(Paths.get(".testfile.tmp"));
+byte[] data = Files.readAllBytes(Paths.get(".testfile.tmp"));
 CoroutineRunner runner = reader.read(data);
 
 // Execute runner 6 times.
@@ -601,8 +611,95 @@ Output from deserialization onward...
 -1930858313 Iteration 6 and value is divisible by 2: -1
 502539523 Iteration 7 and value is divisible by 2: 1
 -1728529858 Iteration 8 and value is divisible by 2: 0
--938301587 Iteration 9 and value is divisible by 2: -1
 ```
+
+Keep in mind that you can chain updaters together. For example, if you have a third version of ```MyCoroutine.echo()``` , you can simply add in a new ```FrameUpdatePoint``` to convert the second version to the third version ```CoroutineReader```. If the reader sees the first version, it will automatically convert it to the second version then to the third version.
+
+#### Example: Supporting old versions
+
+In many cases, it may not be enough to support deserializing from older versions of your coroutine. You may also need to support downgrading to older versions when you serialize your coroutine, such that both older and newer versions of your coroutine will be able to deserialize it.
+
+In the same way that you're able to chain ```FrameUpdatePoint```s in ```CoroutineReader``` to convert to newer versions, you can chain ```FrameUpdatePoint```s in ```CoroutineWriter``` to convert to older versions. The difference is that ```CoroutineWriter``` will write out each conversion in the update chain, allowing ```CoroutineReader``` to pick out the correct version and load it up.
+
+Continuing from the previous example, imagine we start from the initial ```MyCoroutine``` and run it a few times (just like before), but this time we add a ```FrameUpdatePoint``` to ```CoroutineWriter``` so it converts to the modified version of ```MyCoroutine.echo()```...
+```java
+// Create the coroutine.
+Coroutine myCoroutine = new MyCoroutine();
+CoroutineRunner runner = new CoroutineRunner(myCoroutine);
+
+// Run it a few times.
+runner.execute();
+runner.execute();
+runner.execute();
+runner.execute();
+
+// Checkpoint it, adding a FrameUpdatePoint to also support the
+// modified version of MyCoroutine.echo()
+FrameUpdatePoint updater = new FrameUpdatePoint(
+        "MyCoroutine",// class name to intercept
+        1191091979,   // method ID to intercept
+        0,            // continuation point to intercept
+        (frame, mode) -> {
+            int[] ints = frame.getVariables().getInts();
+            Object[] objects = frame.getVariables().getObjects();
+
+            int i = ints[0];
+            int value = ints[1];
+            objects = Arrays.copyOf(objects, 3);
+            objects[2] = "Iteration " + i + " and value is divisible by 2: " + (value % 2);
+
+            return frame
+                    .withMethodId(-571717800)
+                    .withObjectVariables(objects);
+        }
+);
+CoroutineWriter writer = new CoroutineWriter(new FrameUpdatePoint[] { updater });
+byte[] data = writer.write(runner);
+
+Files.write(Paths.get(".testfile.tmp"), data);
+```
+
+Now, we can use ```CoroutineReader``` deserialize to either version of ```MyCoroutine``` without having to supply it a ```FrameUpdatePoint```. ```CoroutineReader``` will automatically pick out the correct version based on the method ID. The code to deserialize is straight forward...
+
+```java
+// Read it back in
+CoroutineReader reader = new CoroutineReader();
+
+byte[] data = Files.readAllBytes(Paths.get(".testfile.tmp"));
+CoroutineRunner runner = reader.read(data);
+
+// Execute runner 6 times.
+runner.execute();
+runner.execute();
+runner.execute();
+runner.execute();
+runner.execute();
+runner.execute();
+```
+
+If we deserialize to the initial ```MyCoroutine```, the output will be...
+
+```
+-1690734402
+-1557280266
+1327362106
+-1930858313
+502539523
+-1728529858
+```
+
+If we deserialize to the modified ```MyCoroutine```, the output will be...
+
+```
+-1690734402 Iteration 3 and value is divisible by 2: 0
+-1557280266 Iteration 4 and value is divisible by 2: 0
+1327362106 Iteration 5 and value is divisible by 2: 0
+-1930858313 Iteration 6 and value is divisible by 2: -1
+502539523 Iteration 7 and value is divisible by 2: 1
+-1728529858 Iteration 8 and value is divisible by 2: 0
+```
+
+Remember that the system is robust. If for whatever reason ```CoroutineReader``` cannot find a compatible version of ```MyCoroutine.echo()```, it will attempt to use the ```FrameUpdatePoint```s supplied to it to get it loadable before erroring out.
 
 ### Common Pitfalls and Best Practices
 
@@ -806,9 +903,15 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [1.4.0] - Unreleased
+- ADDED: Serialization down-versioning.
+- ADDED: Increased serialization/versioning test coverage.
+- CHANGED: Serialization classes made immutable.
+- CHANGED: Decoupled serialized frame interception from frame updates.
 - CHANGED: Decoupled construction from serialization.
 - CHANGED: Combined serialization method ID and method version.
 - CHANGED: Made deserialization to unrecognized method IDs illegal.
+- CHANGED: Serialization class field identifiers now include continuation point IDs.
+- CHANGED: Coroutine extends Serializable.
 
 ### [1.3.0] - 2017-11-15
 - ADDED: Serialization and versioning support.

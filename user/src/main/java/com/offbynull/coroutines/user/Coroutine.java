@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,11 +16,13 @@
  */
 package com.offbynull.coroutines.user;
 
+import java.io.Serializable;
+
 /**
  * Interface to identify a coroutine.
  * @author Kasra Faghihi
  */
-public interface Coroutine {
+public interface Coroutine extends Serializable {
     /**
      * Entry point of coroutine.
      * @param continuation used to suspend/yield the coroutine

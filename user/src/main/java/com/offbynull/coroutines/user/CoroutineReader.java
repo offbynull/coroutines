@@ -16,6 +16,11 @@
  */
 package com.offbynull.coroutines.user;
 
+import com.offbynull.coroutines.user.SerializedState.Data;
+import com.offbynull.coroutines.user.SerializedState.Frame;
+import com.offbynull.coroutines.user.SerializedState.FrameInterceptPoint;
+import com.offbynull.coroutines.user.SerializedState.FrameUpdatePoint;
+import com.offbynull.coroutines.user.SerializedState.VersionedFrame;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InvalidClassException;
@@ -28,70 +33,82 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Reads in (deserializes) the state of a {@link CoroutineRunner} object from a byte array.
+ * Reads in (deserializes) the state of a {@link CoroutineRunner} object.
  * @author Kasra Faghihi
  */
 public final class CoroutineReader {
     private final CoroutineDeserializer deserializer;
-    private final Map updateMap;
+    private final Map updatersMap;
+    private final Map interceptersMap;
 
     /**
-     * Construct a {@link CoroutineReader} object with {@link DefaultCoroutineDeserializer}. Equivalent to calling
-     * {@code new CoroutineReader(new DefaultCoroutineSerializer())}.
+     * Construct a {@link CoroutineReader} object. Equivalent to calling
+     * {@code new CoroutineReader(new DefaultCoroutineDeserializer(), new FrameUpdatePoint[0], new FrameInterceptPoint[0])}.
      */
     public CoroutineReader() {
-        this(new DefaultCoroutineDeserializer());
+        this(new DefaultCoroutineDeserializer(), new FrameUpdatePoint[0], new FrameInterceptPoint[0]);
     }
 
     /**
-     * Constructs a {@link CoroutineReader} object with a custom coroutine deserializer. Equivalent to calling
-     * {@code new CoroutineReader(deserializer, new ContinuationPointUpdater[0])}.
-     * @param deserializer deserializer to write out the coroutine state
+     * Constructs a {@link CoroutineReader}. Equivalent to calling
+     * {@code new CoroutineReader(new DefaultCoroutineDeserializer(), frameUpdatePoints, new FrameInterceptPoint[0])}.
+     * @param frameUpdatePoints frame update points
+     * @throws IllegalArgumentException if {@code frameUpdatePoints} contains more than one entry for the same identifier
+     * (className/oldMethodId/newMethodId/continuationPoint)
      * @throws NullPointerException if any argument is {@code null}
      */
-    public CoroutineReader(CoroutineDeserializer deserializer) {
-        this(deserializer, new ContinuationPointUpdater[0]);
+    public CoroutineReader(FrameUpdatePoint[] frameUpdatePoints) {
+        this(new DefaultCoroutineDeserializer(), frameUpdatePoints, new FrameInterceptPoint[0]);
+    }
+
+    /**
+     * Constructs a {@link CoroutineReader}. Equivalent to calling
+     * {@code new CoroutineReader(new DefaultCoroutineDeserializer(), new FrameUpdatePoint[0], frameInterceptPoints)}.
+     * @param frameInterceptPoints frame intercept points
+     * @throws IllegalArgumentException if {@code frameInterceptPoints} contains more than one entry for the same identifier
+     * (className/methodId/continuationPoint)
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public CoroutineReader(FrameInterceptPoint[] frameInterceptPoints) {
+        this(new DefaultCoroutineDeserializer(), new FrameUpdatePoint[0], frameInterceptPoints);
+    }
+
+    /**
+     * Constructs a {@link CoroutineReader}. Equivalent to calling
+     * {@code new CoroutineReader(new DefaultCoroutineDeserializer(), frameUpdatePoints, frameInterceptPoints)}.
+     * @param frameUpdatePoints frame update points
+     * @param frameInterceptPoints frame intercept points
+     * @throws IllegalArgumentException if {@code frameUpdatePoints} contains more than one entry for the same identifier
+     * (className/oldMethodId/newMethodId/continuationPoint), or if {@code frameInterceptPoints} contains more than one entry for the same
+     * identifier (className/methodId/continuationPoint)
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public CoroutineReader(FrameUpdatePoint[] frameUpdatePoints, FrameInterceptPoint[] frameInterceptPoints) {
+        this(new DefaultCoroutineDeserializer(), frameUpdatePoints, frameInterceptPoints);
     }
 
     /**
      * Constructs a {@link CoroutineReader} object.
      * @param deserializer deserializer to write out the coroutine state
-     * @param continuationPointUpdaters continuation point updaters
+     * @param frameUpdatePoints frame update points
+     * @param frameInterceptPoints frame intercept points
      * @throws NullPointerException if any argument is {@code null} or contains {@code null}
-     * @throws IllegalArgumentException if {@code continuationPointUpdaters} contains more than one entry for the same identifier
-     * (className/methodId/oldMethodVersion/continuationPoint)
+     * @throws IllegalArgumentException if {@code frameUpdatePoints} contains more than one entry for the same identifier
+     * (className/oldMethodId/newMethodId/continuationPoint), or if {@code frameInterceptPoints} contains more than one entry for the same
+     * identifier (className/methodId/continuationPoint)
      */
-    public CoroutineReader(CoroutineDeserializer deserializer, ContinuationPointUpdater[] continuationPointUpdaters) {
-        if (deserializer == null || continuationPointUpdaters == null) {
+    public CoroutineReader(CoroutineDeserializer deserializer,
+            FrameUpdatePoint[] frameUpdatePoints,
+            FrameInterceptPoint[] frameInterceptPoints) {
+        if (deserializer == null || frameUpdatePoints == null || frameInterceptPoints == null) {
             throw new NullPointerException();
         }
 
         this.deserializer = deserializer;
-        this.updateMap = new HashMap();
+        this.updatersMap = new HashMap();
+        this.interceptersMap = new HashMap();
 
-        for (int i = 0; i < continuationPointUpdaters.length; i++) {
-            ContinuationPointUpdater continuationPointUpdater = continuationPointUpdaters[i];
-            if (continuationPointUpdater == null) {
-                throw new NullPointerException();
-            }
-
-            InternalKey key = new InternalKey(
-                    continuationPointUpdater.className,
-                    continuationPointUpdater.oldMethodId,
-                    continuationPointUpdater.continuationPointId);
-            InternalValue value = new InternalValue(
-                    continuationPointUpdater.newMethodId,
-                    continuationPointUpdater.frameModifier);
-            
-            Object oldKey = updateMap.put(key, value);
-            if (oldKey != null) {
-                throw new IllegalArgumentException("Continuation point for identifier already exists: "
-                        + "className=" + continuationPointUpdater.className + ", "
-                        + "oldMethodId=" + continuationPointUpdater.oldMethodId + ", "
-                        + "newMethodId=" + continuationPointUpdater.newMethodId + ", "
-                        + "continuationPoint=" + continuationPointUpdater.continuationPointId);
-            }
-        }
+        SerializationUtils.populateUpdatesMapAndInterceptsMap(updatersMap, frameUpdatePoints, interceptersMap, frameInterceptPoints);
     }
 
     /**
@@ -103,7 +120,7 @@ public final class CoroutineReader {
      * @return {@code data} deserialized to a {@link CoroutineRunner} object
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if failed to deserialize or deserialized to a state for an unrecognized method (e.g. a method that's
-     * state is being deserialized for was changed but no {@link ContinuationPointUpdater} was provided to this class's constructor to
+     * state is being deserialized for was changed but no {@link FrameUpdatePoint} was provided to this class's constructor to
      * handle the changes)
      */
     public CoroutineRunner read(byte[] data) {
@@ -117,69 +134,58 @@ public final class CoroutineReader {
 
     /**
      * Reconstructs a {@link CoroutineRunner} object from a serializable state.
-     * @param serializedState serialized state to reconstruct
+     * @param state serialized state to reconstruct
      * @return reconstructed {@link CoroutineRunner}
      * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if {@code serializedState} contains a reference / was updated to contain a reference to an
-     * unrecognized method (e.g. a method that's state is being reconstructed for was changed but no {@link ContinuationPointUpdater} was
+     * @throws IllegalArgumentException if {@code state} contains a reference / was updated to contain a reference to an
+     * unrecognized method (e.g. a method that's state is being reconstructed for was changed but no {@link FrameUpdatePoint} was
      * provided to this class's constructor to handle the changes)
      */
-    public CoroutineRunner reconstruct(SerializedState serializedState) {
-        if (serializedState == null) {
+    public CoroutineRunner reconstruct(SerializedState state) {
+        if (state == null) {
             throw new NullPointerException();
         }
 
         try {
-            serializedState.validateState();
+            state.validateState();
         } catch (IllegalStateException ise) {
             throw new IllegalArgumentException(ise);
         }
 
-        Object context = serializedState.getContext();
+        Object context = state.getContext();
 
-        SerializedState.Frame[] serializedFrames = serializedState.getFrames();
+        VersionedFrame[] versionedFrames = state.getFrames();
 
-        Coroutine coroutine = serializedState.getCoroutine();
+        Coroutine coroutine = state.getCoroutine();
         Continuation cn = new Continuation();
         cn.setMode(Continuation.MODE_SAVING);
         cn.setContext(context);
 
-        for (int i = serializedFrames.length - 1; i >= 0; i--) {
-            SerializedState.Frame serializedFrame = serializedFrames[i];
+        for (int i = versionedFrames.length - 1; i >= 0; i--) {
+            VersionedFrame versionedFrame = versionedFrames[i];
+            Frame frame = SerializationUtils.calculateCorrectFrameVersion(null, updatersMap, interceptersMap, versionedFrame);
 
-            String className = serializedFrame.getClassName();
-            int methodId = serializedFrame.getMethodId();
-            int continuationPoint = serializedFrame.getContinuationPointId();
-
-            InternalKey internalKey = new InternalKey(className, methodId, continuationPoint);
-            InternalValue internalValue = (InternalValue) updateMap.get(internalKey);
-            while (internalValue != null) {
-                internalValue.frameModifier.modifyFrame(serializedFrame);
-                methodId = internalValue.newMethodId;
-
-                // This case happens if all we want to do is update values in the frame. If we don't catch and break we'll get into an
-                // infinite loop
-                if (internalKey.methodId == internalValue.newMethodId) {
-                    break;
-                }
-
-                internalKey = new InternalKey(className, methodId, continuationPoint);
-                internalValue = (InternalValue) updateMap.get(internalKey);                
+            // Check that a workable frame actually exists
+            if (frame == null) {
+                throw new IllegalArgumentException("No loaded method or frame updated found for one of the supplied frames");
             }
-
-            // Check that we're deserialzing to for the correct version of the class
             
+            
+            // Construct MethodState
+            String className = frame.getClassName();
+            int methodId = frame.getMethodId();
+            int continuationPoint = frame.getContinuationPointId();
 
             LockState lockState = new LockState();
-            Object[] monitors = serializedFrame.getMonitors();
+            Object[] monitors = frame.getMonitors();
             for (int j = 0; j < monitors.length; j++) {
                 Object monitor = monitors[j];
 
                 lockState.enter(monitor);
             }
 
-            SerializedState.Data variables = serializedFrame.getVariables();
-            SerializedState.Data operands = serializedFrame.getOperands();
+            Data variables = frame.getVariables();
+            Data operands = frame.getOperands();
             Object[] frameData = new Object[10];
             frameData[0] = variables.getInts();
             frameData[1] = variables.getFloats();
@@ -196,16 +202,14 @@ public final class CoroutineReader {
             placeContinuationReferences(operands.getContinuationIndexes(), (Object[]) frameData[9], cn);
             
             MethodState methodState = new MethodState(className, methodId, continuationPoint, frameData, lockState);
-            boolean correctVersion = methodState.isValid(null);
-            if (!correctVersion) {
-                throw new IllegalArgumentException("Method not found for frame state "
-                        + "className: " + className + ", "
-                        + "methodId: " + methodId);
-            }
+
+            
+            
+            // Place it in the new continuation object.
             cn.pushNewMethodState(methodState);
         }
 
-        if (serializedFrames.length > 0) {
+        if (versionedFrames.length > 0) {
             // The coroutine has executed and has saved state
             cn.successExecutionCycle();
             cn.setMode(Continuation.MODE_LOADING);
@@ -221,117 +225,6 @@ public final class CoroutineReader {
         for (int i = 0; i < continuationIndexes.length; i++) {
             int idx = continuationIndexes[i];
             objects[idx] = cn;
-        }
-    }
-
-    /**
-     * Continuation point updater.
-     */
-    public static final class ContinuationPointUpdater {
-
-        private final String className;
-        private final int oldMethodId;
-        private final int newMethodId;
-        private final int continuationPointId;
-        private final FrameModifier frameModifier;
-
-        /**
-         * Constructs a {@link ContinuationPointUpdater} object.
-         * @param className class name for the continuation point
-         * @param oldMethodId old method id for the continuation point (used for identification)
-         * @param newMethodId new method id for the continuation point (used as replacement)
-         * @param continuationPointId continuation point ID
-         * @param frameModifier logic to modify the frame's contents to the new version
-         * @throws NullPointerException if any argument is {@code null}
-         * @throws IllegalArgumentException if {@code continuationPointId < 0}
-         */
-        public ContinuationPointUpdater(String className, int oldMethodId, int newMethodId, int continuationPointId,
-                FrameModifier frameModifier) {
-            if (frameModifier == null) {
-                throw new NullPointerException();
-            }
-            if (continuationPointId < 0) {
-                throw new IllegalArgumentException("Negative continuation point");
-            }
-
-            this.className = className;
-            this.oldMethodId = oldMethodId;
-            this.newMethodId = newMethodId;
-            this.continuationPointId = continuationPointId;
-            this.frameModifier = frameModifier;
-        }
-    }
-
-    /**
-     * Frame modifier.
-     */
-    public interface FrameModifier {
-
-        /**
-         * Called when a frame needs to be modified.
-         * @param frame frame to modify
-         */
-        void modifyFrame(SerializedState.Frame frame);
-    }
-
-    private static final class InternalKey {
-
-        private final String className;
-        private final int methodId;
-        private final int continuationPointId;
-
-        InternalKey(String className, int methodId, int continuationPointId) {
-            if (className == null) {
-                throw new NullPointerException();
-            }
-
-            this.className = className;
-            this.methodId = methodId;
-            this.continuationPointId = continuationPointId;
-        }
-
-        public int hashCode() {
-            int hash = 7;
-            hash = 71 * hash + (this.className != null ? this.className.hashCode() : 0);
-            hash = 71 * hash + this.methodId;
-            hash = 71 * hash + this.continuationPointId;
-            return hash;
-        }
-
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final InternalKey other = (InternalKey) obj;
-            if (this.methodId != other.methodId) {
-                return false;
-            }
-            if (this.continuationPointId != other.continuationPointId) {
-                return false;
-            }
-            if ((this.className == null) ? (other.className != null) : !this.className.equals(other.className)) {
-                return false;
-            }
-            return true;
-        }
-    }
-    
-    private static final class InternalValue {
-        private final int newMethodId;
-        private final FrameModifier frameModifier;
-
-        InternalValue(int newMethodId, FrameModifier frameModifier) {
-            if (frameModifier == null) {
-                throw new NullPointerException();
-            }
-            this.newMethodId = newMethodId;
-            this.frameModifier = frameModifier;
         }
     }
 
@@ -385,11 +278,14 @@ public final class CoroutineReader {
 
                 SerializedState serializedState = (SerializedState) ois.readObject();
 
-                SerializedState.Frame[] frames = serializedState.getFrames();
+                VersionedFrame[] frames = serializedState.getFrames();
                 for (int i = 0; i < frames.length; i++) {
-                    SerializedState.Frame frame = frames[i];
-                    if (frame.getMonitors().length > 0) {
-                        throw new IllegalArgumentException("Monitors not allowed in default serializer");
+                    Frame[] possibleFrames = frames[i].getFrames();
+                    for (int j = 0; j < possibleFrames.length; j++) {
+                        Frame frame = possibleFrames[j];
+                        if (frame.getMonitors().length > 0) {
+                            throw new IllegalArgumentException("Monitors not allowed in default serializer");
+                        }
                     }
                 }
                 

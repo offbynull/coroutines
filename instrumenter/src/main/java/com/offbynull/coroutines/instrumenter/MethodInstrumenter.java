@@ -105,15 +105,17 @@ final class MethodInstrumenter {
             methodNode.instructions.remove(nodeToReplace);
         }
         
-        // Shove in the method version information as a field on the class -- used by serialization feature. 
+        // Shove in the deserialization identification data as a fields on the class -- used by deserialization feature. 
         int methodId = attrs.getSignature().getMethodId();
-        String methodIdFieldName = getIdentifyingFieldName(methodId);
-        FieldNode methodIdField = new FieldNode(
-                INSTRUMENTED_METHODID_FIELD_ACCESS,
-                methodIdFieldName,
-                INSTRUMENTED_METHODID_FIELD_TYPE.getDescriptor(),
-                null,
-                INSTRUMENTED_METHODID_FIELD_VALUE);
-        classNode.fields.add(methodIdField);
+        for (int i = 0; i < continuationPoints.size(); i++) {
+            int continuationPointId = i;
+            FieldNode methodIdField = new FieldNode(
+                    INSTRUMENTED_METHODID_FIELD_ACCESS,
+                    getIdentifyingFieldName(methodId, continuationPointId),
+                    INSTRUMENTED_METHODID_FIELD_TYPE.getDescriptor(),
+                    null,
+                    INSTRUMENTED_METHODID_FIELD_VALUE);
+            classNode.fields.add(methodIdField);
+        }
     }
 }
