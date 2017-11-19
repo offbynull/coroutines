@@ -34,8 +34,8 @@ More information on the topic of coroutines and their advantages can be found on
    * [Serialization Instructions](#serialization-instructions)
    * [Versioning Instructions](#versioning-instructions)
      * [Example: Modifying state in current versions](#modifying-state-in-current-versions)
-     * [Example: Upgrading from old versions](#example-upgrading-from-old-versions)
-     * [Example: Supporting old versions](#example-supporting-old-versions)
+     * [Example: Upgrading from old versions (forward compatability)](#example-upgrading-from-old-versions-forward-compatability)
+     * [Example: Supporting old versions (backward compatability)](#example-supporting-old-versions--backward-compatability)
    * [Common Pitfalls and Best Practices](#common-pitfalls-and-best-practices)
      * [Serialization pitfalls and best practices](#serialization-pitfalls-and-best-practices)
      * [Versioning pitfalls and best practices](#versioning-pitfalls-and-best-practices)
@@ -43,6 +43,8 @@ More information on the topic of coroutines and their advantages can be found on
    * [How much overhead am I adding?](#how-much-overhead-am-i-adding)
    * [What projects make use of Coroutines?](#what-projects-make-use-of-coroutines)
    * [What restrictions are there?](#what-restrictions-are-there)
+     * [Reflection API](#reflection-api)
+     * [Lambdas and INVOKEDYNAMIC](#lambdas-and-invokedynamic)
    * [Can I use this with an IDE?](#can-i-use-this-with-an-ide)
    * [What alternatives are available?](#what-alternatives-are-available)
  * [Change Log](#change-log)
@@ -445,7 +447,6 @@ runner.execute();
 runner.execute();
 runner.execute();
 runner.execute();
-}
 ```
 
 Now, if we execute this deserialized coroutine, we'll get numbers printed to stdout using our new ```SecureRandom```. Here's the output of 3 separate runs (both the serialization and deserialization portion). Note that on each run, the first 4 ```runner.execute()``` calls prior to serialization will always produce the same numbers on each run, while the 6 ```runner.execute()``` after deserializing will produce unique random numbers...
@@ -488,9 +489,9 @@ started
 431304956
 ```
 
-#### Example: Upgrading from old versions
+#### Example: Upgrading from old versions (forward compatability)
 
-If you update one or more of the methods that make up your coroutine, the method ID will change. If you want support to deserializing from the older version, you'll need to supply a ```FramePointUpdater``` to read in the data from the old version and convert it to data expected by the new version.
+If you update a method that's intended to run as part of a coroutine but still want to support deserializing from the old version of that method, you'll need to supply a ```FramePointUpdater``` to convert the older versions the new version.
 
 Imagine we start ```MyCoroutine```, run it a few times, and then serialize it...
 
@@ -566,7 +567,7 @@ We can see that the method ID got updated from ```1191091979``` to ```-571717800
 
 ```java
 // Read it back in, making sure to add an updater to handle changes required
-// for this new version.
+// for this modified version.
 FrameUpdatePoint updater = new FrameUpdatePoint(
         "MyCoroutine",// class name to intercept
         1191091979,   // method ID to intercept
@@ -613,11 +614,11 @@ Output from deserialization onward...
 -1728529858 Iteration 8 and value is divisible by 2: 0
 ```
 
-Keep in mind that you can chain updaters together. For example, if you have a third version of ```MyCoroutine.echo()``` , you can simply add in a new ```FrameUpdatePoint``` to convert the second version to the third version ```CoroutineReader```. If the reader sees the first version, it will automatically convert it to the second version then to the third version.
+Keep in mind that you can chain updaters together. For example, if you have a third version of ```MyCoroutine.echo()``` , you can simply add another ```FrameUpdatePoint``` to ```CoroutineReader``` to convert the second version to the third version. If ```CoroutineReader``` sees the first version, it will automatically convert it to the second version, and then convert that second version to the third version.
 
-#### Example: Supporting old versions
+#### Example: Supporting old versions  (backward compatability)
 
-In many cases, it may not be enough to support deserializing from older versions of your coroutine. You may also need to support downgrading to older versions when you serialize your coroutine, such that both older and newer versions of your coroutine will be able to deserialize it.
+In many cases, it may not be enough to just support deserializing from older versions. You may also need to support downgrading to older versions when you serialize, such that both older and newer versions of your coroutine will be able to deserialize.
 
 In the same way that you're able to chain ```FrameUpdatePoint```s in ```CoroutineReader``` to convert to newer versions, you can chain ```FrameUpdatePoint```s in ```CoroutineWriter``` to convert to older versions. The difference is that ```CoroutineWriter``` will write out each conversion in the update chain, allowing ```CoroutineReader``` to pick out the correct version and load it up.
 
@@ -710,7 +711,7 @@ Special care needs to be taken to avoid common pitfalls with serializing and ver
 Common pitfalls with serialization include...
 
  * Objects shared between coroutines will end up being duplicated on deserialization. This includes objects passed in via the coroutine context as well as Object constants that have been loaded as variables or operands. Depending on what your code does, this may or may not matter.
- * Objects being replaced during deserialization may be referenced in multiple places (e.g. an object being updated on the operand stack may need to be updated in the owning class as well).
+ * Objects being replaced during deserialization may be referenced in multiple places. For example, an object being replaced on the operand stack may be referenced in other coroutines as well, meaning those references likely need to be updated to the replaced object.
  * Objects being retained must all be serializable. Generally speaking, low-level resources (locks, files, sockets, etc..) will not be serializable. 
 
 Your simplest and best option for avoiding these serialization pitfalls is to design your coroutine such that you isolate it from shared/global objects, locks, and IO resources. Other potential strategies include...
@@ -903,7 +904,7 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [1.4.0] - Unreleased
-- ADDED: Serialization down-versioning.
+- ADDED: Serialization backwards compatibility.
 - ADDED: Increased serialization/versioning test coverage.
 - CHANGED: Serialization classes made immutable.
 - CHANGED: Decoupled serialized frame interception from frame updates.
