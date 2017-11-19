@@ -50,7 +50,7 @@ public class CoroutinesAgentTest {
     @Test
     public void mustInstrumentClassesWithParams() throws Exception {
         Instrumentation inst = mock(Instrumentation.class);
-        String agentArgs = "STDOUT,true";
+        String agentArgs = "markerType=STDOUT,debugMode=true";
         
         CoroutinesAgent.premain(agentArgs, inst);
         
@@ -73,7 +73,7 @@ public class CoroutinesAgentTest {
     @Test
     public void mustFailIfDebugTypeIncorrect() throws Exception {
         Instrumentation inst = mock(Instrumentation.class);
-        String agentArgs = "NONE,ffffffffffff";
+        String agentArgs = "markerType=NONE,debugType=ffffffffffff";
         
         expectedException.expect(IllegalArgumentException.class);
         CoroutinesAgent.premain(agentArgs, inst);
@@ -82,25 +82,25 @@ public class CoroutinesAgentTest {
     @Test
     public void mustFailIfMarkerTypeIncorrect() throws Exception {
         Instrumentation inst = mock(Instrumentation.class);
-        String agentArgs = "fffffffffff,false";
+        String agentArgs = "markerType=fffffffffff,debugMode=false";
         
         expectedException.expect(IllegalArgumentException.class);
         CoroutinesAgent.premain(agentArgs, inst);
     }
 
     @Test
-    public void mustFailIfMoreThan2Args() throws Exception {
+    public void mustFailIfNoEqualsInArg() throws Exception {
         Instrumentation inst = mock(Instrumentation.class);
-        String agentArgs = "NONE,false,ffff";
+        String agentArgs = "NONE,debugMode=false";
         
         expectedException.expect(IllegalArgumentException.class);
         CoroutinesAgent.premain(agentArgs, inst);
     }
 
     @Test
-    public void mustFailIfLessThan2Args() throws Exception {
+    public void mustFailIfUnknownArg() throws Exception {
         Instrumentation inst = mock(Instrumentation.class);
-        String agentArgs = "NONE";
+        String agentArgs = "pewpewpew=false";
         
         expectedException.expect(IllegalArgumentException.class);
         CoroutinesAgent.premain(agentArgs, inst);

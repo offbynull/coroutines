@@ -53,25 +53,37 @@ public final class CoroutinesAgent {
         boolean debugMode = false;
         if (agentArgs != null && !agentArgs.isEmpty()) {
             String[] splitArgs = agentArgs.split(",");
-            if (splitArgs.length != 2) {
-                throw new IllegalArgumentException("Expected argument format is: markerType,debugMode");
+            for (String splitArg : splitArgs) {
+                String[] keyVal = splitArg.split("=", 2);
+                if (keyVal.length != 2) {
+                    throw new IllegalArgumentException("Unrecognized arg passed to Coroutines Java agent: " + splitArg);
+                }
+                
+                String key = keyVal[0];
+                String val = keyVal[1];
+
+                switch (key) {
+                    case "markerType":
+                        try {
+                            markerType = MarkerType.valueOf(val);
+                        } catch (IllegalArgumentException iae) {
+                            throw new IllegalArgumentException("Unable to parse marker type -- must be one of the following: "
+                                    + Arrays.toString(MarkerType.values()), iae);
+                        }
+                        break;
+                    case "debugMode":
+                        if (val.equalsIgnoreCase("true")) {
+                            debugMode = true;
+                        } else if (val.equalsIgnoreCase("false")) {
+                            debugMode = false;
+                        } else {
+                            throw new IllegalArgumentException("Unable to parse debug mode -- must be true or false");
+                        }
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Unrecognized arg passed to Coroutines Java agent: " + keyVal);
+                }
             }
-            
-            try {
-                markerType = MarkerType.valueOf(splitArgs[0]);
-            } catch (IllegalArgumentException iae) {
-                throw new IllegalArgumentException("Unable to parse marker type -- must be one of the following: "
-                        + Arrays.toString(MarkerType.values()), iae);
-            }
-            
-            if (splitArgs[1].equalsIgnoreCase("true")) {
-                debugMode = true;
-            } else if (splitArgs[1].equalsIgnoreCase("false")) {
-                debugMode = false;
-            } else {
-                throw new IllegalArgumentException("Unable to parse debug mode -- must be true or false");
-            }
-            
         }
         
         inst.addTransformer(new CoroutinesClassFileTransformer(markerType, debugMode));

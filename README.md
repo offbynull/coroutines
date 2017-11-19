@@ -39,6 +39,9 @@ More information on the topic of coroutines and their advantages can be found on
    * [Common Pitfalls and Best Practices](#common-pitfalls-and-best-practices)
      * [Serialization pitfalls and best practices](#serialization-pitfalls-and-best-practices)
      * [Versioning pitfalls and best practices](#versioning-pitfalls-and-best-practices)
+ * [Configuration Guide](#configuration-guide)
+   * [Debug Mode](#debug-mode)
+   * [Marker Type](#marker-type)
  * [FAQ](#faq)
    * [How much overhead am I adding?](#how-much-overhead-am-i-adding)
    * [What projects make use of Coroutines?](#what-projects-make-use-of-coroutines)
@@ -170,7 +173,7 @@ java -javaagent:java-agent-1.4.0-shaded.jar myapp.jar
 # Set the debug mode to true if you'll be stepping through your coroutines in
 # an IDE. You can enable debug mode via Java Agent arguments
 #
-# -javaagent:java-agent-1.4.0-shaded.jar=NONE,true
+# -javaagent:java-agent-1.4.0-shaded.jar=debugMode=true
 #
 # By default, debug mode is false. 
 ```
@@ -727,6 +730,33 @@ Common pitfalls with versioning include...
  * Using different compilers (e.g. Oracle Java vs Eclipse Java Compiler) or using different versions of the same compiler (Oracle JDK 1.7 vs Oracle JDK 1.8) on the same code may produce different method IDs -- the ID in the ```.coroutinesinfo``` file may change even though you didn't modify your code. The bytecode generated between different compilers and compiler versions is mostly the same but also slightly different. These slight differences are what make the version change. To reduce headaches, follow the best practice of sticking to the same compiler vendor and version between your builds.
  * If the constants used by a method are changed, the method ID may not change. The problem is that if the constant is loaded as a getstatic instruction instead of a ldc instruction, the value of the constant won't be factored into the method ID. Future versions of the instrumenter may do multiple passes to properly mix in constants into the method ID.
 
+## Configuration Guide
+
+You can configure instrumentation by supplying key/value arguments to the instrumenter. Arguments are passed in differently depending on how you're performing instrumentation. If you're using...
+
+ * Maven, provide configurations as XML tags inside the ```<configuration>``` tag ([Example](#maven-instructions))
+ * Ant, provide configurations as XML attributes on the ```<InstrumentationTask>``` tag ([Example](#ant-instructions))
+ * Gradle, provide configurations inside the ```coroutines``` block ([Example](#gradle-instructions))
+ * Java Agent, provide configurations by appending ```=KEY1=VAL1,KEY2=VAL2,...``` to the ```-javaagent``` argument ([Example](#java-agent-instructions))
+
+The following subsections provide information on the various configuration options.
+
+### Debug Mode
+
+Debug mode adds extra instrumentation logic such that you can always view the state of the methods that make up your coroutine when tracing via a debugger (e.g. the debugger in Netbeans/Eclipse/IntelliJ). By default, the instrumenter tries to keep things efficient by loading only as much as is needed for your coroutines to continue properly executing.
+
+ * Name: ```debugMode```.
+ * Value: { ```true``` | ```false``` }.
+ * Default: ```false```.
+
+### Marker Type
+
+Marker type adds extra logic to track and output what the instrumenter added to your methods. This provides core information for debugging problems with the instrumenter -- it provides little to no value for you as a user.
+
+ * Name: ```markerType```.
+ * Value: { ```NONE``` | ```CONST``` | ```STDOUT``` }.
+ * Default: ```NONE```.
+
 ## FAQ
 
 #### How much overhead am I adding?
@@ -913,6 +943,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - CHANGED: Made deserialization to unrecognized method IDs illegal.
 - CHANGED: Serialization class field identifiers now include continuation point IDs.
 - CHANGED: Coroutine extends Serializable.
+- CHANGED: Changed format of Java Agent config arguments.
 
 ### [1.3.0] - 2017-11-15
 - ADDED: Serialization and versioning support.
