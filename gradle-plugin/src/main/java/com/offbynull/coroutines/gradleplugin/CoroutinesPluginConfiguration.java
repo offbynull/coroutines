@@ -27,6 +27,7 @@ public final class CoroutinesPluginConfiguration {
     private String jdkLibsDirectory;
     private String markerType;
     private boolean debugMode;
+    private boolean autoSerializable;
 
     /**
      * Constructs a {@link CoroutinesPluginConfiguration} object.
@@ -35,6 +36,7 @@ public final class CoroutinesPluginConfiguration {
         jdkLibsDirectory = System.getProperty("java.home") + "/lib";
         markerType = "NONE";
         debugMode = false;
+        autoSerializable = true;
     }
 
     /**
@@ -93,6 +95,22 @@ public final class CoroutinesPluginConfiguration {
      */
     public void setDebugMode(boolean debugMode) {
         this.debugMode = debugMode;
+    }
+
+    /**
+     * Get auto-serializable.
+     * @return auto-serializable
+     */
+    public boolean isAutoSerializable() {
+        return autoSerializable;
+    }
+
+    /**
+     * Set auto-serializable.
+     * @param autoSerializable auto-serializable
+     */
+    public void setAutoSerializable(boolean autoSerializable) {
+        this.autoSerializable = autoSerializable;
     }
     
 }

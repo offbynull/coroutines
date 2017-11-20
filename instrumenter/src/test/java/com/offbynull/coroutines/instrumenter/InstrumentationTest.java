@@ -113,69 +113,69 @@ public final class InstrumentationTest {
 
     @Test
     public void mustProperlySuspendWithVirtualMethods() throws Exception {
-        performCountTest(NORMAL_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(NORMAL_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
     
     @Test
     public void mustProperlySuspendWithStaticMethods() throws Exception {
-        performCountTest(STATIC_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(STATIC_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithInterfaceMethods() throws Exception {
-        performCountTest(INTERFACE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(INTERFACE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithRecursiveMethods() throws Exception {
-        performCountTest(RECURSIVE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(RECURSIVE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithInheritedMethods() throws Exception {
-        performCountTest(INHERITANCE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(INHERITANCE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithMethodsThatReturnValues() throws Exception {
-        performCountTest(RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithMethodsThatOperateOnLongs() throws Exception {
-        performCountTest(LONG_RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(LONG_RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithMethodsThatOperateOnDoubles() throws Exception {
-        performDoubleCountTest(DOUBLE_RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performDoubleCountTest(DOUBLE_RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithNullTypeInLocalVariableTable() throws Exception {
-        performCountTest(NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
     
     @Test
     public void mustProperlySuspendWithBasicTypesInLocalVariableTableAndOperandStack() throws Exception {
-        performCountTest(BASIC_TYPE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(BASIC_TYPE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustGracefullyIgnoreWhenContinuationPointDoesNotInvokeOtherContinuationPoints() throws Exception {
-        performCountTest(EMPTY_CONTINUATION_POINT_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(EMPTY_CONTINUATION_POINT_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     // Mix of many tests in to a single coroutine
     @Test
     public void mustProperlySuspendInNonTrivialCoroutine() throws Exception {
-        performCountTest(COMPLEX_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(COMPLEX_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
 
     @Test
     public void mustProperlySuspendInNonTrivialCoroutineWhenDebugModeSet() throws Exception {
-        performCountTest(COMPLEX_TEST, new InstrumentationSettings(MarkerType.CONSTANT, true));
+        performCountTest(COMPLEX_TEST, new InstrumentationSettings(MarkerType.CONSTANT, true, true));
     }
     
     @Test
@@ -247,7 +247,7 @@ public final class InstrumentationTest {
         thrown.expect(IllegalArgumentException.class);
         thrown.expectMessage("INVOKEDYNAMIC instructions are not allowed");
         
-        performCountTest(LAMBDA_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(LAMBDA_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
@@ -255,7 +255,7 @@ public final class InstrumentationTest {
         thrown.expect(RuntimeException.class);
         thrown.expectMessage("Exception thrown during execution");
         
-        performCountTest(EXCEPTION_THROW_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performCountTest(EXCEPTION_THROW_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
@@ -401,7 +401,7 @@ public final class InstrumentationTest {
         classpath.addAll(classpath);
         
         Instrumenter instrumenter = new Instrumenter(classpath);
-        InstrumentationSettings settings = new InstrumentationSettings(MarkerType.NONE, true);
+        InstrumentationSettings settings = new InstrumentationSettings(MarkerType.NONE, true, true);
         
         byte[] classInstrumented1stPass = instrumenter.instrument(classContent, settings).getInstrumentedClass();
         byte[] classInstrumented2stPass = instrumenter.instrument(classInstrumented1stPass, settings).getInstrumentedClass();
@@ -413,7 +413,7 @@ public final class InstrumentationTest {
     public void mustProperlySuspendInTryCatchFinally() throws Exception {
         StringBuilder builder = new StringBuilder();
 
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(EXCEPTION_SUSPEND_TEST + ".zip", new InstrumentationSettings(MarkerType.STDOUT, false))) {
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(EXCEPTION_SUSPEND_TEST + ".zip", new InstrumentationSettings(MarkerType.STDOUT, false, true))) {
             Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(EXCEPTION_SUSPEND_TEST);
             Coroutine coroutine = invokeConstructor(cls, builder);
 

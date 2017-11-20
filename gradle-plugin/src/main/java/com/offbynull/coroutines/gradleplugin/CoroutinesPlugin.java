@@ -139,7 +139,8 @@ public class CoroutinesPlugin implements Plugin<Project> {
             log.debug("Creating instrumenter...");
             MarkerType markerType = MarkerType.valueOf(config.getMarkerType());
             boolean debugMode = config.isDebugMode();
-            InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode);
+            boolean autoSerializable = config.isAutoSerializable();
+            InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode, autoSerializable);
             Instrumenter instrumenter = new Instrumenter(classpath);
 
             // This logs to info by default, but info won't show up unless you pass -i to gradle. If you want logs to show up by default,

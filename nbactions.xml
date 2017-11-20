@@ -45,7 +45,7 @@
             <goals>
                 <goal>clean</goal>
                 <goal>install</goal>
-                <goal>javadoc</goal>
+                <goal>javadoc:javadoc</goal>
             </goals>
         </action>
     </actions>

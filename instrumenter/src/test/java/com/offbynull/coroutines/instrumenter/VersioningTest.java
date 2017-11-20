@@ -17,7 +17,6 @@
 package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators;
-import com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.ClassSerializabler;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.loadClassesInZipResourceAndInstrument;
 import com.offbynull.coroutines.user.Coroutine;
 import com.offbynull.coroutines.user.CoroutineReader;
@@ -325,8 +324,8 @@ public final class VersioningTest {
     // need to do this being ObjectInputStream uses the system classloader by default, not the thread's classloader. CoroutineReader has
     // been modified to use the thread's classloader if the system's classloader fails.
     private void runWrapped(String name, WrappedTest test) throws Exception {
-        InstrumentationSettings settings = new InstrumentationSettings(DebugGenerators.MarkerType.NONE, false);
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(name + ".zip", settings, new ClassSerializabler())) {
+        InstrumentationSettings settings = new InstrumentationSettings(DebugGenerators.MarkerType.NONE, false, true);
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(name + ".zip", settings)) {
             ArrayBlockingQueue<Throwable> threadResult = new ArrayBlockingQueue<>(1);
             Thread thread = new Thread(() -> {
                 try {

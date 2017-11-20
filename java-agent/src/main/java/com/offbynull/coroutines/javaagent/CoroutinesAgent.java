@@ -42,8 +42,8 @@ public final class CoroutinesAgent {
      * @param agentArgs args passed in to agent
      * @param inst instrumentation for agent
      * @throws NullPointerException if {@code inst} is {@code null}
-     * @throws IllegalArgumentException if {@code agentArgs} is present but not in the format {@code markerType,debugMode}, or if the passed
-     * in arguments were not parseable (debugMode must be a boolean and markerType must be a member of {@link MarkerType})
+     * @throws IllegalArgumentException if {@code agentArgs} is present but not in the expected format, or if the passed in arguments were
+     * not parseable
      */
     public static void premain(String agentArgs, Instrumentation inst) {
         // How do agent args work? http://stackoverflow.com/questions/23287228/how-do-i-pass-arguments-to-a-java-instrumentation-agent
@@ -51,6 +51,7 @@ public final class CoroutinesAgent {
         
         MarkerType markerType = MarkerType.NONE;
         boolean debugMode = false;
+        boolean autoSerializable = true;
         if (agentArgs != null && !agentArgs.isEmpty()) {
             String[] splitArgs = agentArgs.split(",");
             for (String splitArg : splitArgs) {
@@ -80,26 +81,37 @@ public final class CoroutinesAgent {
                             throw new IllegalArgumentException("Unable to parse debug mode -- must be true or false");
                         }
                         break;
+                    case "autoSerializable":
+                        if (val.equalsIgnoreCase("true")) {
+                            autoSerializable = true;
+                        } else if (val.equalsIgnoreCase("false")) {
+                            autoSerializable = false;
+                        } else {
+                            throw new IllegalArgumentException("Unable to parse debug mode -- must be true or false");
+                        }
+                        break;                        
                     default:
                         throw new IllegalArgumentException("Unrecognized arg passed to Coroutines Java agent: " + keyVal);
                 }
             }
         }
         
-        inst.addTransformer(new CoroutinesClassFileTransformer(markerType, debugMode));
+        inst.addTransformer(new CoroutinesClassFileTransformer(markerType, debugMode, autoSerializable));
     }
     
     private static final class CoroutinesClassFileTransformer implements ClassFileTransformer {
         private final MarkerType markerType;
         private final boolean debugMode;
+        private final boolean autoSerializable;
 
-        CoroutinesClassFileTransformer(MarkerType markerType, boolean debugMode) {
+        CoroutinesClassFileTransformer(MarkerType markerType, boolean debugMode, boolean autoSerializable) {
             if (markerType == null) {
                 throw new NullPointerException();
             }
 
             this.markerType = markerType;
             this.debugMode = debugMode;
+            this.autoSerializable = autoSerializable;
         }
 
         @Override
@@ -124,7 +136,7 @@ public final class CoroutinesAgent {
 //            System.out.println(className + " " + (loader == null));
             
             try {
-                InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode);
+                InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode, autoSerializable);
                 Instrumenter instrumenter = new Instrumenter(new ClassResourceClassInformationRepository(loader));
                 InstrumentationResult result = instrumenter.instrument(classfileBuffer, settings);
                 return result.getInstrumentedClass();

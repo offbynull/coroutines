@@ -47,6 +47,9 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
     
     @Parameter(property = "coroutines.debugMode", defaultValue = "false")
     private boolean debugMode;
+    
+    @Parameter(property = "coroutines.autoSerializable", defaultValue = "true")
+    private boolean autoSerializable;
 
     /**
      * Instruments all classes in a path recursively.
@@ -59,7 +62,7 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
             throws MojoExecutionException {
         try {
             Instrumenter instrumenter = getInstrumenter(log, classpath);
-            InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode);
+            InstrumentationSettings settings = new InstrumentationSettings(markerType, debugMode, autoSerializable);
 
             PluginHelper.instrument(instrumenter, settings, path, path, log::info);
         } catch (Exception ex) {
@@ -103,22 +106,6 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
      */
     protected final MavenProject getProject() {
         return project;
-    }
-
-    /**
-     * Get the marker type.
-     * @return marker type
-     */
-    protected final MarkerType getMarkerType() {
-        return markerType;
-    }
-
-    /**
-     * Get debug mode.
-     * @return debug mode
-     */
-    protected final boolean isDebugMode() {
-        return debugMode;
     }
 
 }

@@ -41,6 +41,7 @@ More information on the topic of coroutines and their advantages can be found on
      * [Versioning pitfalls and best practices](#versioning-pitfalls-and-best-practices)
  * [Configuration Guide](#configuration-guide)
    * [Debug Mode](#debug-mode)
+   * [Auto Serializable](#auto-serializable)
    * [Marker Type](#marker-type)
  * [FAQ](#faq)
    * [How much overhead am I adding?](#how-much-overhead-am-i-adding)
@@ -303,8 +304,7 @@ import com.offbynull.coroutines.user.Coroutine;
 import java.io.Serializable;
 import java.util.Random;
 
-public final class MyCoroutine implements Coroutine, Serializable {
-    private static final long serialVersionUID = 1L; // required if using default serializer
+public final class MyCoroutine implements Coroutine {
 
     @Override
     public void run(Continuation c) {
@@ -749,6 +749,16 @@ Debug mode adds extra instrumentation logic such that you can always view the st
  * Value: { ```true``` | ```false``` }.
  * Default: ```false```.
 
+### Auto Serializable
+
+Auto-serializable will automatically force the owning classes of instrumented methods to implement ```java.io.Serializable``` (if it doesn't already do so) and default ```serialVersionUID``` to ```0L``` (if it isn't already set). This is required by the default serializer/deserializer because it uses Java's internal serialization mechanism to write out and read in your coroutines. Without ```java.io.Serializable```, you'll get a ```java.io.NotSerializableException``` when serializing your coroutine. Without a hardcoded ```serialVersionUID```, any change to the owning class will cause deserialization of previous versions to fail. 
+
+This is provided as a convenience for the user. It does nothing to ensure that the variables, operands, or object state of the class being serialized is serializable. You can turn this feature off if you aren't using serialization, you're using a custom serializer, or you're supplying ```java.io.Serializable``` and ```serialVersionUID``` manually.
+
+ * Name: ```autoSerializable```.
+ * Value: { ```true``` | ```false``` }.
+ * Default: ```true```.
+
 ### Marker Type
 
 Marker type adds extra logic to track and output what the instrumenter added to your methods. This provides core information for debugging problems with the instrumenter -- it provides little to no value for you as a user.
@@ -928,13 +938,12 @@ Alternatives to the Coroutines project include:
 If you know of any other projects please let me know and I'll update this section.
 
 ## Change Log
-<sub>Template adapted from http://keepachangelog.com/</sub>
-
-All notable changes to this project will be documented in this file.
-This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### [1.4.0] - Unreleased
+- CHANGED: Refactored to multi-pass instrumentation architecture.
+- CHANGED: Serialization support now separate instrumentation passes.
 - ADDED: Serialization backwards compatibility.
+- ADDED: Instrumentation pass to force Coroutine classes to implement Serializable.
 - ADDED: Increased serialization/versioning test coverage.
 - CHANGED: Serialization classes made immutable.
 - CHANGED: Decoupled serialized frame interception from frame updates.

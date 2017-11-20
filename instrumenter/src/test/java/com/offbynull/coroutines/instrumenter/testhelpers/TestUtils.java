@@ -73,7 +73,7 @@ public final class TestUtils {
      * @throws IOException if an IO error occurs
      */
     public static URLClassLoader loadClassesInZipResourceAndInstrument(String path) throws IOException {
-        return loadClassesInZipResourceAndInstrument(path, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        return loadClassesInZipResourceAndInstrument(path, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
     
     /**

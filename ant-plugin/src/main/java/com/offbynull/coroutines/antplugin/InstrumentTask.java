@@ -54,6 +54,8 @@ public final class InstrumentTask extends Task {
     
     private boolean debugMode = false;
 
+    private boolean autoSerializable = true;
+
     private String classpath;
 
     private File sourceDirectory;
@@ -87,6 +89,14 @@ public final class InstrumentTask extends Task {
      */
     public void setDebugMode(boolean debugMode) {
         this.debugMode = debugMode;
+    }
+
+    /**
+     * Sets the auto-serializable flag. Defaults to {@code true}.
+     * @param autoSerializable auto-serializable
+     */
+    public void setAutoSerializable(boolean autoSerializable) {
+        this.autoSerializable = autoSerializable;
     }
 
     /**
@@ -180,7 +190,7 @@ public final class InstrumentTask extends Task {
             log("Creating instrumenter...", Project.MSG_DEBUG);
             MarkerType markerTypeEnum = MarkerType.valueOf(markerType);
             instrumenter = new Instrumenter(combinedClasspath);
-            InstrumentationSettings settings = new InstrumentationSettings(markerTypeEnum, debugMode);
+            InstrumentationSettings settings = new InstrumentationSettings(markerTypeEnum, debugMode, autoSerializable);
             
             log("Processing " + sourceDirectory.getAbsolutePath() + " ... ", Project.MSG_DEBUG);
             PluginHelper.instrument(instrumenter, settings, sourceDirectory, targetDirectory, this::log);

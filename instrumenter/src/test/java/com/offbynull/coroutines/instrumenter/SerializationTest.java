@@ -52,64 +52,64 @@ public final class SerializationTest {
 
     @Test
     public void mustProperlySuspendWithVirtualMethods() throws Exception {
-        performIntCountTest(NORMAL_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performIntCountTest(NORMAL_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
     
     @Test
     public void mustProperlySuspendWithStaticMethods() throws Exception {
-        performIntCountTest(STATIC_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performIntCountTest(STATIC_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithInterfaceMethods() throws Exception {
-        performIntCountTest(INTERFACE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performIntCountTest(INTERFACE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithRecursiveMethods() throws Exception {
-        performIntCountTest(RECURSIVE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performIntCountTest(RECURSIVE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithInheritedMethods() throws Exception {
-        performIntCountTest(INHERITANCE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performIntCountTest(INHERITANCE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithMethodsThatReturnValues() throws Exception {
-        performIntCountTest(RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performIntCountTest(RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithMethodsThatOperateOnLongs() throws Exception {
-        performIntCountTest(LONG_RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performIntCountTest(LONG_RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithMethodsThatOperateOnDoubles() throws Exception {
-        performDoubleCountTest(DOUBLE_RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performDoubleCountTest(DOUBLE_RETURN_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustProperlySuspendWithNullTypeInLocalVariableTable() throws Exception {
-        performIntCountTest(NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performIntCountTest(NULL_TYPE_IN_LOCAL_VARIABLE_TABLE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
     
     @Test
     public void mustProperlySuspendWithBasicTypesInLocalVariableTableAndOperandStack() throws Exception {
-        performIntCountTest(BASIC_TYPE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performIntCountTest(BASIC_TYPE_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     @Test
     public void mustGracefullyIgnoreWhenContinuationPointDoesNotInvokeOtherContinuationPoints() throws Exception {
-        performIntCountTest(EMPTY_CONTINUATION_POINT_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false));
+        performIntCountTest(EMPTY_CONTINUATION_POINT_INVOKE_TEST, new InstrumentationSettings(MarkerType.CONSTANT, false, true));
     }
 
     private void performIntCountTest(String testClass, InstrumentationSettings settings) throws Exception {
         // This test is being wrapped in a new thread where the thread's context classlaoder is being set to the classloader of the zip
         // we're dynamically loading. We need to do this being ObjectInputStream uses the system classloader by default, not the thread's
         // classloader. CoroutineReader has been modified to use the thread's classloader if the system's classloader fails.
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip", settings, new ClassSerializabler())) {
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip", settings)) {
             ArrayBlockingQueue<Throwable> threadResult = new ArrayBlockingQueue<>(1);
             Thread thread = new Thread(() -> {
                 try {
@@ -184,7 +184,7 @@ public final class SerializationTest {
         // This test is being wrapped in a new thread where the thread's context classlaoder is being set to the classloader of the zip
         // we're dynamically loading. We need to do this being ObjectInputStream uses the system classloader by default, not the thread's
         // classloader. CoroutineReader has been modified to use the thread's classloader if the system's classloader fails.
-        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip", settings, new ClassSerializabler())) {
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(testClass + ".zip", settings)) {
             ArrayBlockingQueue<Throwable> threadResult = new ArrayBlockingQueue<>(1);
             Thread thread = new Thread(() -> {
                 try {

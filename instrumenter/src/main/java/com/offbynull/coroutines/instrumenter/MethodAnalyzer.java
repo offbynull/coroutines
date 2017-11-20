@@ -87,7 +87,7 @@ final class MethodAnalyzer {
         ///////////////////////////////////////////////////////////////////////////////////////////
         // CREATE METHOD SIGNATURE
         ///////////////////////////////////////////////////////////////////////////////////////////
-        int methodId = InternalUtils.generateMethodId(classNode.name, methodNode);
+        int methodId = new MethodHasher().generateMethodHash(classNode, methodNode);
         MethodSignature signature = new MethodSignature(methodId, classNode.name, methodNode.name,
                 Type.getMethodType(methodNode.desc));
         

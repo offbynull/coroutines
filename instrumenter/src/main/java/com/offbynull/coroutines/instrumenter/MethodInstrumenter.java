@@ -27,19 +27,10 @@ import org.objectweb.asm.tree.MethodNode;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.enterMonitorAndStore;
 import static com.offbynull.coroutines.instrumenter.SynchronizationGenerators.exitMonitorAndDelete;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
-import static com.offbynull.coroutines.user.MethodState.getIdentifyingFieldName;
 import org.apache.commons.lang3.Validate;
-import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldNode;
 
 final class MethodInstrumenter {
-    
-    // The following consts are used to write out the versions of the methods being instrumented -- this is used by the serialization logic
-    // to determine if the MethodState objects being deserialized are for the methods loaded.
-    private static final int INSTRUMENTED_METHODID_FIELD_ACCESS = Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC;
-    private static final Type INSTRUMENTED_METHODID_FIELD_TYPE = Type.INT_TYPE;
-    private static final Integer INSTRUMENTED_METHODID_FIELD_VALUE = 0;
 
     public void instrument(ClassNode classNode, MethodNode methodNode, MethodAttributes attrs) {
         Validate.notNull(classNode);
@@ -103,19 +94,6 @@ final class MethodInstrumenter {
             
             methodNode.instructions.insertBefore(nodeToReplace, insnsToReplaceWith);
             methodNode.instructions.remove(nodeToReplace);
-        }
-        
-        // Shove in the deserialization identification data as a fields on the class -- used by deserialization feature. 
-        int methodId = attrs.getSignature().getMethodId();
-        for (int i = 0; i < continuationPoints.size(); i++) {
-            int continuationPointId = i;
-            FieldNode methodIdField = new FieldNode(
-                    INSTRUMENTED_METHODID_FIELD_ACCESS,
-                    getIdentifyingFieldName(methodId, continuationPointId),
-                    INSTRUMENTED_METHODID_FIELD_TYPE.getDescriptor(),
-                    null,
-                    INSTRUMENTED_METHODID_FIELD_VALUE);
-            classNode.fields.add(methodIdField);
         }
     }
 }

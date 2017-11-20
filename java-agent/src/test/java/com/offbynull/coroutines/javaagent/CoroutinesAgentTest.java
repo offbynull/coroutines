@@ -50,7 +50,7 @@ public class CoroutinesAgentTest {
     @Test
     public void mustInstrumentClassesWithParams() throws Exception {
         Instrumentation inst = mock(Instrumentation.class);
-        String agentArgs = "markerType=STDOUT,debugMode=true";
+        String agentArgs = "markerType=STDOUT,debugMode=true,autoSerializable=false";
         
         CoroutinesAgent.premain(agentArgs, inst);
         

@@ -16,28 +16,23 @@
  */
 package com.offbynull.coroutines.instrumenter;
 
+import com.offbynull.coroutines.instrumenter.InstrumentationState.ControlFlag;
 import com.offbynull.coroutines.instrumenter.asm.ClassInformationRepository;
 import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepository;
-import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findField;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
-import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithParameter;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
 import com.offbynull.coroutines.instrumenter.asm.SimpleVerifier;
-import com.offbynull.coroutines.user.Continuation;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.Validate;
-import org.apache.commons.lang3.reflect.FieldUtils;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
@@ -47,29 +42,11 @@ import org.objectweb.asm.util.Textifier;
 import org.objectweb.asm.util.TraceMethodVisitor;
 
 /**
- * Instruments methods in Java classes that are intended to be run as coroutines. Tested with Java 1.2 and Java 8, so hopefully thing should
+ * Instruments methods in Java classes that are intended to be run as coroutines. Tested with Java 1.4 and Java 8, so hopefully thing should
  * work with all versions of Java inbetween.
  * @author Kasra Faghihi
  */
 public final class Instrumenter {
-
-    private static final Type CONTINUATION_CLASS_TYPE = Type.getType(Continuation.class);
-    
-    // The following consts are used to determine if the class being instrumented is already instrumented + to make sure that if it is
-    // instrumented that it's instrumented with this version of the instrumenter 
-    private static final int INSTRUMENTED_MARKER_FIELD_ACCESS = Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC;
-    private static final Type INSTRUMENTED_MARKER_FIELD_TYPE = Type.LONG_TYPE;
-    private static final String INSTRUMENTED_MARKER_FIELD_NAME = "__COROUTINES_INSTRUMENTATION_VERSION";
-    private static final Long INSTRUMENTED_MARKER_FIELD_VALUE;
-    static {
-        try {
-            // We update serialVersionUIDs in user package whenever we do anything that makes us incompatible with previous versions, so
-            // this is a good value to use to detect which version of the instrumenter we instrumented with
-            INSTRUMENTED_MARKER_FIELD_VALUE = (Long) FieldUtils.readDeclaredStaticField(Continuation.class, "serialVersionUID", true);
-        } catch (Exception e) {
-            throw new IllegalStateException("Unable to grab int value from " + Continuation.class.getName() + " serialVersionUID", e);
-        }
-    }
 
     private ClassInformationRepository classRepo;
 
@@ -109,62 +86,42 @@ public final class Instrumenter {
         Validate.notNull(input);
         Validate.notNull(settings);
         Validate.isTrue(input.length > 0);
-        
+
+
+
         // Read class as tree model -- because we're using SimpleClassNode, JSR blocks get inlined
         ClassReader cr = new ClassReader(input);
         ClassNode classNode = new SimpleClassNode();
         cr.accept(classNode, 0);
 
-        // Is this class an interface? if so, skip it
-        if ((classNode.access & Opcodes.ACC_INTERFACE) == Opcodes.ACC_INTERFACE) {
-            return new InstrumentationResult(input, null);
+
+
+        // Apply passes.
+        InstrumentationPass[] passes = new InstrumentationPass[] {
+            new IdentifyInstrumentationPass(),          // identify methods for instrumentation
+            new AnalyzeInstrumentationPass(),           // analyze methods for instrumentation
+            new SerializationPreInstrumentationPass(),  // create .coroutinesinfo files for methods to be instrumented
+            new PerformInstrumentationPass(),           // perform instrumentation of methods
+            new SerializationPostInstrumentationPass(), // add fields needed for serializer/deserializer to identify versioning info
+            new AutoSerializableInstrumentationPass()   // make class serializable + give serializationuid
+        };
+        InstrumentationState passState = new InstrumentationState(settings, classRepo);
+
+        for (InstrumentationPass pass : passes) {
+            pass.pass(classNode, passState);
+
+            ControlFlag controlFlag = passState.control();
+            switch (controlFlag) {
+                case CONTINUE_INSTRUMENT:
+                    break;
+                case NO_INSTRUMENT:
+                    return new InstrumentationResult(input); // class should not be instrumented -- return original data.
+                default:
+                    throw new IllegalStateException(); // should never happen
+            }
         }
 
-        // Has this class already been instrumented? if so, skip it
-        FieldNode instrumentedMarkerField = findField(classNode, INSTRUMENTED_MARKER_FIELD_NAME);
-        if (instrumentedMarkerField != null) {
-            if (INSTRUMENTED_MARKER_FIELD_ACCESS != instrumentedMarkerField.access) {
-                throw new IllegalArgumentException("Instrumentation marker found with wrong access: " + instrumentedMarkerField.access);
-            }
-            if (!INSTRUMENTED_MARKER_FIELD_TYPE.getDescriptor().equals(instrumentedMarkerField.desc)) {
-                throw new IllegalArgumentException("Instrumentation marker found with wrong type: " + instrumentedMarkerField.desc);
-            }
-            if (!INSTRUMENTED_MARKER_FIELD_VALUE.equals(instrumentedMarkerField.value)) {
-                throw new IllegalArgumentException("Instrumentation marker found wrong value: " + instrumentedMarkerField.value);
-            }
-            
-            return new InstrumentationResult(input, null);
-        }
-        
-        // Find methods that need to be instrumented. If none are found, skip
-        List<MethodNode> methodNodesToInstrument = findMethodsWithParameter(classNode.methods, CONTINUATION_CLASS_TYPE);
-        if (methodNodesToInstrument.isEmpty()) {
-            return new InstrumentationResult(input, null);
-        }
-        
-        // Add the "Instrumented" marker field to this class so if we ever come back to it, we can skip it
-        instrumentedMarkerField = new FieldNode(
-                INSTRUMENTED_MARKER_FIELD_ACCESS,
-                INSTRUMENTED_MARKER_FIELD_NAME,
-                INSTRUMENTED_MARKER_FIELD_TYPE.getDescriptor(),
-                null,
-                INSTRUMENTED_MARKER_FIELD_VALUE);
-        classNode.fields.add(instrumentedMarkerField);
 
-        // Instrument each method that needs to be instrumented
-        MethodAnalyzer analyzer = new MethodAnalyzer(classRepo);
-        MethodInstrumenter instrumenter = new MethodInstrumenter();
-        MethodDetailer detailer = new MethodDetailer();
-        StringBuilder details = new StringBuilder();
-        for (MethodNode methodNode : methodNodesToInstrument) {
-            MethodAttributes methodAttrs = analyzer.analyze(classNode, methodNode, settings);
-            
-            // If methodProps is null, it means that the analyzer determined that the method doesn't need to be instrumented.
-            if (methodAttrs != null) {
-                detailer.detail(methodNode, methodAttrs, details);
-                instrumenter.instrument(classNode, methodNode, methodAttrs);
-            }
-        }
 
         // Write tree model back out as class -- NOTE: If we get a NegativeArraySizeException on classNode.accept(), it likely means that
         //                                             we're doing bad things with the stack. So, before writing the class out and returning
@@ -174,7 +131,11 @@ public final class Instrumenter {
 
         ClassWriter cw = new SimpleClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, classRepo);
         classNode.accept(cw);
-        return new InstrumentationResult(cw.toByteArray(), details.toString());
+        
+        byte[] classData = cw.toByteArray();
+        Map<String, byte[]> extraFiles = passState.extraFiles();
+
+        return new InstrumentationResult(classData, extraFiles);
     }
 
 

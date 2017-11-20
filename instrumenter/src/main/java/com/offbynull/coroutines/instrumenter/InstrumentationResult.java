@@ -17,6 +17,10 @@
 package com.offbynull.coroutines.instrumenter;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.collections4.map.UnmodifiableMap;
 import org.apache.commons.lang3.Validate;
 
 /**
@@ -25,13 +29,22 @@ import org.apache.commons.lang3.Validate;
  */
 public final class InstrumentationResult {
     private final byte[] instrumentedClass;
-    private final String instrumentationDetails;
+    private final UnmodifiableMap<String, byte[]> extraFiles;
 
-    InstrumentationResult(byte[] instrumentedClass, String instrumentationDetails) {
+    InstrumentationResult(byte[] instrumentedClass) {
+        this(instrumentedClass, Collections.emptyMap());
+    }
+
+    InstrumentationResult(
+            byte[] instrumentedClass,
+            Map<String, byte[]> extraFiles) {
         Validate.notNull(instrumentedClass);
-        // instrumentedInformation can be null
+        Validate.notNull(extraFiles);
+        Validate.noNullElements(extraFiles.keySet());
+        Validate.noNullElements(extraFiles.values());
+
         this.instrumentedClass = Arrays.copyOf(instrumentedClass, instrumentedClass.length);
-        this.instrumentationDetails = instrumentationDetails;
+        this.extraFiles = (UnmodifiableMap<String, byte[]>) UnmodifiableMap.unmodifiableMap(new HashMap<>(extraFiles));
     }
 
     /**
@@ -43,10 +56,10 @@ public final class InstrumentationResult {
     }
 
     /**
-     * Get human-readable instrumented class information.
-     * @return instrumented class information ({@code null} if nothing in the class was instrumented)
+     * Get extra files to include along with the instrumented class.
+     * @return extra files to include along with the instrumented class
      */
-    public String getInstrumentationDetails() {
-        return instrumentationDetails;
+    public UnmodifiableMap<String, byte[]> getExtraFiles() {
+        return extraFiles;
     }
 }

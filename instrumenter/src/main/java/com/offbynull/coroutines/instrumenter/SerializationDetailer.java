@@ -25,7 +25,7 @@ import org.objectweb.asm.tree.LocalVariableNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.analysis.BasicValue;
 
-final class MethodDetailer {
+final class SerializationDetailer {
     
     // MUST BE CALLED PRIOR TO INSTRUMENTATION!!!!
     public void detail(MethodNode methodNode, MethodAttributes attrs, StringBuilder output) {

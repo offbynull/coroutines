@@ -18,14 +18,12 @@ package com.offbynull.coroutines.instrumenter;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
-import static org.apache.commons.io.FilenameUtils.removeExtension;
 import org.apache.commons.lang3.Validate;
 
 /**
@@ -94,6 +92,7 @@ public final class PluginHelper {
         for (Entry<File, File> e : srcDstMapping.entrySet()) {
             File inputFile = e.getKey();
             File outputFile = e.getValue();
+            File outputDir = outputFile.getParentFile();
 
             Validate.notNull(inputFile);
             Validate.notNull(outputFile);
@@ -105,18 +104,22 @@ public final class PluginHelper {
             InstrumentationResult result = instrumenter.instrument(input, settings);
             
             byte[] output = result.getInstrumentedClass();
-            String details = result.getInstrumentationDetails();
+            Map<String, byte[]> extraOutputs = result.getExtraFiles();
             
-            if (input.length == output.length && details == null) { // condition that determines if no instrumentation happened
+            if (input.length == output.length) { // condition that determines if no instrumentation happened
                 continue;
             }
-            
-            logger.accept("Instrumenting " + inputFile.getAbsolutePath() + " (" + input.length + " bytes -> " + output.length + " bytes)");
-            
-            File detailsFile = convertClassFileToDetailFile(outputFile);
 
             FileUtils.writeByteArrayToFile(outputFile, output);
-            FileUtils.writeStringToFile(detailsFile, details, StandardCharsets.UTF_8);
+            for (Entry<String, byte[]> extraOutput : extraOutputs.entrySet()) {
+                File extraFile = new File(outputDir, extraOutput.getKey());
+                byte[] extraData = extraOutput.getValue();
+                FileUtils.writeByteArrayToFile(extraFile, extraData);
+            }
+            
+            logger.accept("Instrumenting " + inputFile.getAbsolutePath()
+                    + " (" + input.length + " bytes -> " + output.length + " bytes)"
+                    + (extraOutputs.isEmpty() ? "" : " with extra files " + extraOutputs.keySet()));
         }
     }
 
@@ -140,14 +143,5 @@ public final class PluginHelper {
             Consumer<String> logger) throws IOException {
         Map<File, File> srcDstMapping = mapPaths(srcDir, dstDir);
         instrument(instrumenter, settings, srcDstMapping, logger);
-    }
-
-    private static File convertClassFileToDetailFile(File dstClsFile) {
-        Validate.notNull(dstClsFile);
-        
-        String extRemoved = removeExtension(dstClsFile.toString());
-        String extChanged = extRemoved + ".coroutinesinfo";
-        
-        return new File(extChanged);
     }
 }
