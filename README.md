@@ -939,7 +939,7 @@ If you know of any other projects please let me know and I'll update this sectio
 
 ## Change Log
 
-### [1.4.0] - Unreleased
+### [1.4.0] - 2017-11-20
 - CHANGED: Refactored to multi-pass instrumentation architecture.
 - CHANGED: Serialization support now separate instrumentation passes.
 - ADDED: Serialization backwards compatibility.
