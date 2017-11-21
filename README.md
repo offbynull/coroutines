@@ -240,12 +240,11 @@ Typical use-cases include...
 
 ### Serialization Instructions
 
-To serialize / deserialize a coroutine, use ```CoroutineWriter``` and ```CoroutineReader```. By default, these classes use Java's built-in object serialization mechanism, which means objects that makes up your coroutine's state (classes of methods called, objects on operand stack, objects on local variable table) must implement ```java.io.Serializable```.
+To serialize / deserialize a coroutine, use ```CoroutineWriter``` and ```CoroutineReader```. By default, these classes use Java's built-in object serialization mechanism, which means objects that makes up your coroutine's state (classes of methods called, objects on operand stack, objects on local variable table) must implement ```java.io.Serializable``` (see the [Auto Serializable](#auto-serializable) configuration option for more information).
 
 Basic example of serialization/deserialization...
 ```java
-// Create your coroutine and make sure that it's serializable
-public final class MyCoroutine implements Coroutine, Serializable {
+public final class MyCoroutine implements Coroutine {
     @Override
     public void run(Continuation c) {
         System.out.println("started");
