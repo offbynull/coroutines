@@ -19,7 +19,7 @@ In addition, Javaflow appears to be largely unmaintained at present.
 More information on the topic of coroutines and their advantages can be found on the following pages:
 
 * [Wikipedia: Coroutine](https://en.wikipedia.org/wiki/Coroutine)
-* [Wikipedia: Green threads](https://en.wikipedia.org/wiki/Greenthreads)
+* [Wikipedia: Fiber (computer science)](https://en.wikipedia.org/wiki/Fiber_(computer_science))
 * [Stackoverflow: Difference between a "coroutine" and a "thread"?](https://stackoverflow.com/a/23436125)
 
 ## Table of Contents
@@ -778,7 +778,7 @@ As of version 1.2.0, the instrumenter generates much more efficient suspend/resu
 
 | Project | Description |
 |---------|-------------|
-| [Peernetic](https://github.com/offbynull/peernetic) | The Coroutines project was originally made for use in (and is heavily used by) the Peernetic project. Peernetic is a Java actor-based P2P computing framework specifically designed to facilitate development and testing of distributed and P2P algorithms. The use of Coroutines makes actor logic easily understandable/readable. See the Javadoc header in [this file](https://github.com/offbynull/peernetic/blob/2143d4b208d1107a933e06868e53811a2c7608c4/core/src/main/java/com/offbynull/peernetic/core/actor/CoroutineActor.java) for an overview of why this is. |
+| [Actors](https://github.com/offbynull/actors) | The Coroutines project was made for Actors (formerly called Peernetic). Actors is a Java actor framework that greatly simplifies the design and development of horizontally scalable software. |
 | [Towards Resilient Java Computational Programs](https://hal.archives-ouvertes.fr/hal-01316493/document) | Towards Resilient Java Computational Programs<br>The 46th Annual IEEE/IFIP International Conference on Dependable Systems and Networks<br>Jun 2016, Toulouse, France<br>Authors: Quyen L. Nguyen, Dr. Arun K. Sood |
 
 If you know of any other projects please let me know and I'll update this section.
