@@ -12,8 +12,8 @@ import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.create
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipResourcesAsClassNodes;
 import java.net.URLClassLoader;
 import org.apache.commons.lang3.reflect.MethodUtils;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -27,7 +27,7 @@ public final class DebugGeneratorsTest {
     private ClassNode classNode;
     private MethodNode methodNode;
     
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         // Load class, get method
         classNode = readZipResourcesAsClassNodes(ZIP_RESOURCE_PATH).get(STUB_FILENAME);

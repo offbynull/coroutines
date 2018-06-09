@@ -1,6 +1,5 @@
 package com.offbynull.coroutines.antplugin;
 
-import com.offbynull.coroutines.antplugin.InstrumentTask;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,15 +12,15 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class InstrumentTaskTest {
     
     private InstrumentTask fixture;
     
-    @Before
+    @BeforeEach
     public void setUp() {
         fixture = new InstrumentTask();
     }
@@ -54,7 +53,7 @@ public class InstrumentTaskTest {
             byte[] outputContent = FileUtils.readFileToByteArray(outputClass);
             
             // test
-            Assert.assertTrue(outputContent.length > inputContent.length);
+            assertTrue(outputContent.length > inputContent.length);
         } finally {
             if (inputDir != null) {
                 FileUtils.deleteDirectory(inputDir);

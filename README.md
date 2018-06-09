@@ -56,7 +56,7 @@ More information on the topic of coroutines and their advantages can be found on
 
 ## Quick-start Guide
 
-The Coroutines project relies on bytecode instrumentation to make your coroutines work. Maven, Ant, and Gradle plugins are provided to instrument your code. In addition to these plugins, a Java Agent is provided to instrument your code at runtime. Although your code can target any version of Java from Java 1.4 to Java 8, the plugins and Java Agent that instrument your code will require Java 8 to run.
+The Coroutines project relies on bytecode instrumentation to make your coroutines work. Maven, Ant, and Gradle plugins are provided to instrument your code. In addition to these plugins, a Java Agent is provided to instrument your code at runtime. Although your code can target any version of Java from Java 1.6 to Java 10, the plugins and Java Agent that instrument your code will require Java 10 to run.
 
 ### Maven Instructions
 
@@ -937,6 +937,12 @@ Alternatives to the Coroutines project include:
 If you know of any other projects please let me know and I'll update this section.
 
 ## Change Log
+
+### [1.5.0] - Unreleased
+- CHANGED: Changed required JDK version from 8 to 10.
+- CHANGED: Changed minimum JRE version from 1.4 to 1.6.
+- CHANGED: Upgraded dependencies and plugins.
+- CHANGED: Unit tests upgraded to Junit 5.
 
 ### [1.4.0] - 2017-11-20
 - CHANGED: Refactored to multi-pass instrumentation architecture.

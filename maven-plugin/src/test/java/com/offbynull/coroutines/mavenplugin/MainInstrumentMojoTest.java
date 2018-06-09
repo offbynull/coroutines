@@ -18,9 +18,9 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.maven.model.Build;
 import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.project.MavenProject;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public final class MainInstrumentMojoTest {
@@ -29,7 +29,7 @@ public final class MainInstrumentMojoTest {
     
     private MainInstrumentMojo fixture;
     
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         fixture = new MainInstrumentMojo();
         
@@ -40,7 +40,6 @@ public final class MainInstrumentMojoTest {
         FieldUtils.writeField(fixture, "markerType", MarkerType.NONE, true);
         FieldUtils.writeField(fixture, "debugMode", false, true);
         FieldUtils.writeField(fixture, "log", log, true);
-        FieldUtils.writeField(fixture, "jdkLibsDirectory", System.getProperty("java.home") + "/lib", true);
     }
 
     @Test
@@ -67,7 +66,7 @@ public final class MainInstrumentMojoTest {
             byte[] modifiedMainClassContent = FileUtils.readFileToByteArray(mainClass);
             
             // test
-            Assert.assertTrue(modifiedMainClassContent.length > classContent.length);
+            assertTrue(modifiedMainClassContent.length > classContent.length);
         } finally {
             if (mainDir != null) {
                 FileUtils.deleteDirectory(mainDir);

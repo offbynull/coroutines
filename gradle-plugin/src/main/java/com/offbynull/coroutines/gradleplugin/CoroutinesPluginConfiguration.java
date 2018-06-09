@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2018, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,7 +24,6 @@ import org.apache.commons.lang3.Validate;
  */
 public final class CoroutinesPluginConfiguration {
 
-    private String jdkLibsDirectory;
     private String markerType;
     private boolean debugMode;
     private boolean autoSerializable;
@@ -33,30 +32,9 @@ public final class CoroutinesPluginConfiguration {
      * Constructs a {@link CoroutinesPluginConfiguration} object.
      */
     public CoroutinesPluginConfiguration() {
-        jdkLibsDirectory = System.getProperty("java.home") + "/lib";
         markerType = "NONE";
         debugMode = false;
         autoSerializable = true;
-    }
-
-    /**
-     * Get JDK library directory.
-     *
-     * @return JDK library directory
-     */
-    public String getJdkLibsDirectory() {
-        return jdkLibsDirectory;
-    }
-
-    /**
-     * Set JDK library directory.
-     *
-     * @param jdkLibsDirectory JDK library directory
-     * @throws NullPointerException if any argument is {@code null}
-     */
-    public void setJdkLibsDirectory(String jdkLibsDirectory) {
-        Validate.notNull(jdkLibsDirectory);
-        this.jdkLibsDirectory = jdkLibsDirectory;
     }
 
     /**

@@ -1,48 +1,32 @@
-/*
- * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
- * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
 package com.offbynull.coroutines.instrumenter.generators;
 
-import com.offbynull.coroutines.instrumenter.asm.VariableTable;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.call;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.construct;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.forEach;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.ifIntegersEqual;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.ifObjectsEqual;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadVar;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadStringConst;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.merge;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.returnValue;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.saveVar;
-import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.tableSwitch;
-import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithName;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.readZipResourcesAsClassNodes;
-import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
 import org.apache.commons.lang3.reflect.MethodUtils;
-import org.junit.Before;
-import org.junit.Test;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static com.offbynull.coroutines.instrumenter.asm.SearchUtils.findMethodsWithName;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable;
+import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.call;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.forEach;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.ifIntegersEqual;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.ifObjectsEqual;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadStringConst;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.loadVar;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.returnValue;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.saveVar;
+import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.tableSwitch;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.throwRuntimeException;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.createJarAndLoad;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.objectweb.asm.Opcodes;
 
 public final class GenericGeneratorsTest {
@@ -54,7 +38,7 @@ public final class GenericGeneratorsTest {
     private ClassNode classNode;
     private MethodNode methodNode;
     
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         // Load class, get method
         classNode = readZipResourcesAsClassNodes(ZIP_RESOURCE_PATH).get(STUB_FILENAME);
@@ -116,21 +100,21 @@ public final class GenericGeneratorsTest {
             
             try {
                 MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, 0, 0);
-                fail();
+                fail("failed");
             } catch (InvocationTargetException ex) {
                 assertEquals("0", ex.getCause().getMessage());
             }
 
             try {
                 MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, 2, 10);
-                fail();
+                fail("failed");
             } catch (InvocationTargetException ex) {
                 assertEquals("innerdefault", ex.getCause().getMessage());
             }
 
             try {
                 MethodUtils.invokeMethod(obj, STUB_METHOD_NAME, 10, 0);
-                fail();
+                fail("failed");
             } catch (InvocationTargetException ex) {
                 assertEquals("default", ex.getCause().getMessage());
             }

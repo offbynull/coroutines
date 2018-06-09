@@ -1,66 +1,67 @@
 package com.offbynull.coroutines.instrumenter.asm;
 
-import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.getClasspath;
-import org.junit.AfterClass;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import com.offbynull.coroutines.instrumenter.testhelpers.TestUtils;
+import java.io.File;
+import static java.util.Arrays.asList;
+import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.AfterAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 public final class FileSystemClassInformationRepositoryTest {
     
+    private static File jarFile;
     private static FileSystemClassInformationRepository repo;
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() throws Exception {
-        repo = FileSystemClassInformationRepository.create(getClasspath());
+        byte[] data = TestUtils.getResource("FakeJVMClasses.jar");
+        
+        jarFile = File.createTempFile(TestUtils.class.getSimpleName(), ".jar");
+        jarFile.deleteOnExit();
+        FileUtils.writeByteArrayToFile(jarFile, data);
+        
+        repo = FileSystemClassInformationRepository.create(asList(jarFile));
     }
     
-    @AfterClass
+    @AfterAll
     public static void afterClass() {
-        repo = null;
+        jarFile.delete();
     }
 
     @Test
     public void mustGetClassInformationForInteger() {
-        ClassInformation info = repo.getInformation("java/lang/Integer");
+        ClassInformation info = repo.getInformation("fake/java/lang/Integer");
         
-        assertEquals("java/lang/Number", info.getSuperClassName());
+        assertEquals("fake/java/lang/Number", info.getSuperClassName());
         assertEquals(1, info.getInterfaces().size());
-        assertTrue(info.getInterfaces().contains("java/lang/Comparable"));
+        assertTrue(info.getInterfaces().contains("fake/java/lang/Comparable"));
         assertFalse(info.isInterface());
     }
     
     @Test
     public void mustGetClassInformationForBoolean() {
-        ClassInformation info = repo.getInformation("java/lang/Boolean");
+        ClassInformation info = repo.getInformation("fake/java/lang/Boolean");
         
         assertEquals("java/lang/Object", info.getSuperClassName());
         assertEquals(2, info.getInterfaces().size());
-        assertTrue(info.getInterfaces().contains("java/lang/Comparable"));
-        assertTrue(info.getInterfaces().contains("java/io/Serializable"));
-        assertFalse(info.isInterface());
-    }
-    
-    @Test
-    public void mustGetClassInformationForObject() {
-        ClassInformation info = repo.getInformation("java/lang/Object");
-        
-        assertNull(info.getSuperClassName());
-        assertTrue(info.getInterfaces().isEmpty());
+        assertTrue(info.getInterfaces().contains("fake/java/lang/Comparable"));
+        assertTrue(info.getInterfaces().contains("fake/java/io/Serializable"));
         assertFalse(info.isInterface());
     }
 
     @Test
     public void mustGetClassInformationForRunnableFuture() {
-        ClassInformation info = repo.getInformation("java/util/concurrent/RunnableFuture");
+        ClassInformation info = repo.getInformation("fake/java/util/concurrent/RunnableFuture");
         
         assertEquals("java/lang/Object", info.getSuperClassName());
         assertEquals(2, info.getInterfaces().size());
-        assertTrue(info.getInterfaces().contains("java/lang/Runnable"));
-        assertTrue(info.getInterfaces().contains("java/util/concurrent/Future"));
+        assertTrue(info.getInterfaces().contains("fake/java/lang/Runnable"));
+        assertTrue(info.getInterfaces().contains("fake/java/util/concurrent/Future"));
         assertTrue(info.isInterface());
     }
 

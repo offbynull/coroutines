@@ -30,9 +30,9 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.List;
 import org.apache.commons.lang3.reflect.MethodUtils;
-import static org.junit.Assert.assertEquals;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -44,7 +44,7 @@ import org.objectweb.asm.tree.MethodNode;
 public final class SearchUtilsTest {
     private ClassNode classNode;
     
-    @Before
+    @BeforeEach
     public void setUp() throws IOException {
         classNode = readZipResourcesAsClassNodes("SearchUtilsStubs.zip").get("SearchUtilsStubs.class");
     }

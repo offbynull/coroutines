@@ -11,18 +11,14 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
-import static org.junit.Assert.assertTrue;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 public class CoroutinesAgentTest {
-    
-    @Rule
-    public ExpectedException expectedException = ExpectedException.none();
 
     @Test
     public void mustInstrumentClasses() throws Exception {
@@ -75,8 +71,9 @@ public class CoroutinesAgentTest {
         Instrumentation inst = mock(Instrumentation.class);
         String agentArgs = "markerType=NONE,debugType=ffffffffffff";
         
-        expectedException.expect(IllegalArgumentException.class);
-        CoroutinesAgent.premain(agentArgs, inst);
+        assertThrows(IllegalArgumentException.class, () -> {
+           CoroutinesAgent.premain(agentArgs, inst); 
+        });
     }
 
     @Test
@@ -84,8 +81,9 @@ public class CoroutinesAgentTest {
         Instrumentation inst = mock(Instrumentation.class);
         String agentArgs = "markerType=fffffffffff,debugMode=false";
         
-        expectedException.expect(IllegalArgumentException.class);
-        CoroutinesAgent.premain(agentArgs, inst);
+        assertThrows(IllegalArgumentException.class, () -> {
+            CoroutinesAgent.premain(agentArgs, inst);
+        });
     }
 
     @Test
@@ -93,8 +91,9 @@ public class CoroutinesAgentTest {
         Instrumentation inst = mock(Instrumentation.class);
         String agentArgs = "NONE,debugMode=false";
         
-        expectedException.expect(IllegalArgumentException.class);
-        CoroutinesAgent.premain(agentArgs, inst);
+        assertThrows(IllegalArgumentException.class, () -> {
+            CoroutinesAgent.premain(agentArgs, inst);
+        });
     }
 
     @Test
@@ -102,8 +101,9 @@ public class CoroutinesAgentTest {
         Instrumentation inst = mock(Instrumentation.class);
         String agentArgs = "pewpewpew=false";
         
-        expectedException.expect(IllegalArgumentException.class);
-        CoroutinesAgent.premain(agentArgs, inst);
+        assertThrows(IllegalArgumentException.class, () -> {
+            CoroutinesAgent.premain(agentArgs, inst);
+        });
     }
     
     private Map<String, byte[]> readZipFromResource(String path) throws IOException {

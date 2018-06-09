@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2018, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,6 @@ import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerTy
 import java.io.File;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.commons.io.FileUtils;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.logging.Log;
@@ -38,9 +37,6 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
 
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
-
-    @Parameter(defaultValue = "${java.home}/lib", required = true)
-    private String jdkLibsDirectory;
     
     @Parameter(property = "coroutines.markerType", defaultValue = "NONE")
     private MarkerType markerType;
@@ -83,8 +79,6 @@ public abstract class AbstractInstrumentMojo extends AbstractMojo {
             log.debug("Getting compile classpath");
             classpathFiles = classpath
                     .stream().map(x -> new File(x)).collect(Collectors.toList());
-            log.debug("Getting bootstrap classpath");
-            classpathFiles.addAll(FileUtils.listFiles(new File(jdkLibsDirectory), new String[]{"jar"}, true));
 
             log.debug("Classpath for instrumentation is as follows: " + classpathFiles);
         } catch (Exception ex) {

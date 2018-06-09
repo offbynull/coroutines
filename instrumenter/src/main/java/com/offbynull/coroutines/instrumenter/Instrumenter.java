@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2018, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,6 +18,8 @@ package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.InstrumentationState.ControlFlag;
 import com.offbynull.coroutines.instrumenter.asm.ClassInformationRepository;
+import com.offbynull.coroutines.instrumenter.asm.ClassResourceClassInformationRepository;
+import com.offbynull.coroutines.instrumenter.asm.CompositeClassInformationRepository;
 import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepository;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
@@ -60,7 +62,10 @@ public final class Instrumenter {
         Validate.notNull(classpath);
         Validate.noNullElements(classpath);
 
-        classRepo = FileSystemClassInformationRepository.create(classpath);
+        classRepo = new CompositeClassInformationRepository(
+                new ClassResourceClassInformationRepository(Instrumenter.class.getClassLoader()), // access to core JRE classes
+                FileSystemClassInformationRepository.create(classpath)                            // access to user classes
+        );
     }
 
     /**

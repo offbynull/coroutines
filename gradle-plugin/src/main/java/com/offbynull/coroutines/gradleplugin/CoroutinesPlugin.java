@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2018, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import static java.util.stream.Collectors.toList;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.jxpath.JXPathContext;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.gradle.api.Plugin;
@@ -127,8 +126,6 @@ public class CoroutinesPlugin implements Plugin<Project> {
             classpath.add(classesDir); // change to destinationDir?
             log.debug("Getting compile classpath");
             classpath.addAll(compileClasspath);
-            log.debug("Getting bootstrap classpath");
-            classpath.addAll(FileUtils.listFiles(new File(config.getJdkLibsDirectory()), new String[]{"jar"}, true));
 
             classpath = classpath.stream()
                     .filter(x -> x.exists())

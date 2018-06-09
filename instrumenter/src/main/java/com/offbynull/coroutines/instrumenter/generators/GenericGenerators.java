@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2018, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,6 +18,7 @@ package com.offbynull.coroutines.instrumenter.generators;
 
 import com.offbynull.coroutines.instrumenter.asm.VariableTable.Variable;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import org.apache.commons.lang3.reflect.MethodUtils;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.IincInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
@@ -458,6 +460,70 @@ public final class GenericGenerators {
 
         return ret;
     }
+    
+    /**
+     * Load a static field on to the stack. If the static field is of a primitive type, that primitive value will be directly loaded on to
+     * the stack (the field won't be referenced). If the static field is an object type, the actual field will be loaded onto the stack.
+     * @param field reflection reference to a static field
+     * @return instructions to grab the object stored in the static field {@code field}
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code field} is not static
+     */
+    public static InsnList loadStaticField(Field field) {
+        Validate.notNull(field);
+        Validate.isTrue((field.getModifiers() & Modifier.STATIC) != 0);
+        
+        String owner = Type.getInternalName(field.getDeclaringClass());
+        String name = field.getName();
+        Type type = Type.getType(field.getType());
+        
+        field.setAccessible(true);
+        
+        InsnList ret = new InsnList();
+        switch (type.getSort()) {
+            case Type.BOOLEAN:
+            case Type.BYTE:
+            case Type.CHAR:
+            case Type.SHORT:
+            case Type.INT:
+                try {
+                    ret.add(new LdcInsnNode(field.getInt(null)));
+                } catch (IllegalAccessException iae) {
+                    throw new IllegalStateException(iae); // should never happen
+                }
+                break;
+            case Type.LONG:
+                try {
+                    ret.add(new LdcInsnNode(field.getLong(null)));
+                } catch (IllegalAccessException iae) {
+                    throw new IllegalStateException(iae); // should never happen
+                }    
+                break;
+            case Type.FLOAT:
+                try {
+                    ret.add(new LdcInsnNode(field.getFloat(null)));
+                } catch (IllegalAccessException iae) {
+                    throw new IllegalStateException(iae); // should never happen
+                }
+                break;
+            case Type.DOUBLE:
+                try {
+                    ret.add(new LdcInsnNode(field.getDouble(null)));
+                } catch (IllegalAccessException iae) {
+                    throw new IllegalStateException(iae); // should never happen
+                }
+                break;
+            case Type.OBJECT:
+            case Type.ARRAY:
+                ret.add(new FieldInsnNode(Opcodes.GETSTATIC, owner, name, type.getDescriptor()));
+                break;
+            default:
+                throw new IllegalStateException(); // should never happen, there is code in Variable/VariableTable to make sure invalid
+                                                   // types aren't set
+        }
+        
+        return ret;
+    }
 
     /**
      * Creates a new object array on the stack.
@@ -594,6 +660,32 @@ public final class GenericGenerators {
         ret.add(new JumpInsnNode(Opcodes.IF_ACMPNE, notEqualLabelNode));
         ret.add(action);
         ret.add(notEqualLabelNode);
+        
+        return ret;
+    }
+    /**
+     * Compares two objects and performs some action if the objects are NOT the same (uses != to check if not same).
+     * @param lhs left hand side instruction list -- must leave an object on the stack
+     * @param rhs right hand side instruction list -- must leave an object on the stack
+     * @param action action to perform if results of {@code lhs} and {@code rhs} are not equal
+     * @return instructions instruction list to perform some action if two objects are not equal
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static InsnList ifObjectsNotEqual(InsnList lhs, InsnList rhs, InsnList action) {
+        Validate.notNull(lhs);
+        Validate.notNull(rhs);
+        Validate.notNull(action);
+        
+        
+        InsnList ret = new InsnList();
+        
+        LabelNode equalLabelNode = new LabelNode();
+        
+        ret.add(lhs);
+        ret.add(rhs);
+        ret.add(new JumpInsnNode(Opcodes.IF_ACMPEQ, equalLabelNode));
+        ret.add(action);
+        ret.add(equalLabelNode);
         
         return ret;
     }

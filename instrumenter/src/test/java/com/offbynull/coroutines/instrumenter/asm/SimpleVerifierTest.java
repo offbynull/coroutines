@@ -1,19 +1,3 @@
-/*
- * Copyright (c) 2016, Kasra Faghihi, All rights reserved.
- * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
 package com.offbynull.coroutines.instrumenter.asm;
 
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.addLabel;
@@ -34,9 +18,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
@@ -51,17 +32,19 @@ import org.objectweb.asm.tree.analysis.Frame;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.returnVoid;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.throwRuntimeException;
 import static com.offbynull.coroutines.instrumenter.generators.GenericGenerators.pop;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class SimpleVerifierTest {
 
-    private FileSystemClassInformationRepository classRepo;
+    private ClassResourceClassInformationRepository classRepo;
     private ClassNode classNode;
     private MethodNode methodNode;
 
-    @Before
+    @BeforeEach
     public void setUp() throws IOException {
-        classRepo = new FileSystemClassInformationRepository();
-        classRepo.addClasspath(TestUtils.getClasspath());
+        classRepo = new ClassResourceClassInformationRepository(TestUtils.class.getClassLoader());
 
         byte[] classData = readZipFromResource("SimpleStub.zip").get("SimpleStub.class");
 
@@ -167,7 +150,7 @@ public class SimpleVerifierTest {
         
         
         // ensure that that the local variable for the collection we created in the switch blocks is an abstract type
-        Assert.assertEquals("java/util/AbstractCollection", basicValue.getType().getInternalName());
+        assertEquals("java/util/AbstractCollection", basicValue.getType().getInternalName());
     }
 
 }

@@ -1,19 +1,3 @@
-/*
- * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
- * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
 package com.offbynull.coroutines.instrumenter;
 
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators;
@@ -27,20 +11,21 @@ import java.net.URLClassLoader;
 import java.util.concurrent.ArrayBlockingQueue;
 import static org.apache.commons.lang3.reflect.ConstructorUtils.invokeConstructor;
 import static org.apache.commons.lang3.reflect.FieldUtils.readField;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import org.junit.Test;
 import static com.offbynull.coroutines.user.SerializedState.FrameModifier.WRITE;
 import static com.offbynull.coroutines.user.SerializedState.FrameModifier.READ;
 import com.offbynull.coroutines.user.SerializedState.FrameUpdatePoint;
-import static org.junit.Assert.fail;
 import static com.offbynull.coroutines.instrumenter.SharedConstants.INTERCEPT_TEST;
 import static com.offbynull.coroutines.instrumenter.SharedConstants.UPDATE_TEST;
 import static com.offbynull.coroutines.instrumenter.SharedConstants.UPDATE_TEST_MODIFIED;
 import static com.offbynull.coroutines.instrumenter.SharedConstants.UPDATE_TEST_ORIGINAL;
 import java.util.Arrays;
 import org.apache.commons.lang3.mutable.MutableObject;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.Test;
 
 public final class VersioningTest {
 
@@ -257,56 +242,64 @@ public final class VersioningTest {
     
     
     
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void mustNotAllowMultipleInterceptsOnSameKeyForRead() throws Exception {
-        FrameInterceptPoint interceptPoint = new FrameInterceptPoint("fakeName", 12345, 0,
-                (frame, mode) -> {
-                    fail();
-                    return null;
-                }
-        );
+        assertThrows(IllegalArgumentException.class, () -> {
+            FrameInterceptPoint interceptPoint = new FrameInterceptPoint("fakeName", 12345, 0,
+                    (frame, mode) -> {
+                        fail();
+                        return null;
+                    }
+            );
 
-        CoroutineReader reader = new CoroutineReader(
-                new FrameInterceptPoint[]{
-                    interceptPoint,
-                    interceptPoint
-                });
+            CoroutineReader reader = new CoroutineReader(
+                    new FrameInterceptPoint[]{
+                        interceptPoint,
+                        interceptPoint
+                    });
+        });
     }
     
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void mustNotAllowMultipleInterceptsOnSameKeyForWrite() throws Exception {
-        FrameInterceptPoint interceptPoint1 = new FrameInterceptPoint("fakeName", 12345, 0, (frame, mode) -> null);
-        FrameInterceptPoint interceptPoint2 = new FrameInterceptPoint("fakeName", 12345, 0, (frame, mode) -> null);
-        
-        CoroutineWriter writer = new CoroutineWriter(
-                new FrameInterceptPoint[]{
-                    interceptPoint1,
-                    interceptPoint2
-                });
+        assertThrows(IllegalArgumentException.class, () -> {
+            FrameInterceptPoint interceptPoint1 = new FrameInterceptPoint("fakeName", 12345, 0, (frame, mode) -> null);
+            FrameInterceptPoint interceptPoint2 = new FrameInterceptPoint("fakeName", 12345, 0, (frame, mode) -> null);
+
+            CoroutineWriter writer = new CoroutineWriter(
+                    new FrameInterceptPoint[]{
+                        interceptPoint1,
+                        interceptPoint2
+                    });
+        });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void mustNotAllowMultipleUpdatersOnSameKeyForRead() throws Exception {
-        FrameInterceptPoint interceptPoint1 = new FrameInterceptPoint("fakeName", 12345, 0, (frame, mode) -> null);
-        FrameInterceptPoint interceptPoint2 = new FrameInterceptPoint("fakeName", 12345, 0, (frame, mode) -> null);
+        assertThrows(IllegalArgumentException.class, () -> {
+            FrameInterceptPoint interceptPoint1 = new FrameInterceptPoint("fakeName", 12345, 0, (frame, mode) -> null);
+            FrameInterceptPoint interceptPoint2 = new FrameInterceptPoint("fakeName", 12345, 0, (frame, mode) -> null);
 
-        CoroutineReader reader = new CoroutineReader(
-                new FrameInterceptPoint[]{
-                    interceptPoint1,
-                    interceptPoint2
-                });
+            CoroutineReader reader = new CoroutineReader(
+                    new FrameInterceptPoint[]{
+                        interceptPoint1,
+                        interceptPoint2
+                    });
+        });
     }
     
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void mustNotAllowMultipleUpdatersOnSameKeyForWrite() throws Exception {
-        FrameUpdatePoint updatePoint1 = new FrameUpdatePoint("fakeName", 12345, 0, (frame, mode) -> null);
-        FrameUpdatePoint updatePoint2 = new FrameUpdatePoint("fakeName", 12345, 0, (frame, mode) -> null);
-        
-        CoroutineWriter writer = new CoroutineWriter(
-                new FrameUpdatePoint[]{
-                    updatePoint1,
-                    updatePoint2
-                });
+        assertThrows(IllegalArgumentException.class, () -> {
+            FrameUpdatePoint updatePoint1 = new FrameUpdatePoint("fakeName", 12345, 0, (frame, mode) -> null);
+            FrameUpdatePoint updatePoint2 = new FrameUpdatePoint("fakeName", 12345, 0, (frame, mode) -> null);
+
+            CoroutineWriter writer = new CoroutineWriter(
+                    new FrameUpdatePoint[]{
+                        updatePoint1,
+                        updatePoint2
+                    });
+        });
     }
     
     

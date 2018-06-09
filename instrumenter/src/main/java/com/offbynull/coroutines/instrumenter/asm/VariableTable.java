@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2018, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,6 +21,8 @@ import java.util.List;
 import org.apache.commons.lang3.Validate;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import static org.objectweb.asm.Type.DOUBLE_TYPE;
+import static org.objectweb.asm.Type.LONG_TYPE;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -117,7 +119,11 @@ public final class VariableTable {
             }
         }
         
-        Variable var = new Variable(type, extraOffset + extraVars.size(), true);
+        // Remember that LONG and DOUBLE primitives take up 2 LVT slots (and 2 operand stack slots) -- that's why sometimes we add 2
+        int extraSlotLen = (int) extraVars.stream()
+                .mapToInt(x -> x.type.equals(LONG_TYPE) || x.type.equals(DOUBLE_TYPE) ? 2 : 1)
+                .sum();
+        Variable var = new Variable(type, extraOffset + extraSlotLen, true);
         extraVars.add(var);
         return var;
     }
@@ -136,6 +142,14 @@ public final class VariableTable {
         Validate.isTrue(variable.used);
 
         variable.used = false;
+    }
+
+    /**
+     * Get number of arguments.
+     * @return number of arguments
+     */
+    public int getArgCount() {
+        return argVars.size();
     }
     
     /**

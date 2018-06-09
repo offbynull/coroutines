@@ -1,26 +1,12 @@
-/*
- * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
- * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
 package com.offbynull.coroutines.instrumenter.testhelpers;
 
 import com.offbynull.coroutines.instrumenter.InstrumentationSettings;
 import com.offbynull.coroutines.instrumenter.Instrumenter;
-import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
+import com.offbynull.coroutines.instrumenter.asm.ClassResourceClassInformationRepository;
+import com.offbynull.coroutines.instrumenter.asm.CompositeClassInformationRepository;
 import com.offbynull.coroutines.instrumenter.asm.FileSystemClassInformationRepository;
 import com.offbynull.coroutines.instrumenter.asm.SimpleClassNode;
+import com.offbynull.coroutines.instrumenter.asm.SimpleClassWriter;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -112,8 +98,8 @@ public final class TestUtils {
         }
         File originalJarFile = createJar(originalJarEntries.toArray(new JarEntry[0]));
         
-        // Get classpath used to run this Java process and addIndividual the jar file we created to it (used by the instrumenter)
-        List<File> classpath = getClasspath();
+        // Add the jar file we created to list of classpaths (used by the instrumenter)
+        List<File> classpath = new ArrayList<>();
         classpath.add(originalJarFile);
         
         // Instrument classes and write out new jar
@@ -173,8 +159,12 @@ public final class TestUtils {
         Validate.notNull(classNodes);
         Validate.noNullElements(classNodes);
         
-        FileSystemClassInformationRepository infoRepo = FileSystemClassInformationRepository.create(getClasspath());
-        SimpleClassWriter cw = new SimpleClassWriter(SimpleClassWriter.COMPUTE_MAXS | SimpleClassWriter.COMPUTE_FRAMES, infoRepo);
+        CompositeClassInformationRepository infoRepo = new CompositeClassInformationRepository(
+                new ClassResourceClassInformationRepository(TestUtils.class.getClassLoader()),
+                FileSystemClassInformationRepository.create(getClasspath())
+        );
+
+        SimpleClassWriter cw = new SimpleClassWriter(SimpleClassWriter.COMPUTE_MAXS | SimpleClassWriter.COMPUTE_FRAMES,infoRepo);
         
         JarEntry[] jarEntries = new JarEntry[classNodes.length];
         for (int i = 0; i < jarEntries.length; i++) {
@@ -262,17 +252,18 @@ public final class TestUtils {
                 .filter(x -> x.exists())
                 .collect(Collectors.toList());
 
-        String bootClasspath = System.getProperty("sun.boot.class.path");
-        Validate.validState(bootClasspath != null);
-        List<File> bootClassPathFiles = Arrays
-                .stream(bootClasspath.split(Pattern.quote(pathSeparator)))
-                .map(x -> new File(x))
-                .filter(x -> x.exists())
-                .collect(Collectors.toList());
+        // Commented out block is no longer valid as of Java9+
+//        String bootClasspath = System.getProperty("sun.boot.class.path");
+//        Validate.validState(bootClasspath != null);
+//        List<File> bootClassPathFiles = Arrays
+//                .stream(bootClasspath.split(Pattern.quote(pathSeparator)))
+//                .map(x -> new File(x))
+//                .filter(x -> x.exists())
+//                .collect(Collectors.toList());
 
         ArrayList<File> ret = new ArrayList<>();
         ret.addAll(classPathFiles);
-        ret.addAll(bootClassPathFiles);
+//        ret.addAll(bootClassPathFiles);
         
         return ret;
     }

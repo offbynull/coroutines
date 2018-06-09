@@ -1,19 +1,3 @@
-/*
- * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
- * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
 package com.offbynull.coroutines.instrumenter;
 
 import static com.offbynull.coroutines.instrumenter.SharedConstants.BASIC_TYPE_INVOKE_TEST;
@@ -28,7 +12,6 @@ import static com.offbynull.coroutines.instrumenter.SharedConstants.RECURSIVE_IN
 import static com.offbynull.coroutines.instrumenter.SharedConstants.RETURN_INVOKE_TEST;
 import static com.offbynull.coroutines.instrumenter.SharedConstants.STATIC_INVOKE_TEST;
 import com.offbynull.coroutines.instrumenter.generators.DebugGenerators.MarkerType;
-import com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.ClassSerializabler;
 import static com.offbynull.coroutines.instrumenter.testhelpers.TestUtils.loadClassesInZipResourceAndInstrument;
 import com.offbynull.coroutines.user.Coroutine;
 import com.offbynull.coroutines.user.CoroutineReader;
@@ -38,17 +21,12 @@ import java.net.URLClassLoader;
 import java.util.concurrent.ArrayBlockingQueue;
 import static org.apache.commons.lang3.reflect.ConstructorUtils.invokeConstructor;
 import static org.apache.commons.lang3.reflect.FieldUtils.readField;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 public final class SerializationTest {
-
-    @Rule
-    public ExpectedException thrown = ExpectedException.none();
 
     @Test
     public void mustProperlySuspendWithVirtualMethods() throws Exception {

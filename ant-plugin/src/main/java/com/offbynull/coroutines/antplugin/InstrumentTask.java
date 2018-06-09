@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Kasra Faghihi, All rights reserved.
+ * Copyright (c) 2018, Kasra Faghihi, All rights reserved.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -62,16 +62,10 @@ public final class InstrumentTask extends Task {
     
     private File targetDirectory;
 
-    private File jdkLibsDirectory;
-
     /**
      * Constructs a {@link InstrumentTask} object.
      */
     public InstrumentTask() {
-        String jdkHome = (String) System.getProperties().get("java.home");
-        if (jdkHome != null) {
-            jdkLibsDirectory = new File(jdkHome + "/lib");
-        }
         classpath = "";
     }
 
@@ -123,14 +117,6 @@ public final class InstrumentTask extends Task {
         this.targetDirectory = targetDirectory;
     }
 
-    /**
-     * Sets the JDK libs directory -- required by instrumenter when instrumenting class files.
-     * @param jdkLibsDirectory directory to JDK's libs directory
-     */
-    public void setJdkLibsDirectory(File jdkLibsDirectory) {
-        this.jdkLibsDirectory = jdkLibsDirectory;
-    }
-
     @Override
     public void execute() throws BuildException {
         // Check classpath
@@ -155,14 +141,6 @@ public final class InstrumentTask extends Task {
         } catch (IOException ioe) {
             throw new BuildException("Unable to create target directory", ioe);
         }
-        
-        // Check JDK libs directory
-        if (jdkLibsDirectory == null) {
-            throw new BuildException("JDK libs directory not set");
-        }
-        if (!jdkLibsDirectory.isDirectory()) {
-            throw new BuildException("JDK libs directory is not a directory: " + jdkLibsDirectory.getAbsolutePath());
-        }
 
         // Check instrumentation settings (sanity check, should default to null)
         if (markerType == null) {
@@ -177,8 +155,6 @@ public final class InstrumentTask extends Task {
                     .filter(x -> !x.isEmpty())
                     .map(x -> new File(x))
                     .collect(Collectors.toList());
-            log("Getting bootstrap classpath", Project.MSG_DEBUG);
-            combinedClasspath.addAll(FileUtils.listFiles(jdkLibsDirectory, new String[]{"jar"}, true));
 
             log("Classpath for instrumentation is as follows: " + combinedClasspath, Project.MSG_DEBUG);
         } catch (Exception ex) {

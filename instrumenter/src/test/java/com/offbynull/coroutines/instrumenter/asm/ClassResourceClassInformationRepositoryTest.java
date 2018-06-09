@@ -1,17 +1,18 @@
 package com.offbynull.coroutines.instrumenter.asm;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 
 public final class ClassResourceClassInformationRepositoryTest {
     
     private ClassResourceClassInformationRepository repo;
     
-    @Before
+    @BeforeEach
     public void setUp() {
         ClassLoader classLoader = getClass().getClassLoader();
         repo = new ClassResourceClassInformationRepository(classLoader);
