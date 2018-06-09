@@ -9,7 +9,7 @@ Why use Coroutines over Javaflow? The Couroutines project is a new Java coroutin
 * Saves and loads method state faster than Javaflow [<sub>[1]</sub>](#footnotes)
 * Provides Maven, Ant, and Gradle plugins [<sub>[2]</sub>](#footnotes)
 * Provides a Java Agent [<sub>[3]</sub>](#footnotes)
-* Proper support for Java 8 bytecode [<sub>[4]</sub>](#footnotes)
+* Proper support for Java 8+ bytecode [<sub>[4]</sub>](#footnotes)
 * Proper support for synchronized blocks [<sub>[5]</sub>](#footnotes)
 * Proper support for serialization and versioning [<sub>[6]</sub>](#footnotes)
 * Modular project structure and the code is readable, tested, and well commented [<sub>[7]</sub>](#footnotes)
@@ -938,7 +938,7 @@ If you know of any other projects please let me know and I'll update this sectio
 
 ## Change Log
 
-### [1.5.0] - Unreleased
+### [1.5.0] - 2018-08-09
 - CHANGED: Changed required JDK version from 8 to 10.
 - CHANGED: Changed minimum JRE version from 1.4 to 1.6.
 - CHANGED: Upgraded dependencies and plugins.
