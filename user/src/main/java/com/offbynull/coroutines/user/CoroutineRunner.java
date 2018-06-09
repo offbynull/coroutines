@@ -23,7 +23,7 @@ import java.io.Serializable;
  * @author Kasra Faghihi
  */
 public final class CoroutineRunner implements Serializable {
-    private static final long serialVersionUID = 5L;
+    private static final long serialVersionUID = 6L;
     
     private Coroutine coroutine;
     private Continuation continuation;
