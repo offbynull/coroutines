@@ -938,7 +938,7 @@ If you know of any other projects please let me know and I'll update this sectio
 
 ## Change Log
 
-### [1.5.0] - 2018-08-09
+### [1.5.0] - 2018-06-09
 - CHANGED: Changed required JDK version from 8 to 10.
 - CHANGED: Changed minimum JRE version from 1.4 to 1.6.
 - CHANGED: Upgraded dependencies and plugins.
