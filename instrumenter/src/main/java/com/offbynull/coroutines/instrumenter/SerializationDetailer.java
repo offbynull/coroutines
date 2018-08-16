@@ -124,6 +124,7 @@ final class SerializationDetailer {
                     type = "double";
                     doubleIdx++;
                     break;
+                case Type.ARRAY:
                 case Type.OBJECT:
                     accessor = "varObjects[" + objectIdx + "]";
                     type = local.getType().toString();
@@ -175,6 +176,7 @@ final class SerializationDetailer {
                     type = "double";
                     doubleIdx++;
                     break;
+                case Type.ARRAY:
                 case Type.OBJECT:
                     accessor = "operandObjects[" + objectIdx + "]";
                     type = operand.getType().toString();
