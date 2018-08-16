@@ -940,6 +940,7 @@ If you know of any other projects please let me know and I'll update this sectio
 ## Change Log
 
 ### [1.4.2] - Unreleased
+- FIXED: SerializationDetailer doesn't hanndle array types (ported from 1.5.1).
 
 ### [1.4.0] - 2017-11-20
 - CHANGED: Refactored to multi-pass instrumentation architecture.
