@@ -11,6 +11,7 @@ import static com.offbynull.coroutines.instrumenter.SharedConstants.EXCEPTION_TH
 import static com.offbynull.coroutines.instrumenter.SharedConstants.EXCEPTION_THROW_TEST;
 import static com.offbynull.coroutines.instrumenter.SharedConstants.INHERITANCE_INVOKE_TEST;
 import static com.offbynull.coroutines.instrumenter.SharedConstants.INTERFACE_INVOKE_TEST;
+import static com.offbynull.coroutines.instrumenter.SharedConstants.ISSUE_84_TEST;
 import static com.offbynull.coroutines.instrumenter.SharedConstants.JSR_EXCEPTION_SUSPEND_TEST;
 import static com.offbynull.coroutines.instrumenter.SharedConstants.LAMBDA_INVOKE_TEST;
 import static com.offbynull.coroutines.instrumenter.SharedConstants.LONG_RETURN_INVOKE_TEST;
@@ -487,6 +488,20 @@ public final class InstrumentationTest {
             assertArrayEquals(new Object[] { }, continuation.getSaved(0).getLockState().toArray());
             
             assertFalse(runner.execute()); // coroutine finished executing here            
+        }
+    }
+    
+    @Test
+    public void mustNotCrashIfUnusedLVTItemIsOfWrongType() throws Exception { // issue #84
+        try (URLClassLoader classLoader = loadClassesInZipResourceAndInstrument(ISSUE_84_TEST + ".zip")) {
+            Class<Coroutine> cls = (Class<Coroutine>) classLoader.loadClass(ISSUE_84_TEST);
+            Coroutine coroutine = invokeConstructor(cls);
+
+            CoroutineRunner runner = new CoroutineRunner(coroutine);
+
+            while (runner.execute()) { // run until finished
+                
+            }
         }
     }
 }

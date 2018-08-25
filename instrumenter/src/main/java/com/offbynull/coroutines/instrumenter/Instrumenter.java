@@ -98,6 +98,11 @@ public final class Instrumenter {
         ClassReader cr = new ClassReader(input);
         ClassNode classNode = new SimpleClassNode();
         cr.accept(classNode, 0);
+        
+        
+        
+        // Recompute stackmap frames.
+        classNode = reconstructStackMapFrames(classNode);
 
 
 
@@ -184,5 +189,37 @@ public final class Instrumenter {
                 throw new IllegalStateException(writer.toString(), e);
             }
         }
+    }
+    
+    private ClassNode reconstructStackMapFrames(ClassNode classNode) {
+        // Remove stackmap frames from method
+        for (MethodNode methodNode : classNode.methods) {
+            if (methodNode.instructions == null) {
+                continue;
+            }
+            
+            AbstractInsnNode insn = methodNode.instructions.getFirst();
+            while (insn != null) {
+                AbstractInsnNode nextInsn = insn.getNext();
+                if (insn.getType() == AbstractInsnNode.FRAME) {
+                    methodNode.instructions.remove(insn);
+                }
+                insn = nextInsn;
+            }
+        }
+        
+        // Write out the class (recomputes stackmap frames)
+        ClassWriter cw = new SimpleClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, classRepo);
+        classNode.accept(cw);
+        
+        byte[] temp = cw.toByteArray();
+        
+        // Read the class back in
+        ClassReader cr = new ClassReader(temp);
+        ClassNode newClassNode = new SimpleClassNode();
+        cr.accept(newClassNode, 0);
+        
+        // Return the class with newly computed stackmap frames
+        return newClassNode;
     }
 }

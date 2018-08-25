@@ -29,4 +29,5 @@ final class SharedConstants {
     public static final String UPDATE_TEST = "UpdateTest";    
     public static final String UPDATE_TEST_ORIGINAL = UPDATE_TEST + "_Original";    
     public static final String UPDATE_TEST_MODIFIED = UPDATE_TEST + "_Modified";    
+    public static final String ISSUE_84_TEST = "Issue84Test";
 }

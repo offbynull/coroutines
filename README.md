@@ -938,8 +938,11 @@ If you know of any other projects please let me know and I'll update this sectio
 
 ## Change Log
 
+### [1.5.2] - Unreleased
+- FIXED: Improper handling of interface types (see issue #84 -- thank you to @little-pan).
+
 ### [1.5.1] - 2018-08-16
-- FIXED: SerializationDetailer doesn't hanndle array types.
+- FIXED: SerializationDetailer doesn't handle array types (see issue #85 -- thank you to @little-pan).
 
 ### [1.5.0] - 2018-06-09
 - CHANGED: Changed required JDK version from 8 to 10.
