@@ -121,10 +121,6 @@ public final class TypeUtils {
         
         ClassInformation ci = repo.getInformation(t.getInternalName());
         Validate.isTrue(ci != null, "Unable to find class information for %s", t);
-        
-        if (ci.isInterface()) { // special logic found in original SimpleVerifier moved here
-            t = Type.getType(Object.class);
-        }
 
         LinkedHashSet<String> hierarchy = flattenHierarchy(repo, u.getInternalName());
         return hierarchy.contains(t.getInternalName());
@@ -149,24 +145,23 @@ public final class TypeUtils {
         Validate.notNull(type);
         
         LinkedHashSet<String> ret = new LinkedHashSet<>();
-        
-        String currentType = type;
-        while (true) {
-            ret.add(currentType);
-            
-            ClassInformation classHierarchy = repo.getInformation(currentType); // must return a result
-            Validate.isTrue(classHierarchy != null, "No parent found for %s", currentType);
-            if (classHierarchy.getSuperClassName() == null) {
-                break;
-            }
-            
-            for (String interfaceType : classHierarchy.getInterfaces()) {
-                ret.add(interfaceType);
-            }
-            
-            currentType = classHierarchy.getSuperClassName();
-        }
-        
+        flattenHierarchy(repo, type, ret);
         return ret;
+    }
+    
+    private static void flattenHierarchy(ClassInformationRepository repo, String type, LinkedHashSet<String> ret) {
+        ret.add(type);
+
+        ClassInformation classHierarchy = repo.getInformation(type); // must return a result
+        Validate.isTrue(classHierarchy != null, "No parent found for %s", type);
+
+        String superType = classHierarchy.getSuperClassName();
+        if (superType != null) {
+            flattenHierarchy(repo, superType, ret);
+        }
+
+        for (String interfaceType : classHierarchy.getInterfaces()) {
+            flattenHierarchy(repo, interfaceType, ret);
+        }
     }
 }

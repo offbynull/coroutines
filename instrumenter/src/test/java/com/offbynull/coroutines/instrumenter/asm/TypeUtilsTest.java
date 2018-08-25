@@ -60,12 +60,6 @@ public class TypeUtilsTest {
         check(Integer[].class, Object.class);
         check(int[].class, Object.class);
     }
-
-    @Test
-    public void mustIdentifyInterfaceAsObject() { // this does not apply to arrays
-        check(Comparable.class, Object.class, true);
-        check(Serializable.class, Object.class, true);
-    }
     
     @Test
     public void mustIdentifyAssignabilityToParent() {
