@@ -939,7 +939,7 @@ If you know of any other projects please let me know and I'll update this sectio
 
 ## Change Log
 
-### [1.4.2] - Unreleased
+### [1.4.2] - 2018-09-01
 - FIXED: Improper handling of interface types (see issue #84 -- thank you to @little-pan, backported from 1.5.2).
 - FIXED: SerializationDetailer doesn't hanndle array types (see issue #85 -- thank you to @little-pan, backported from 1.5.1).
 
