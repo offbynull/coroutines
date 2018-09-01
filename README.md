@@ -940,7 +940,6 @@ If you know of any other projects please let me know and I'll update this sectio
 
 ### [1.5.2] - 2018-08-25
 - FIXED: Improper handling of interface types (see issue #84 -- thank you to @little-pan).
-- CHANGED: Upgraded to ASM6.
 
 ### [1.5.1] - 2018-08-16
 - FIXED: SerializationDetailer doesn't handle array types (see issue #85 -- thank you to @little-pan).
