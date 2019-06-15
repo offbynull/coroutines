@@ -143,7 +143,8 @@ final class MethodHasher {
                 daos.writeInt(labelOffsets.get(dflt));
                 daos.writeInt(labels.length);
                 for (Label label : labels) {
-                    daos.writeInt(label.getOffset());
+//                    daos.writeInt(label.getOffset());
+                    daos.writeInt(labelOffsets.get(label));
                 }
             } catch (Exception e) {
                 throw new IllegalStateException(e);
