@@ -134,6 +134,9 @@ final class MethodHasher {
             }
         }
 
+        /**
+         * @author Hei Zhujian(github.com/blackhzj)
+         */
         @Override
         public void visitTableSwitchInsn(int min, int max, Label dflt, Label... labels) {
             try {
@@ -143,7 +146,6 @@ final class MethodHasher {
                 daos.writeInt(labelOffsets.get(dflt));
                 daos.writeInt(labels.length);
                 for (Label label : labels) {
-//                    daos.writeInt(label.getOffset());
                     daos.writeInt(labelOffsets.get(label));
                 }
             } catch (Exception e) {
