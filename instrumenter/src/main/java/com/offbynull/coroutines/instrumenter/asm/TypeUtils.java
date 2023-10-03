@@ -120,7 +120,7 @@ public final class TypeUtils {
         Validate.isTrue(u.getSort() == Type.OBJECT);
         
         ClassInformation ci = repo.getInformation(t.getInternalName());
-        Validate.isTrue(ci != null, "Unable to find class information for %s", t);
+        Validate.notNull(ci, "Unable to find class information for %s", t);
 
         LinkedHashSet<String> hierarchy = flattenHierarchy(repo, u.getInternalName());
         return hierarchy.contains(t.getInternalName());
@@ -134,7 +134,7 @@ public final class TypeUtils {
         Validate.isTrue(u.getSort() == Type.OBJECT);
         
         ClassInformation ci = repo.getInformation(t.getInternalName());
-        Validate.isTrue(ci != null, "Unable to find class information for %s", t);
+        Validate.notNull(ci, "Unable to find class information for %s", t);
 
         LinkedHashSet<String> hierarchy = flattenHierarchy(repo, u.getInternalName());
         return hierarchy.contains(t.getInternalName());
@@ -153,7 +153,7 @@ public final class TypeUtils {
         ret.add(type);
 
         ClassInformation classHierarchy = repo.getInformation(type); // must return a result
-        Validate.isTrue(classHierarchy != null, "No parent found for %s", type);
+        Validate.notNull(classHierarchy, "No parent found for %s", type);
 
         String superType = classHierarchy.getSuperClassName();
         if (superType != null) {
